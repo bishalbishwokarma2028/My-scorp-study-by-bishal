@@ -4,7 +4,7 @@ import { Loader2, Shuffle, Check, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { canUseAI, bumpAIUsage, QUOTA_MSG, getAIUsedToday, AI_DAILY_LIMIT } from "@/lib/dailyLimits";
+import { canUseAI, bumpAIUsage, QUOTA_MSG } from "@/lib/dailyLimits";
 
 export const Route = createFileRoute("/_authenticated/dashboard/flashcards")({
   component: FlashcardsPage,
@@ -12,11 +12,33 @@ export const Route = createFileRoute("/_authenticated/dashboard/flashcards")({
 
 type Card = { front: string; back: string };
 type Mode = "flip" | "match" | "type";
+type CardType = "Term / Definition" | "Very Short Answer" | "Short Answer" | "Long Answer";
+
+const CARD_TYPE_INFO: Record<CardType, { icon: string; desc: string; frontLabel: string; backLabel: string }> = {
+  "Term / Definition":   { icon: "📚", desc: "Classic flashcards — term on front, definition on back.", frontLabel: "Term", backLabel: "Definition" },
+  "Very Short Answer":   { icon: "⚡", desc: "Question on front, 1–5 word answer on back.", frontLabel: "Question", backLabel: "Answer (1–5 words)" },
+  "Short Answer":        { icon: "✏️", desc: "Question on front, 1–3 sentence answer on back.", frontLabel: "Question", backLabel: "Short Answer" },
+  "Long Answer":         { icon: "📝", desc: "Question on front, detailed paragraph answer on back.", frontLabel: "Question", backLabel: "Detailed Answer" },
+};
+
+function buildFlashcardPrompt(topic: string, count: number, cardType: CardType): string {
+  if (cardType === "Term / Definition") {
+    return `Create ${count} flashcards for studying: "${topic}". Return STRICT JSON array: [{"front":"key term or concept","back":"clear definition"}]. No prose.`;
+  }
+  if (cardType === "Very Short Answer") {
+    return `Create ${count} flashcards for: "${topic}". Each card has a question on front and a 1–5 word answer on back (a key fact, date, name, or term). Return STRICT JSON: [{"front":"question","back":"1-5 word answer"}]. No prose.`;
+  }
+  if (cardType === "Short Answer") {
+    return `Create ${count} flashcards for: "${topic}". Each card has a question on front and a 1–3 sentence answer on back. Return STRICT JSON: [{"front":"question","back":"1-3 sentence answer"}]. No prose.`;
+  }
+  return `Create ${count} flashcards for: "${topic}". Each card has a question on front and a detailed paragraph answer (6–10 sentences) on back, covering key concepts, examples, and significance. Return STRICT JSON: [{"front":"question","back":"detailed paragraph answer"}]. No prose.`;
+}
 
 function FlashcardsPage() {
   const { user } = Route.useRouteContext();
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(10);
+  const [cardType, setCardType] = useState<CardType>("Term / Definition");
   const [cards, setCards] = useState<Card[] | null>(null);
   const [mode, setMode] = useState<Mode>("flip");
   const [idx, setIdx] = useState(0);
@@ -43,7 +65,7 @@ function FlashcardsPage() {
     if (!canUseAI()) return toast.error(QUOTA_MSG);
     setLoading(true);
     bumpAIUsage();
-    const prompt = `Create ${count} flashcards for studying: "${topic}". Return STRICT JSON array: [{"front":"question or term","back":"answer or definition"}]. No prose.`;
+    const prompt = buildFlashcardPrompt(topic, count, cardType);
     const res = await askAI(prompt, "Output JSON only.");
     const parsed = extractJSON<Card[]>(res.text);
     if (parsed && parsed.length) {
@@ -73,14 +95,40 @@ function FlashcardsPage() {
     setTimeout(next, 1200);
   }
 
+  const info = CARD_TYPE_INFO[cardType];
+
   if (!cards) {
     return (
-      <div className="card-soft mx-auto max-w-xl space-y-4 p-4 sm:p-6">
+      <div className="card-soft mx-auto max-w-xl space-y-5 p-4 sm:p-6">
         <h2 className="text-lg font-semibold">Make flashcards</h2>
         <textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={4} placeholder="Topic or notes to study..." className="w-full rounded-lg border border-input bg-background p-3 text-sm" />
+
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Card Type</label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {(Object.keys(CARD_TYPE_INFO) as CardType[]).map((ct) => {
+              const ci = CARD_TYPE_INFO[ct];
+              return (
+                <button
+                  key={ct}
+                  onClick={() => setCardType(ct)}
+                  className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition-colors ${cardType === ct ? "border-primary bg-primary/5" : "border-border hover:bg-accent"}`}
+                >
+                  <span className="text-base">{ci.icon}</span>
+                  <div>
+                    <p className={`text-xs font-semibold ${cardType === ct ? "text-primary" : ""}`}>{ct}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{ci.desc}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <select value={count} onChange={(e) => setCount(+e.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
           {[5, 10, 15, 20].map((n) => <option key={n}>{n} cards</option>)}
         </select>
+
         <button onClick={generate} disabled={loading} className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
           {loading ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Bishal's Assistant is thinking…</> : "Generate"}
         </button>
@@ -88,13 +136,19 @@ function FlashcardsPage() {
     );
   }
 
+  const isLongAnswer = cardType === "Long Answer";
+
   return (
     <div className="space-y-4">
       <div className="card-soft flex flex-wrap items-center justify-between gap-3 p-3">
-        <div className="flex gap-2">
-          {(["flip", "match", "type"] as Mode[]).map((m) => (
-            <button key={m} onClick={() => { setMode(m); setIdx(0); setFlipped(false); setMatches([]); }} className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${mode === m ? "bg-primary text-primary-foreground" : "bg-accent"}`}>{m}</button>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{info.icon}</span>
+          <span className="text-xs font-semibold text-muted-foreground">{cardType}</span>
+          <div className="flex gap-1.5">
+            {(["flip", "match", "type"] as Mode[]).map((m) => (
+              <button key={m} onClick={() => { setMode(m); setIdx(0); setFlipped(false); setMatches([]); }} className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${mode === m ? "bg-primary text-primary-foreground" : "bg-accent"}`}>{m}</button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>Known: <strong className="text-success">{known.size}</strong> / {cards.length}</span>
@@ -107,12 +161,18 @@ function FlashcardsPage() {
       {mode === "flip" && (
         <div className="mx-auto max-w-xl">
           <div onClick={() => setFlipped(!flipped)} className="flip-card cursor-pointer">
-            <div className={`flip-inner relative h-64 w-full rounded-2xl ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
+            <div className={`flip-inner relative w-full rounded-2xl ${isLongAnswer ? "min-h-[200px]" : "h-64"} ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
               <div className="flip-face absolute inset-0 grid place-items-center rounded-2xl bg-primary p-6 text-center text-primary-foreground card-soft">
-                <p className="text-xl font-semibold">{cards[idx].front}</p>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest opacity-70 mb-2">{info.frontLabel}</p>
+                  <p className="text-xl font-semibold">{cards[idx].front}</p>
+                </div>
               </div>
-              <div className="flip-face absolute inset-0 grid place-items-center rounded-2xl bg-card p-6 text-center [transform:rotateY(180deg)] card-soft">
-                <p className="text-lg">{cards[idx].back}</p>
+              <div className={`flip-face absolute inset-0 grid ${isLongAnswer ? "items-start pt-5" : "place-items-center"} rounded-2xl bg-card p-6 text-center [transform:rotateY(180deg)] card-soft overflow-y-auto`}>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest opacity-50 mb-2">{info.backLabel}</p>
+                  <p className={isLongAnswer ? "text-sm text-left leading-relaxed" : "text-lg"}>{cards[idx].back}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -127,8 +187,13 @@ function FlashcardsPage() {
       {mode === "type" && (
         <div className="card-soft mx-auto max-w-xl p-6 text-center">
           <p className="text-sm text-muted-foreground">{idx + 1} / {cards.length}</p>
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mt-1">{info.frontLabel}</p>
           <p className="my-4 text-xl font-semibold">{cards[idx].front}</p>
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type your answer..." className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+          {isLongAnswer ? (
+            <textarea value={typed} onChange={(e) => setTyped(e.target.value)} rows={5} placeholder="Write your detailed answer…" className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none text-left" />
+          ) : (
+            <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type your answer..." className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+          )}
           <button onClick={checkTyped} disabled={!typed} className="mt-3 w-full rounded-lg bg-primary py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Check</button>
         </div>
       )}

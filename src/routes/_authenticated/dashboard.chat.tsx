@@ -422,6 +422,7 @@ function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const askedQuestionsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     try {
@@ -488,17 +489,27 @@ function ChatPage() {
     const newMsgs: Msg[] = [...messages, { role: "user", content: text }];
     setMessages(newMsgs);
 
-    const cached = getCachedAnswer(text);
-    if (cached && !topperMode) {
-      setMessages([...newMsgs, { role: "assistant", content: cached, provider: "Bishal's Assistant" }]);
-      setTimeout(() => inputRef.current?.focus(), 50);
-      return;
+    const normalizedQ = text.trim().toLowerCase();
+    const isRepeat = askedQuestionsRef.current.has(normalizedQ);
+    askedQuestionsRef.current.add(normalizedQ);
+
+    if (!isRepeat && !topperMode) {
+      const cached = getCachedAnswer(text);
+      if (cached) {
+        setMessages([...newMsgs, { role: "assistant", content: cached, provider: "Bishal's Assistant" }]);
+        setTimeout(() => inputRef.current?.focus(), 50);
+        return;
+      }
     }
 
     bumpAIUsage();
     const greeting = isFirst
       ? "\n\nThis is the first message — greet the student warmly in one short sentence before answering."
       : "\n\nThis is a follow-up — do NOT repeat the greeting. Jump straight to the answer.";
+
+    const variationNote = isRepeat
+      ? `\n\n⚡ FRESH ANGLE REQUIRED: The student is asking this again. You MUST give a completely different explanation — different structure, different analogies, different examples, different opening line. Never repeat the previous response format.`
+      : "";
 
     let promptToSend = text;
     let webSearchUsed = false;
@@ -518,13 +529,13 @@ function ChatPage() {
 
     // Step 2: Pick system prompt based on what we know now
     const sys = webSearchUsed
-      ? `${WEB_SYSTEM_PROMPT}${greeting}`
-      : `${SYSTEM_PROMPT}${topperMode ? TOPPER_PROMPT : ""}${greeting}`;
+      ? `${WEB_SYSTEM_PROMPT}${greeting}${variationNote}`
+      : `${SYSTEM_PROMPT}${topperMode ? TOPPER_PROMPT : ""}${greeting}${variationNote}`;
 
     // Step 3: AI call
     setLoading(true);
     const res = await askAI(promptToSend, sys);
-    setCachedAnswer(text, res.text);
+    if (!isRepeat) setCachedAnswer(text, res.text);
     const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed };
     setMessages([...newMsgs, assistantMsg]);
 
@@ -671,48 +682,32 @@ Return STRICT JSON only (no prose, no markdown fences):
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
-  const BOLD_COLORS = [
-    { bg: "bg-blue-100",    text: "text-blue-800",    border: "border-blue-400"    },
-    { bg: "bg-amber-100",   text: "text-amber-900",   border: "border-amber-400"   },
-    { bg: "bg-orange-100",  text: "text-orange-900",  border: "border-orange-400"  },
-    { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-400" },
-    { bg: "bg-violet-100",  text: "text-violet-800",  border: "border-violet-400"  },
-    { bg: "bg-rose-100",    text: "text-rose-800",    border: "border-rose-400"    },
-  ];
-
   function createMdComponents() {
-    let boldIdx = 0;
-
-    const H2_THEMES: { test: (t: string) => boolean; bg: string; border: string; text: string }[] = [
-      { test: t => /formula|equation|math|variable|⚗|🚀/.test(t),          bg: "bg-purple-50",  border: "border-purple-200",  text: "text-purple-900"  },
-      { test: t => /definition|overview|what|core|📌|🔍/.test(t),           bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-900"    },
-      { test: t => /example|real|golden|tip|step|how to|💡|🔢/.test(t),     bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-900"   },
-      { test: t => /key point|key fact|remember|summary|takeaway|🧠/.test(t),bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-900"    },
-      { test: t => /mistake|common|wrong|broken|warning|⚠/.test(t),         bg: "bg-rose-50",    border: "border-rose-200",    text: "text-rose-900"    },
-      { test: t => /recap|conclusion|summary|✅/.test(t),                    bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900" },
-      { test: t => /real world|impact|use|🌍/.test(t),                      bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-900"    },
+    const H2_THEMES: { test: (t: string) => boolean; bg: string; border: string; text: string; dot: string }[] = [
+      { test: t => /formula|equation|math|variable|⚗|🚀|the formula/.test(t),            bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-900",  dot: "bg-violet-400"  },
+      { test: t => /definition|overview|what|core|📌|🔍|each variable|means/.test(t),     bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-900",    dot: "bg-blue-400"    },
+      { test: t => /example|real|golden|tip|step.by.step|how to|💡|🔢/.test(t),           bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-900",   dot: "bg-amber-400"   },
+      { test: t => /key point|key fact|remember|summary|takeaway|🧠|remember/.test(t),    bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-900",    dot: "bg-pink-400"    },
+      { test: t => /mistake|common|wrong|broken|warning|⚠|caution/.test(t),              bg: "bg-rose-50",    border: "border-rose-200",    text: "text-rose-900",    dot: "bg-rose-400"    },
+      { test: t => /recap|conclusion|summary|✅|result|final/.test(t),                    bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900", dot: "bg-emerald-400" },
+      { test: t => /real world|impact|use|🌍|application/.test(t),                       bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-900",    dot: "bg-cyan-400"    },
     ];
-
     const H2_FALLBACKS = [
-      { bg: "bg-purple-50",  border: "border-purple-200",  text: "text-purple-900"  },
-      { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-900"    },
-      { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-900"   },
-      { bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-900"    },
-      { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900" },
-      { bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-900"    },
+      { bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-900",  dot: "bg-violet-400"  },
+      { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-900",    dot: "bg-blue-400"    },
+      { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-900",   dot: "bg-amber-400"   },
+      { bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-900",    dot: "bg-pink-400"    },
+      { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900", dot: "bg-emerald-400" },
+      { bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-900",    dot: "bg-cyan-400"    },
     ];
     let h2Count = 0;
 
     return {
-      strong: ({ children }: { children?: React.ReactNode }) => {
-        const c = BOLD_COLORS[boldIdx % BOLD_COLORS.length];
-        boldIdx++;
-        return (
-          <mark className={`${c.bg} ${c.text} font-bold rounded-md px-1.5 py-0.5 not-italic border-b-2 ${c.border}`}>
-            {children}
-          </mark>
-        );
-      },
+      strong: ({ children }: { children?: React.ReactNode }) => (
+        <mark className="bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-900 font-bold rounded px-1.5 py-[2px] not-italic border-b-2 border-amber-400">
+          {children}
+        </mark>
+      ),
       em: ({ children }: { children?: React.ReactNode }) => (
         <em className="not-italic text-violet-700 font-semibold underline decoration-violet-300 decoration-2 underline-offset-2">{children}</em>
       ),
@@ -724,7 +719,8 @@ Return STRICT JSON only (no prose, no markdown fences):
         const theme = H2_THEMES.find(th => th.test(t)) ?? H2_FALLBACKS[h2Count % H2_FALLBACKS.length];
         h2Count++;
         return (
-          <div className={`flex items-center gap-2.5 rounded-2xl border ${theme.border} ${theme.bg} px-4 py-2.5 mt-6 mb-3`}>
+          <div className={`flex items-center gap-3 rounded-2xl border ${theme.border} ${theme.bg} px-4 py-2.5 mt-6 mb-3`}>
+            <span className={`flex-shrink-0 h-2 w-2 rounded-full ${theme.dot}`} />
             <h2 className={`font-extrabold text-[13.5px] tracking-wide ${theme.text} leading-snug`}>{children}</h2>
           </div>
         );
@@ -1024,19 +1020,6 @@ Return STRICT JSON only (no prose, no markdown fences):
           </button>
         </div>
       )}
-
-      {/* Color palette legend */}
-      <div className="flex items-center gap-1.5 border-t border-border/50 bg-slate-50/80 px-3 py-1.5 sm:px-4">
-        <span className="text-[10px] font-semibold text-muted-foreground mr-0.5 flex-shrink-0">Highlights:</span>
-        {BOLD_COLORS.map((c, i) => (
-          <span
-            key={i}
-            title={["Blue","Amber","Orange","Emerald","Violet","Rose"][i]}
-            className={`inline-block h-4 w-4 rounded-full border-2 ${c.border} ${c.bg} shadow-sm cursor-default flex-shrink-0`}
-          />
-        ))}
-        <span className="ml-auto text-[10px] text-muted-foreground hidden sm:block">Bold terms auto-color cycle →</span>
-      </div>
 
       {/* Input area */}
       <div className="border-t border-border bg-white px-3 py-2.5 sm:px-4 sm:py-3" style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
