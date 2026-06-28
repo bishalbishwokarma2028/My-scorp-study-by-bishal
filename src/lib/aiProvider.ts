@@ -1,10 +1,15 @@
 import { askAIServer } from "./aiProvider.functions";
 
 export type AIResult = { text: string; provider: string };
+export type HistoryMsg = { role: "user" | "assistant"; content: string };
 
-export async function askAI(prompt: string, systemPrompt?: string): Promise<AIResult> {
+export async function askAI(
+  prompt: string,
+  systemPrompt?: string,
+  history?: HistoryMsg[],
+): Promise<AIResult> {
   try {
-    const result = await askAIServer({ data: { prompt, systemPrompt } });
+    const result = await askAIServer({ data: { prompt, systemPrompt, history } });
     console.log(`[ScorpStudy AI] Answered by: ${result.provider}`);
     return result;
   } catch (err) {
@@ -21,7 +26,6 @@ export function extractJSON<T = unknown>(text: string): T | null {
   const firstBrace = candidate.search(/[\[{]/);
   if (firstBrace === -1) return null;
   const sliced = candidate.slice(firstBrace);
-  // Try to find balanced JSON; greedy fallback.
   for (let end = sliced.length; end > 0; end--) {
     try {
       return JSON.parse(sliced.slice(0, end)) as T;

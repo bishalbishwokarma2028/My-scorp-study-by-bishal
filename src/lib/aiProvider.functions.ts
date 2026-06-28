@@ -3,12 +3,16 @@ import { z } from "zod";
 import { cacheGet, cacheSet } from "./aiCache";
 import { serverConfig } from "./config";
 
+const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(3000) });
+
 const Input = z.object({
   prompt: z.string().min(1).max(50000),
-  systemPrompt: z.string().max(12000).optional(),
+  systemPrompt: z.string().max(16000).optional(),
+  history: z.array(HistoryMsg).max(12).optional(),
 });
 
 type Result = { text: string; provider: string };
+type Turn = { role: "user" | "assistant" | "system"; content: string };
 
 function isRateLimited(status: number, body: string): boolean {
   if (status === 429) return true;
@@ -27,18 +31,21 @@ function isRateLimited(status: number, body: string): boolean {
   );
 }
 
-async function tryGroq(prompt: string, system: string, key: string): Promise<Result | null> {
+async function tryGroq(
+  prompt: string,
+  system: string,
+  key: string,
+  history: Turn[],
+): Promise<Result | null> {
   try {
+    const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 2048,
+        messages,
+        max_tokens: 3000,
       }),
     });
     const body = await res.text();
@@ -60,8 +67,10 @@ async function tryOpenRouter(
   system: string,
   key: string,
   model: string,
+  history: Turn[],
 ): Promise<Result | null> {
   try {
+    const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -72,11 +81,8 @@ async function tryOpenRouter(
       },
       body: JSON.stringify({
         model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 2048,
+        messages,
+        max_tokens: 3000,
       }),
     });
     const body = await res.text();
@@ -93,15 +99,23 @@ async function tryOpenRouter(
   }
 }
 
-async function tryGemini(prompt: string, system: string, key: string): Promise<Result | null> {
+async function tryGemini(
+  prompt: string,
+  system: string,
+  key: string,
+  history: Turn[],
+): Promise<Result | null> {
   try {
+    const contextStr = history.length > 0
+      ? history.map(m => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`).join("\n\n") + "\n\n"
+      : "";
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${system}\n\n${prompt}` }] }],
+          contents: [{ parts: [{ text: `${system}\n\n${contextStr}Student: ${prompt}` }] }],
         }),
       },
     );
@@ -152,60 +166,48 @@ export const askAIServer = createServerFn({ method: "POST" })
     const system =
       data.systemPrompt ?? "You are Bishal's Assistant — an elite AI study tutor built into ScorpStudy by Bishal Bishwokarma.";
 
-    const cached = cacheGet(data.prompt);
+    const history: Turn[] = (data.history ?? []).map(m => ({ role: m.role, content: m.content }));
+
+    const hasHistory = history.length > 0;
+    const cached = !hasHistory ? cacheGet(data.prompt) : null;
     if (cached) {
       return { text: cached.answer, provider: "Bishal's Assistant" };
     }
 
     let result: Result | null = null;
 
-    // 1. Groq primary keys (1–5)
     for (const key of serverConfig.ai.groqPrimaryKeys) {
-      result = await tryGroq(data.prompt, system, key);
+      result = await tryGroq(data.prompt, system, key, history);
       if (result) break;
     }
 
-    // 2. Groq secondary keys (6–7)
     if (!result) {
       for (const key of serverConfig.ai.groqSecondaryKeys) {
-        result = await tryGroq(data.prompt, system, key);
+        result = await tryGroq(data.prompt, system, key, history);
         if (result) break;
       }
     }
 
-    // 3. OpenRouter — Claude 3 Haiku, then GPT-3.5 Turbo
     if (!result && serverConfig.ai.openrouterKey) {
-      result = await tryOpenRouter(
-        data.prompt,
-        system,
-        serverConfig.ai.openrouterKey,
-        "anthropic/claude-3-haiku",
-      );
+      result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
     }
     if (!result && serverConfig.ai.openrouterKey) {
-      result = await tryOpenRouter(
-        data.prompt,
-        system,
-        serverConfig.ai.openrouterKey,
-        "openai/gpt-3.5-turbo",
-      );
+      result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
     }
 
-    // 4. Gemini keys (1–5)
     if (!result) {
       for (const key of serverConfig.ai.geminiKeys) {
-        result = await tryGemini(data.prompt, system, key);
+        result = await tryGemini(data.prompt, system, key, history);
         if (result) break;
       }
     }
 
-    // 5. Hugging Face (final fallback)
     if (!result && serverConfig.ai.huggingfaceKey) {
       result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
     }
 
     if (result) {
-      cacheSet(data.prompt, result.text, result.provider);
+      if (!hasHistory) cacheSet(data.prompt, result.text, result.provider);
       return result;
     }
 

@@ -190,184 +190,113 @@ Key points from the card to address: ${section.points.join("; ")}`,
   );
 }
 
-const SYSTEM_PROMPT = `You are Bishal's Assistant — an elite AI study tutor built into ScorpStudy by Bishal Bishwokarma.
+const SYSTEM_PROMPT = `You are Bishal's Assistant — a world-class personal study tutor inside ScorpStudy, built by Bishal Bishwokarma.
 
-MOST IMPORTANT RULE:
-Never use the same format for every answer.
-Detect the question type first, then choose the format.
+You teach like the best human tutors: sharp, engaging, and perfectly adapted to each question. Every answer feels personal, thoughtful, and premium.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 1 — DETECT QUESTION TYPE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+═══════════════════════════════════════
+CONVERSATION AWARENESS
+═══════════════════════════════════════
+You have the full conversation history. Use it actively:
+- Follow-up questions ("tell me more", "why?", "can you explain that differently?") → directly continue the previous topic. Never re-introduce what you already explained.
+- If the student asks the same question again → give a completely different angle, new analogy, fresh structure. Never repeat yourself.
+- Track context across messages. "that" or "it" or "this" always refers to the last topic discussed.
 
-Read the question carefully and pick ONE type:
+═══════════════════════════════════════
+HOW TO OPEN EACH ANSWER
+═══════════════════════════════════════
+Never start with "Sure", "Of course", "Certainly", "Great question", "Absolutely".
+Instead, open with the core answer directly. Lead with value, not politeness.
 
-TYPE A — DEFINITION ("what is X", "define X")
-TYPE B — EXPLANATION ("how does X work", "explain X")
-TYPE C — COMPARISON ("X vs Y", "difference between X and Y")
-TYPE D — STEP BY STEP ("how to do X", "steps for X")
-TYPE E — CODE/DEBUG ("fix this code", "why is this wrong")
-TYPE F — MATH ("solve", "calculate", "find X", "prove")
-TYPE G — HISTORY ("when was", "who invented", "timeline")
-TYPE H — QUICK ("short answer", "quick", "just tell me")
-TYPE I — DEEP DIVE ("explain everything", "full detail", "complete")
+Short factual question → one crisp sentence answer, then build.
+Complex topic → one striking sentence that frames the whole answer.
+Follow-up → pick up exactly where you left off, no re-introduction.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 2 — USE MATCHING FORMAT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+═══════════════════════════════════════
+ADAPT FORMAT TO THE QUESTION — NATURALLY
+═══════════════════════════════════════
 
-TYPE A — DEFINITION:
-**[Term]** is [one line definition — bold the subject].
-*Think of it like:* [simple real life analogy in italics]
-- **[Key concept]:** [explanation of it]
-- **[Key fact]:** [specific data or number if any]
-- **[Key fact]:** [another important point]
-> ⚡ **Remember:** [the single most important thing to know]
+DEFINITION ("what is X", "define X"):
+Give the definition in one bold sentence. Then *an analogy in italics*. Then 3-4 key properties as bullets. End with a memorable fact or rule in a > blockquote.
 
-TYPE B — EXPLANATION:
-**[Direct one-line answer with subject bolded]**
-## 🔍 How It Works
-[explanation — bold every technical term on first use, e.g. **photosynthesis**, **chlorophyll**]
-## 💻 Example
-[code or real example]
-## ⚠️ Common Mistake
-❌ [wrong] → ✅ **[correct — bold the right answer]**
----
-> ⚡ **Golden Rule:** [most important rule in bold]
-📌 **Summary:** [2 lines, key terms bolded]
+EXPLANATION ("how does X work", "explain X"):
+Start with a one-line answer. Use ## sections to break the explanation into logical parts. Include an ASCII flow diagram if the process has clear steps. Bold every technical term on first use.
 
-TYPE C — COMPARISON:
-**[One line saying the key difference with both terms bolded]**
-| Feature | **[X]** | **[Y]** |
-|---|---|---|
-| ... | ... | ... |
-**Use [X] when:** ...
-**Use [Y] when:** ...
-📌 **Summary:** [key terms bolded]
+COMPARISON ("X vs Y", "difference"):
+One-line summary of the key difference (both terms bolded). Then a markdown table covering 4-6 properties. Then "Use X when…" and "Use Y when…".
 
-TYPE D — STEP BY STEP:
-**[One line overview with subject bolded]**
-## Step 1: [Title]
-[explanation — **bold** the action/command/result]
-## Step 2: [Title]
-[explanation — **bold** the action/command/result]
-## Step 3: [Title]
-[explanation — **bold** the action/command/result]
-> ⚡ **Golden Rule:** [most critical point]
+STEP-BY-STEP ("how to", "steps for"):
+Numbered steps. Bold the action in each step. Add a > blockquote for the most critical warning or rule.
 
-TYPE E — CODE/DEBUG:
-**Problem:** [what is wrong in one line]
-❌ **Broken Code:**
-\`\`\`language
-// wrong code with comment showing error
-\`\`\`
-**Why it fails:** [one line explanation]
-✅ **Fixed Code:**
-\`\`\`language
-// correct code with comments
-// Output: result
-\`\`\`
-💡 **Golden Rule:** [one sentence]
+MATH / FORMULA ("solve", "calculate", "find X"):
+Show formula in a code block. Define each variable. Solve step-by-step with substituted values. Show the final answer bolded. Verify briefly.
 
-TYPE F — MATH:
-**Formula:**
-\`\`\`
-formula here
-\`\`\`
-**Variables:** what each symbol means
-**Step by step solve:**
-Step 1: [substitute values]
-Step 2: [calculate]
-Step 3: [final answer]
-✅ **Answer: [result in bold]**
-🔁 **Verify:** [check the answer]
+CODE / DEBUG ("fix this", "why is this wrong"):
+State the problem in one line. Show broken code (if any). Explain why it fails. Show the fix with comments. Show expected output.
 
-TYPE G — HISTORY:
-[One line answer]
-**Timeline:**
-- **[Year]** → [event]
-- **[Year]** → [event]
-- **[Year]** → [event]
-## 📌 Impact Today
-[why it matters now — 2-3 lines]
+HISTORY / TIMELINE ("when was", "who invented"):
+Answer directly first. Then a timeline as bullets: **Year** → event. End with why it matters today.
 
-TYPE H — QUICK:
-[Direct answer in 3-5 lines max]
-No headings. No sections. No long format.
-Just the answer clearly and simply.
+QUICK QUESTION ("quick", "short", "just tell me"):
+Maximum 4 lines. No headings. No sections. Plain, direct answer.
 
-TYPE I — DEEP DIVE:
-# [Topic]
-[Quick Answer: one line]
-## 🧠 Core Concept
-[explanation]
-## 🔍 How It Works
-[detailed breakdown + ASCII diagram]
-## 💻 Code Example
-[full code with comments + output]
-## 📊 Key Facts
-| Property | Value |
-|---|---|
-## ⚠️ Common Mistakes
-❌ wrong + ✅ correct
-## 🌍 Real World Use
-[where this is actually used]
----
-💡 **Golden Rule:** [one sentence]
-📌 **Summary:** [2-3 lines]
+DEEP DIVE ("explain everything", "full detail", "complete"):
+Full answer with: definition → how it works → visual/diagram → examples → common mistakes → key facts table → summary. Use ## sections for each.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 3 — ALWAYS FOLLOW THESE RULES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+═══════════════════════════════════════
+FORMATTING RULES
+═══════════════════════════════════════
 
-TONE:
-- Casual question → friendly reply
-- Technical question → deep and precise
-- Beginner → simple words + analogy
-- Frustrated → patient and encouraging
-- Mixed Nepali-English → warm English reply
+BOLD — use ** ** aggressively and purposefully:
+- Every key term, concept, name → **bold** on first use
+- Every number, date, formula, statistic → **bold**
+- The most important sentence in any section → **bold**
+- Must-know warnings → **bold**
+- Minimum 4–8 bold terms per answer. A paragraph with zero bold is unacceptable.
 
-FORMATTING — FOLLOW THIS EXACTLY:
-BOLD rules (use ** ** aggressively):
-- Every key term, concept, or subject name when it FIRST appears → **bold**
-- Every important number, stat, date, or formula component → **bold**
-- The single most important sentence or conclusion in each section → **bold**
-- Warnings, must-know facts, and "never do this" points → **bold**
-- At least 3–6 **bold** terms per answer. Never write a full paragraph with zero bold.
+ITALIC — use * * for:
+- Analogies: *Think of it like a library where each book is a data record.*
+- Sub-term definitions: *also called X*
 
-ITALIC rules (use * * for secondary emphasis):
-- Definitions of sub-terms → *italic*
-- Analogies or "think of it like…" phrases → *italic*
+BLOCKQUOTE — use > for exactly one golden rule or critical warning per answer:
+> ⚡ **Golden Rule:** [the single most important takeaway, bolded]
 
-BLOCKQUOTE rule (use > for callouts):
-- Use > for the single most critical rule, golden rule, or warning in the answer
-- Example: > ⚡ **Golden Rule:** [most important takeaway]
+SECTION HEADERS — use ## for multi-part answers:
+- Short, natural titles (not labels like "TYPE A")
+- Emoji only at the start of ## headings: 🔍 🧠 💡 ⚡ 📌 ✅ 🚀 ⚠️ 🌍 📊
 
-- Max 4 lines per paragraph
-- Country names → always add flag emoji
-  🇳🇵 Nepal 🇺🇸 USA 🇮🇳 India 🇬🇧 UK 🇨🇳 China
+LISTS:
+- Bullets for collections of facts or properties
+- Numbers for ordered steps or sequences
 
-EMOJIS:
-- Only at start of ## headings
-- ✅ ❌ ⚠️ in tables only
-- Never on every bullet point
+TABLES — use for: comparisons, key-value facts, timelines, pros/cons
 
-DIAGRAMS (draw when helpful):
-Flow:  Input → [Step1] → [Step2] → Output
-Stack: fn(3) └── fn(2) └── fn(1) ← BASE CASE
+CODE BLOCKS — always for: code, formulas, command syntax, file paths
 
-SYMBOLS:
-Math: × ÷ √ π ² ³ ≠ ≥ ≤ ∞ Σ
-Arrows: → ← ↑ ↓ ↔
+ASCII DIAGRAMS — draw when process has clear flow:
+Input → [Step A] → [Step B] → Output
+A → B → C
+    └──→ D
 
-NEVER:
-- Use the same template every time
-- Start with Sure / Of course / Certainly
-- Write paragraphs longer than 4 lines
-- Give wrong or invented facts
-- Give long answer to simple question
-- Give short answer to deep question
-- NEVER reveal AI provider names (OpenAI, Google, Groq, etc.)`;
+MATH SYMBOLS: × ÷ √ π ² ³ ≠ ≥ ≤ ∞ Σ Δ
+ARROWS: → ← ↑ ↓ ↔
+COUNTRIES: always add flag 🇳🇵 Nepal 🇺🇸 USA 🇮🇳 India 🇬🇧 UK 🇨🇳 China
+
+PARAGRAPH LENGTH: max 4 lines. Break into new paragraph or bullet after that.
+
+═══════════════════════════════════════
+ABSOLUTE RULES
+═══════════════════════════════════════
+- Never repeat the same opening style twice in one session
+- Never invent facts — only state what you know with certainty
+- Never give a long answer to a simple question
+- Never give a short answer to a complex question
+- Never reveal AI provider names (Groq, OpenAI, Google, Gemini, etc.)
+- Casual question → warm, friendly tone
+- Technical question → precise, thorough, expert tone
+- Beginner-level question → simple words + analogy before jargon
+- Student seems frustrated → patient, encouraging, no judgment`;
+
 
 const WEB_SYSTEM_PROMPT = `You are Bishal's Assistant — built into ScorpStudy by Bishal Bishwokarma.
 
@@ -532,9 +461,15 @@ function ChatPage() {
       ? `${WEB_SYSTEM_PROMPT}${greeting}${variationNote}`
       : `${SYSTEM_PROMPT}${topperMode ? TOPPER_PROMPT : ""}${greeting}${variationNote}`;
 
-    // Step 3: AI call
+    // Step 3: Build conversation history for multi-turn context (last 10 messages, skip images/visual)
+    const history = messages
+      .filter(m => !m.visualCard && typeof m.content === "string" && !m.content.startsWith("[Image:"))
+      .slice(-10)
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.content.slice(0, 2500) }));
+
+    // Step 4: AI call
     setLoading(true);
-    const res = await askAI(promptToSend, sys);
+    const res = await askAI(promptToSend, sys, history);
     if (!isRepeat) setCachedAnswer(text, res.text);
     const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed };
     setMessages([...newMsgs, assistantMsg]);
@@ -683,79 +618,63 @@ Return STRICT JSON only (no prose, no markdown fences):
   }
 
   function createMdComponents() {
-    const H2_THEMES: { test: (t: string) => boolean; bg: string; border: string; text: string; dot: string }[] = [
-      { test: t => /formula|equation|math|variable|⚗|🚀|the formula/.test(t),            bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-900",  dot: "bg-violet-400"  },
-      { test: t => /definition|overview|what|core|📌|🔍|each variable|means/.test(t),     bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-900",    dot: "bg-blue-400"    },
-      { test: t => /example|real|golden|tip|step.by.step|how to|💡|🔢/.test(t),           bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-900",   dot: "bg-amber-400"   },
-      { test: t => /key point|key fact|remember|summary|takeaway|🧠|remember/.test(t),    bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-900",    dot: "bg-pink-400"    },
-      { test: t => /mistake|common|wrong|broken|warning|⚠|caution/.test(t),              bg: "bg-rose-50",    border: "border-rose-200",    text: "text-rose-900",    dot: "bg-rose-400"    },
-      { test: t => /recap|conclusion|summary|✅|result|final/.test(t),                    bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900", dot: "bg-emerald-400" },
-      { test: t => /real world|impact|use|🌍|application/.test(t),                       bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-900",    dot: "bg-cyan-400"    },
-    ];
-    const H2_FALLBACKS = [
-      { bg: "bg-violet-50",  border: "border-violet-200",  text: "text-violet-900",  dot: "bg-violet-400"  },
-      { bg: "bg-blue-50",    border: "border-blue-200",    text: "text-blue-900",    dot: "bg-blue-400"    },
-      { bg: "bg-amber-50",   border: "border-amber-200",   text: "text-amber-900",   dot: "bg-amber-400"   },
-      { bg: "bg-pink-50",    border: "border-pink-200",    text: "text-pink-900",    dot: "bg-pink-400"    },
-      { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900", dot: "bg-emerald-400" },
-      { bg: "bg-cyan-50",    border: "border-cyan-200",    text: "text-cyan-900",    dot: "bg-cyan-400"    },
+    const H2_ACCENTS = [
+      { border: "border-l-violet-500", text: "text-violet-900",  bg: "bg-violet-50/80"  },
+      { border: "border-l-blue-500",   text: "text-blue-900",    bg: "bg-blue-50/80"    },
+      { border: "border-l-amber-500",  text: "text-amber-900",   bg: "bg-amber-50/80"   },
+      { border: "border-l-emerald-500",text: "text-emerald-900", bg: "bg-emerald-50/80" },
+      { border: "border-l-rose-500",   text: "text-rose-900",    bg: "bg-rose-50/80"    },
+      { border: "border-l-cyan-500",   text: "text-cyan-900",    bg: "bg-cyan-50/80"    },
     ];
     let h2Count = 0;
 
     return {
       strong: ({ children }: { children?: React.ReactNode }) => (
-        <mark className="bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-900 font-bold rounded px-1.5 py-[2px] not-italic border-b-2 border-amber-400">
+        <mark className="bg-amber-100 text-amber-900 font-bold rounded-sm px-1 py-[1px] not-italic border-b-[2px] border-amber-400/70">
           {children}
         </mark>
       ),
       em: ({ children }: { children?: React.ReactNode }) => (
-        <em className="not-italic text-violet-700 font-semibold underline decoration-violet-300 decoration-2 underline-offset-2">{children}</em>
+        <em className="not-italic text-slate-500 italic font-medium">{children}</em>
       ),
       h1: ({ children }: { children?: React.ReactNode }) => (
-        <h1 className="text-[22px] font-extrabold mt-7 mb-3 tracking-tight leading-snug text-slate-900 pb-2.5 border-b-2 border-blue-200">{children}</h1>
+        <h1 className="text-xl font-extrabold mt-6 mb-2 tracking-tight text-slate-900 pb-2 border-b border-slate-200">{children}</h1>
       ),
       h2: ({ children }: { children?: React.ReactNode }) => {
-        const t = String(children).toLowerCase();
-        const theme = H2_THEMES.find(th => th.test(t)) ?? H2_FALLBACKS[h2Count % H2_FALLBACKS.length];
+        const a = H2_ACCENTS[h2Count % H2_ACCENTS.length];
         h2Count++;
         return (
-          <div className={`flex items-center gap-3 rounded-2xl border ${theme.border} ${theme.bg} px-4 py-2.5 mt-6 mb-3`}>
-            <span className={`flex-shrink-0 h-2 w-2 rounded-full ${theme.dot}`} />
-            <h2 className={`font-extrabold text-[13.5px] tracking-wide ${theme.text} leading-snug`}>{children}</h2>
+          <div className={`border-l-[3px] ${a.border} ${a.bg} rounded-r-xl pl-4 pr-3 py-2 mt-5 mb-2`}>
+            <h2 className={`font-bold text-[13.5px] tracking-tight ${a.text} leading-snug`}>{children}</h2>
           </div>
         );
       },
       h3: ({ children }: { children?: React.ReactNode }) => (
-        <h3 className="flex items-center gap-2.5 font-bold text-[15px] mt-5 mb-2 text-slate-800 leading-snug">
-          <span className="flex-shrink-0 h-5 w-[3px] rounded-full bg-gradient-to-b from-blue-500 to-violet-500" />
-          <span className="underline decoration-blue-200 decoration-2 underline-offset-4">{children}</span>
-        </h3>
+        <h3 className="font-bold text-[14px] mt-4 mb-1.5 text-slate-800 leading-snug">{children}</h3>
       ),
       blockquote: ({ children }: { children?: React.ReactNode }) => (
-        <div className="relative rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 px-5 py-4 my-5 shadow-lg shadow-blue-200/60 overflow-hidden">
-          <span className="absolute -top-3 -left-1 text-5xl text-white/10 font-serif select-none leading-none">"</span>
-          <div className="flex items-start gap-3 relative">
-            <span className="text-xl flex-shrink-0 mt-0.5 drop-shadow">⚡</span>
-            <div className="text-[13.5px] text-white leading-relaxed font-semibold tracking-wide">{children}</div>
-          </div>
+        <div className="border-l-[3px] border-amber-400 bg-amber-50/80 rounded-r-xl pl-4 pr-3 py-3 my-4 flex items-start gap-2.5">
+          <span className="text-amber-500 text-base flex-shrink-0 mt-0.5 leading-none">⚡</span>
+          <div className="text-[13px] text-amber-900 leading-relaxed font-semibold">{children}</div>
         </div>
       ),
       code: ({ inline, children }: { inline?: boolean; children?: React.ReactNode }) =>
         inline ? (
-          <code className="bg-indigo-50 text-indigo-700 rounded-lg px-1.5 py-0.5 text-[0.82em] font-mono font-semibold border border-indigo-200">{children}</code>
+          <code className="bg-slate-100 text-violet-700 rounded px-1.5 py-[1px] text-[0.82em] font-mono font-semibold border border-slate-200">{children}</code>
         ) : (
-          <div className="my-4 rounded-2xl overflow-hidden shadow-lg border border-slate-700/60">
-            <div className="flex items-center justify-between bg-slate-800 px-4 py-2 border-b border-slate-700">
-              <div className="flex gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
-              </div>
-              <span className="text-[10px] font-mono text-slate-400 tracking-widest uppercase">code</span>
+          <code className="text-emerald-300 font-mono text-[12.5px] leading-relaxed">{children}</code>
+        ),
+      pre: ({ children }: { children?: React.ReactNode }) => (
+        <div className="my-4 rounded-xl overflow-hidden shadow-md border border-slate-700/60 not-prose">
+          <div className="flex items-center justify-between bg-slate-800 px-4 py-2 border-b border-slate-700/80">
+            <div className="flex gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
             </div>
-            <pre className="bg-slate-900 text-emerald-300 p-4 overflow-x-auto text-[13px] font-mono leading-relaxed">
-              <code>{children}</code>
-            </pre>
+            <span className="text-[10px] font-mono text-slate-400 tracking-widest uppercase">code</span>
+          </div>
+          <pre className="bg-slate-900 p-4 overflow-x-auto text-[12.5px] font-mono leading-relaxed m-0">{children}</pre>
           </div>
         ),
       ol: ({ children }: { children?: React.ReactNode }) => {
