@@ -656,50 +656,71 @@ Return STRICT JSON only (no prose, no markdown fences):
 
   const mdComponents = {
     strong: ({ children }: { children?: React.ReactNode }) => (
-      <mark className="bg-blue-100 text-blue-900 font-bold rounded px-0.5 not-italic border-b border-blue-300">{children}</mark>
+      <mark className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-900 font-bold rounded-md px-1 py-0.5 not-italic border-b-2 border-blue-400">{children}</mark>
+    ),
+    em: ({ children }: { children?: React.ReactNode }) => (
+      <em className="not-italic text-violet-700 font-semibold underline decoration-violet-300 decoration-2 underline-offset-2">{children}</em>
     ),
     h1: ({ children }: { children?: React.ReactNode }) => (
-      <h1 className="text-xl font-bold mt-4 mb-2 text-slate-900 border-b border-slate-200 pb-1">{children}</h1>
+      <h1 className="text-[22px] font-extrabold mt-7 mb-3 tracking-tight leading-snug text-slate-900 pb-2.5 border-b-2 border-gradient-to-r border-blue-200">{children}</h1>
     ),
     h2: ({ children }: { children?: React.ReactNode }) => {
       const t = String(children).toLowerCase();
-      let cls = "bg-blue-50 border-blue-500 text-blue-900 shadow-blue-100";
-      if (t.includes("📌") || t.includes("definition") || t.includes("overview") || t.includes("what"))
-        cls = "bg-purple-50 border-purple-500 text-purple-900 shadow-purple-100";
-      else if (t.includes("💡") || t.includes("example") || t.includes("real"))
-        cls = "bg-amber-50 border-amber-500 text-amber-900 shadow-amber-100";
-      else if (t.includes("✅") || t.includes("recap") || t.includes("summary") || t.includes("takeaway"))
-        cls = "bg-emerald-50 border-emerald-500 text-emerald-900 shadow-emerald-100";
-      else if (t.includes("🧠") || t.includes("key term") || t.includes("concept"))
-        cls = "bg-violet-50 border-violet-500 text-violet-900 shadow-violet-100";
-      else if (t.includes("⚗") || t.includes("formula") || t.includes("equation") || t.includes("math"))
-        cls = "bg-slate-100 border-slate-500 text-slate-900 shadow-slate-100";
-      else if (t.includes("⚠") || t.includes("misconception") || t.includes("mistake") || t.includes("common"))
-        cls = "bg-rose-50 border-rose-500 text-rose-900 shadow-rose-100";
+      let bg = "from-blue-600 to-indigo-600"; let border = "border-blue-500"; let badge = "bg-blue-500/20 text-blue-100";
+      if (t.includes("📌") || t.includes("definition") || t.includes("overview") || t.includes("what") || t.includes("core"))
+        { bg = "from-violet-600 to-purple-700"; border = "border-violet-400"; badge = "bg-violet-500/20 text-violet-100"; }
+      else if (t.includes("💡") || t.includes("example") || t.includes("real") || t.includes("golden") || t.includes("tip"))
+        { bg = "from-amber-500 to-orange-500"; border = "border-amber-400"; badge = "bg-amber-500/20 text-amber-100"; }
+      else if (t.includes("✅") || t.includes("recap") || t.includes("summary") || t.includes("takeaway") || t.includes("key fact"))
+        { bg = "from-emerald-600 to-teal-600"; border = "border-emerald-400"; badge = "bg-emerald-500/20 text-emerald-100"; }
+      else if (t.includes("🧠") || t.includes("key term") || t.includes("concept") || t.includes("fact"))
+        { bg = "from-violet-600 to-fuchsia-600"; border = "border-violet-400"; badge = "bg-violet-500/20 text-violet-100"; }
+      else if (t.includes("⚗") || t.includes("formula") || t.includes("equation") || t.includes("math") || t.includes("variable"))
+        { bg = "from-slate-700 to-slate-800"; border = "border-slate-500"; badge = "bg-slate-500/20 text-slate-200"; }
+      else if (t.includes("⚠") || t.includes("mistake") || t.includes("common") || t.includes("wrong") || t.includes("broken"))
+        { bg = "from-rose-500 to-red-600"; border = "border-rose-400"; badge = "bg-rose-500/20 text-rose-100"; }
+      else if (t.includes("🌍") || t.includes("real world") || t.includes("impact") || t.includes("use"))
+        { bg = "from-cyan-600 to-blue-600"; border = "border-cyan-400"; badge = "bg-cyan-500/20 text-cyan-100"; }
+      else if (t.includes("step") || t.includes("how to") || t.includes("🔍"))
+        { bg = "from-blue-600 to-cyan-600"; border = "border-blue-400"; badge = "bg-blue-500/20 text-blue-100"; }
       return (
-        <div className={`rounded-xl border-l-[5px] px-4 py-3 mt-6 mb-2 shadow-sm ${cls}`}>
-          <h2 className="font-extrabold text-sm tracking-wide">{children}</h2>
+        <div className={`rounded-2xl bg-gradient-to-r ${bg} px-4 py-3 mt-7 mb-3 shadow-md border-l-4 ${border}`}>
+          <h2 className="font-extrabold text-[13.5px] tracking-wide text-white leading-snug drop-shadow-sm">{children}</h2>
         </div>
       );
     },
     h3: ({ children }: { children?: React.ReactNode }) => (
-      <h3 className="font-bold text-sm mt-4 mb-1.5 text-slate-800 flex items-center gap-2 border-b border-dashed border-slate-200 pb-1">{children}</h3>
+      <h3 className="flex items-center gap-2.5 font-bold text-[15px] mt-5 mb-2 text-slate-800 leading-snug">
+        <span className="flex-shrink-0 h-5 w-[3px] rounded-full bg-gradient-to-b from-blue-500 to-violet-500" />
+        <span className="underline decoration-blue-200 decoration-2 underline-offset-4">{children}</span>
+      </h3>
     ),
     blockquote: ({ children }: { children?: React.ReactNode }) => (
-      <div className="rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 px-5 py-4 my-4 shadow-lg shadow-blue-200">
-        <div className="flex items-start gap-3">
-          <span className="text-xl flex-shrink-0 mt-0.5">⚡</span>
-          <div className="text-sm text-white leading-relaxed font-medium">{children}</div>
+      <div className="relative rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 px-5 py-4 my-5 shadow-lg shadow-blue-200/60 overflow-hidden">
+        <span className="absolute -top-3 -left-1 text-5xl text-white/10 font-serif select-none leading-none">"</span>
+        <div className="flex items-start gap-3 relative">
+          <span className="text-xl flex-shrink-0 mt-0.5 drop-shadow">⚡</span>
+          <div className="text-[13.5px] text-white leading-relaxed font-semibold tracking-wide">{children}</div>
         </div>
       </div>
     ),
     code: ({ inline, children }: { inline?: boolean; children?: React.ReactNode }) =>
       inline ? (
-        <code className="bg-blue-50 text-blue-700 rounded-md px-1.5 py-0.5 text-[0.85em] font-mono border border-blue-100">{children}</code>
+        <code className="bg-indigo-50 text-indigo-700 rounded-lg px-1.5 py-0.5 text-[0.82em] font-mono font-semibold border border-indigo-200">{children}</code>
       ) : (
-        <pre className="bg-slate-900 text-green-400 rounded-xl p-4 overflow-x-auto text-sm font-mono my-3 leading-relaxed shadow-md">
-          <code>{children}</code>
-        </pre>
+        <div className="my-4 rounded-2xl overflow-hidden shadow-lg border border-slate-700/60">
+          <div className="flex items-center justify-between bg-slate-800 px-4 py-2 border-b border-slate-700">
+            <div className="flex gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 tracking-widest uppercase">code</span>
+          </div>
+          <pre className="bg-slate-900 text-emerald-300 p-4 overflow-x-auto text-[13px] font-mono leading-relaxed">
+            <code>{children}</code>
+          </pre>
+        </div>
       ),
     ol: ({ children }: { children?: React.ReactNode }) => {
       let counter = 0;
@@ -708,43 +729,49 @@ Return STRICT JSON only (no prose, no markdown fences):
         counter++;
         return React.cloneElement(child as React.ReactElement, { "data-num": counter } as Record<string, unknown>);
       });
-      return <ol className="space-y-2.5 my-3 pl-0 list-none">{numbered}</ol>;
+      return <ol className="space-y-3 my-3.5 pl-0 list-none">{numbered}</ol>;
     },
     ul: ({ children }: { children?: React.ReactNode }) => (
-      <ul className="space-y-2 my-2.5 pl-0 list-none">{children}</ul>
+      <ul className="space-y-2.5 my-3 pl-0 list-none">{children}</ul>
     ),
     li: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => {
       const num = (props as Record<string, unknown>)["data-num"];
       return (
-        <li className="flex items-start gap-3 text-sm">
+        <li className="flex items-start gap-3">
           {num !== undefined ? (
-            <span className="flex-shrink-0 grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 text-white text-[11px] font-bold shadow-sm">
+            <span className="flex-shrink-0 grid h-6 min-w-[1.5rem] place-items-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-[11px] font-extrabold shadow-md shadow-blue-200/50 mt-0.5">
               {String(num)}
             </span>
           ) : (
-            <span className="flex-shrink-0 mt-[7px] h-2 w-2 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-sm" />
+            <span className="flex-shrink-0 mt-[9px] h-1.5 w-1.5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm" />
           )}
-          <span className="pt-0.5 leading-relaxed">{children}</span>
+          <span className="leading-relaxed text-slate-700">{children}</span>
         </li>
       );
     },
     table: ({ children }: { children?: React.ReactNode }) => (
-      <div className="overflow-x-auto my-4 rounded-xl border border-blue-100 shadow-sm">
-        <table className="w-full border-collapse text-sm">{children}</table>
+      <div className="overflow-x-auto my-5 rounded-2xl border border-slate-200 shadow-md shadow-slate-100/80">
+        <table className="w-full border-collapse text-[13.5px]">{children}</table>
       </div>
     ),
     thead: ({ children }: { children?: React.ReactNode }) => (
-      <thead className="bg-gradient-to-r from-blue-600 to-blue-700">{children}</thead>
+      <thead className="bg-gradient-to-r from-blue-600 to-indigo-700">{children}</thead>
     ),
     th: ({ children }: { children?: React.ReactNode }) => (
-      <th className="border-b border-blue-400 px-4 py-2.5 text-left font-bold text-white text-xs uppercase tracking-wider">{children}</th>
+      <th className="px-4 py-3 text-left font-bold text-white text-[11px] uppercase tracking-widest">{children}</th>
     ),
     td: ({ children }: { children?: React.ReactNode }) => (
-      <td className="border-b border-slate-100 px-4 py-2.5 last:border-b-0 text-sm">{children}</td>
+      <td className="border-t border-slate-100 px-4 py-2.5 text-slate-700 [tr:nth-child(even)_&]:bg-slate-50/70">{children}</td>
     ),
-    hr: () => <hr className="my-5 border-blue-100" />,
+    hr: () => (
+      <div className="my-6 flex items-center gap-3">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
+        <span className="text-blue-300 text-xs">✦</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
+      </div>
+    ),
     p: ({ children }: { children?: React.ReactNode }) => (
-      <p className="text-sm leading-7 my-2">{children}</p>
+      <p className="text-[14.5px] leading-[1.85] my-2.5 text-slate-700">{children}</p>
     ),
   };
 
@@ -863,7 +890,7 @@ Return STRICT JSON only (no prose, no markdown fences):
                 <VisualInfoCard data={m.visualCard} />
               ) : (
                 <>
-                  <div className="prose prose-sm max-w-none text-foreground">
+                  <div className="prose prose-sm max-w-none text-foreground ai-prose">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                       {m.content}
                     </ReactMarkdown>

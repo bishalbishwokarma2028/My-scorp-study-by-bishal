@@ -117,6 +117,14 @@
   h1,h2,h3,h4 { letter-spacing: -0.02em; }
 }
 
+.ai-prose {
+  font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 14.5px;
+  line-height: 1.85;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+}
+
 @utility card-soft {
   background: var(--color-card);
   border: 1px solid var(--color-border);
