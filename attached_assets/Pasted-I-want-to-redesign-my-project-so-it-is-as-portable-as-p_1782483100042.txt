@@ -1,0 +1,32 @@
+I want to redesign my project so it is as portable as possible when moving between Replit projects.
+
+My goal is that after I download this project as a ZIP file and upload it into another Replit project, I should not have to manually configure Supabase or all of my AI API keys again.
+
+Currently, my project requires:
+
+Supabase URL
+Supabase Anon Key
+Supabase Publishable Key
+Supabase Service Role Key
+All other Supabase-related configuration
+Around 12 different AI provider API keys
+
+Every time I move the project, I have to recreate all of these Secrets manually before Sign In, Sign Up, Authentication, Database access, and AI features start working.
+
+I want you to redesign the project architecture to eliminate this repetitive setup as much as technically possible.
+
+Your tasks
+Audit the entire project and identify every required environment variable.
+Centralize all configuration into one configuration system.
+Create automatic environment loading for both development and production.
+Generate a complete .env.example containing every required variable.
+Refactor the project so every service (Supabase, Authentication, Database, AI Providers, Storage, etc.) reads its configuration from one central location.
+If Replit provides any supported way to preserve or import Secrets automatically, implement it.
+If Replit does not allow automatic transfer of Secrets, implement the closest possible solution that reduces the setup to a single step.
+Make the application automatically validate all required variables during startup and clearly report any missing ones.
+Ensure that after moving the project, Sign In, Sign Up, Supabase Authentication, Database access, and all AI features work with the least possible manual configuration.
+Do not hardcode secret values into the source code.
+Follow Replit and security best practices.
+Explain exactly which parts can be automated and which parts are impossible because of Replit's platform limitations, and implement the best available alternative.
+
+My objective is simple: after importing this project into another Replit, I want the project to require as close to zero manual setup as technically possible while keeping all secrets secure.

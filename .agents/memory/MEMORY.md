@@ -1,0 +1,1 @@
+- [Chat mobile layout](chat-mobile-layout.md) — use `fixed inset-x-0 top-14 bottom-0` on mobile, NOT negative margin trick; negative margins cause overflow artifacts
