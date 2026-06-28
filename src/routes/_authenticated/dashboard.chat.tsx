@@ -3,10 +3,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Copy, RefreshCw, Save, Plus, GraduationCap, ImageIcon, Paperclip, User, Loader2, X, ChevronDown, ChevronUp, Sparkles, Zap } from "lucide-react";
+import { Send, Copy, RefreshCw, Save, Plus, GraduationCap, ImageIcon, Paperclip, User, Loader2, X, ChevronDown, ChevronUp, Sparkles, Zap, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
+import { webSearchServer } from "@/lib/webSearch.functions";
 import { supabase } from "@/integrations/supabase/client";
 import logoUrl from "@/assets/scorpstudy-logo.png";
 import { canUseAI, bumpAIUsage, QUOTA_MSG, getCachedAnswer, setCachedAnswer, getAIUsedToday, AI_DAILY_LIMIT } from "@/lib/dailyLimits";
@@ -37,7 +38,19 @@ type Msg = {
   provider?: string;
   visualCard?: VisualCard;
   imageUrl?: string;
+  webSearchUsed?: boolean;
 };
+
+const WEB_SEARCH_KEYWORDS = [
+  "today", "recent", "latest", "news", "match", "score", "winner",
+  "2024", "2025", "who won", "currently", "right now", "yesterday",
+  "this week", "cricket", "football", "politics", "election", "weather",
+];
+
+function needsWebSearch(text: string): boolean {
+  const lower = text.toLowerCase();
+  return WEB_SEARCH_KEYWORDS.some((kw) => lower.includes(kw));
+}
 
 const COLORS = {
   purple: { bg: "bg-purple-50 border-purple-200", text: "text-purple-900", head: "text-purple-700", btn: "bg-purple-100 hover:bg-purple-200 text-purple-800", exp: "bg-purple-50 border-purple-200" },
@@ -261,6 +274,7 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [topperMode, setTopperMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [visualLoading, setVisualLoading] = useState(false);
   const [selectedText, setSelectedText] = useState("");
   const [pendingImage, setPendingImage] = useState<{ base64: string; mimeType: string; name: string; preview: string } | null>(null);
@@ -345,9 +359,25 @@ function ChatPage() {
 
     bumpAIUsage();
     const sys = `${SYSTEM_PROMPT}${topperMode ? TOPPER_PROMPT : ""}${isFirst ? "\n\nThis is the first message — greet the student warmly in one sentence before answering." : "\n\nThis is a follow-up — do NOT repeat the greeting. Jump straight to the answer."}`;
-    const res = await askAI(text, sys);
+
+    let promptToSend = text;
+    let webSearchUsed = false;
+
+    if (needsWebSearch(text)) {
+      setSearching(true);
+      try {
+        const searchResult = await webSearchServer({ data: { query: text } });
+        if (searchResult.used && searchResult.context) {
+          webSearchUsed = true;
+          promptToSend = `${text}\n\n[REAL-TIME WEB SEARCH RESULTS — use this fresh data to answer accurately]\n${searchResult.context}\n[END OF WEB RESULTS]`;
+        }
+      } catch { /* silent — fall back to AI without search context */ }
+      setSearching(false);
+    }
+
+    const res = await askAI(promptToSend, sys);
     setCachedAnswer(text, res.text);
-    const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant" };
+    const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed };
     setMessages([...newMsgs, assistantMsg]);
 
     if (isFirst) {
@@ -717,6 +747,11 @@ Return STRICT JSON only (no prose, no markdown fences):
                     <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                       ● Bishal's Assistant
                     </span>
+                    {m.webSearchUsed && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 border border-cyan-200 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
+                        <Globe className="h-3 w-3" /> Web Search Used
+                      </span>
+                    )}
                     {i === messages.length - 1 && m.role === "assistant" && (
                       <button
                         onClick={() => {
@@ -734,6 +769,25 @@ Return STRICT JSON only (no prose, no markdown fences):
             </div>
           </div>
         ))}
+
+        {searching && (
+          <div className="flex items-start gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600">
+              <Globe className="h-4 w-4 text-white" />
+            </div>
+            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3.5 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <Loader2 className="h-4 w-4 animate-spin text-cyan-600" />
+                <span className="text-sm font-semibold text-cyan-700">🔍 Searching the web…</span>
+                <span className="flex gap-1">
+                  {[0, 1, 2].map(d => (
+                    <span key={d} className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: `${d * 0.15}s` }} />
+                  ))}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {(loading || visualLoading) && (
           <div className="flex items-start gap-3">

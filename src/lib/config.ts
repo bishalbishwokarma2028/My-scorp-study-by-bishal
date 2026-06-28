@@ -45,6 +45,10 @@ export const serverConfig = {
       .filter(Boolean),
     huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
   },
+  search: {
+    tavilyKey: getEnv("TAVILY_API_KEY"),
+    serperKey: getEnv("SERPER_API_KEY"),
+  },
 } as const;
 
 /**
