@@ -5,7 +5,7 @@ import { serverConfig } from "./config";
 
 const Input = z.object({
   prompt: z.string().min(1).max(50000),
-  systemPrompt: z.string().max(4000).optional(),
+  systemPrompt: z.string().max(12000).optional(),
 });
 
 type Result = { text: string; provider: string };
