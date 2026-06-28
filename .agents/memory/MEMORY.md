@@ -1,1 +1,2 @@
 - [Chat mobile layout](chat-mobile-layout.md) — use `fixed inset-x-0 top-14 bottom-0` on mobile, NOT negative margin trick; negative margins cause overflow artifacts
+- [Vite SSR env var timing](vite-ssr-env-timing.md) — Replit Secrets not visible at Vite SSR module-load time; use JS getter properties on config objects so process.env is read at request time

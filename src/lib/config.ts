@@ -22,34 +22,45 @@ function getEnv(...keys: string[]): string {
   return "";
 }
 
+/**
+ * Lazily-evaluated config — each property is a getter that reads
+ * process.env at access time, so Replit Secrets injected after module
+ * load (or in the SSR context) are always picked up correctly.
+ */
 export const serverConfig = {
-  supabase: {
-    url: getEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
-    anonKey: getEnv(
-      "SUPABASE_ANON_KEY",
-      "SUPABASE_PUBLISHABLE_KEY",
-      "VITE_SUPABASE_PUBLISHABLE_KEY",
-    ),
-    serviceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  get supabase() {
+    return {
+      url: getEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
+      anonKey: getEnv(
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_PUBLISHABLE_KEY",
+        "VITE_SUPABASE_PUBLISHABLE_KEY",
+      ),
+      serviceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    };
   },
-  ai: {
-    groqPrimaryKeys: [1, 2, 3, 4, 5]
-      .map((i) => getEnv(`GROQ_API_KEY_${i}`))
-      .filter(Boolean),
-    groqSecondaryKeys: [6, 7]
-      .map((i) => getEnv(`GROQ_API_KEY_${i}`))
-      .filter(Boolean),
-    openrouterKey: getEnv("OPENROUTER_API_KEY"),
-    geminiKeys: [1, 2, 3, 4, 5]
-      .map((i) => getEnv(`GEMINI_API_KEY_${i}`))
-      .filter(Boolean),
-    huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
+  get ai() {
+    return {
+      groqPrimaryKeys: [1, 2, 3, 4, 5]
+        .map((i) => getEnv(`GROQ_API_KEY_${i}`))
+        .filter(Boolean),
+      groqSecondaryKeys: [6, 7]
+        .map((i) => getEnv(`GROQ_API_KEY_${i}`))
+        .filter(Boolean),
+      openrouterKey: getEnv("OPENROUTER_API_KEY"),
+      geminiKeys: [1, 2, 3, 4, 5]
+        .map((i) => getEnv(`GEMINI_API_KEY_${i}`))
+        .filter(Boolean),
+      huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
+    };
   },
-  search: {
-    tavilyKey: getEnv("TAVILY_API_KEY"),
-    serperKey: getEnv("SERPER_API_KEY"),
+  get search() {
+    return {
+      tavilyKey: getEnv("TAVILY_API_KEY"),
+      serperKey: getEnv("SERPER_API_KEY"),
+    };
   },
-} as const;
+};
 
 /**
  * Call once at startup (e.g. in server.ts) to surface missing variables
@@ -65,12 +76,13 @@ export function validateConfig(): string[] {
   if (!serverConfig.supabase.serviceRoleKey)
     missing.push("SUPABASE_SERVICE_ROLE_KEY");
 
+  const ai = serverConfig.ai;
   const hasAnyAI =
-    serverConfig.ai.groqPrimaryKeys.length > 0 ||
-    serverConfig.ai.groqSecondaryKeys.length > 0 ||
-    !!serverConfig.ai.openrouterKey ||
-    serverConfig.ai.geminiKeys.length > 0 ||
-    !!serverConfig.ai.huggingfaceKey;
+    ai.groqPrimaryKeys.length > 0 ||
+    ai.groqSecondaryKeys.length > 0 ||
+    !!ai.openrouterKey ||
+    ai.geminiKeys.length > 0 ||
+    !!ai.huggingfaceKey;
 
   if (!hasAnyAI)
     missing.push(
