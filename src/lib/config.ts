@@ -33,13 +33,16 @@ export const serverConfig = {
     serviceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY"),
   },
   ai: {
-    groqKeys: [1, 2, 3, 4, 5]
+    groqPrimaryKeys: [1, 2, 3, 4, 5]
       .map((i) => getEnv(`GROQ_API_KEY_${i}`))
       .filter(Boolean),
+    groqSecondaryKeys: [6, 7]
+      .map((i) => getEnv(`GROQ_API_KEY_${i}`))
+      .filter(Boolean),
+    openrouterKey: getEnv("OPENROUTER_API_KEY"),
     geminiKeys: [1, 2, 3, 4, 5]
       .map((i) => getEnv(`GEMINI_API_KEY_${i}`))
       .filter(Boolean),
-    openaiKey: getEnv("OPENAI_API_KEY"),
     huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
   },
 } as const;
@@ -59,14 +62,15 @@ export function validateConfig(): string[] {
     missing.push("SUPABASE_SERVICE_ROLE_KEY");
 
   const hasAnyAI =
-    serverConfig.ai.groqKeys.length > 0 ||
+    serverConfig.ai.groqPrimaryKeys.length > 0 ||
+    serverConfig.ai.groqSecondaryKeys.length > 0 ||
+    !!serverConfig.ai.openrouterKey ||
     serverConfig.ai.geminiKeys.length > 0 ||
-    !!serverConfig.ai.openaiKey ||
     !!serverConfig.ai.huggingfaceKey;
 
   if (!hasAnyAI)
     missing.push(
-      "at least one AI key — GROQ_API_KEY_1, GEMINI_API_KEY_1, OPENAI_API_KEY, or HUGGINGFACE_API_KEY",
+      "at least one AI key — GROQ_API_KEY_1, GEMINI_API_KEY_1, OPENROUTER_API_KEY, or HUGGINGFACE_API_KEY",
     );
 
   if (missing.length > 0) {

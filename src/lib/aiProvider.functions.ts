@@ -21,7 +21,9 @@ function isRateLimited(status: number, body: string): boolean {
     lower.includes("too many requests") ||
     lower.includes("resource exhausted") ||
     lower.includes("exceeded your") ||
-    lower.includes("limit reached")
+    lower.includes("limit reached") ||
+    lower.includes("insufficient credits") ||
+    lower.includes("billing")
   );
 }
 
@@ -32,6 +34,44 @@ async function tryGroq(prompt: string, system: string, key: string): Promise<Res
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 2048,
+      }),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      if (isRateLimited(res.status, body)) return null;
+      return null;
+    }
+    const data = JSON.parse(body);
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function tryOpenRouter(
+  prompt: string,
+  system: string,
+  key: string,
+  model: string,
+): Promise<Result | null> {
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+        "HTTP-Referer": "https://scorpstudy.app",
+        "X-Title": "ScorpStudy",
+      },
+      body: JSON.stringify({
+        model,
         messages: [
           { role: "system", content: system },
           { role: "user", content: prompt },
@@ -79,34 +119,6 @@ async function tryGemini(prompt: string, system: string, key: string): Promise<R
   }
 }
 
-async function tryOpenAI(prompt: string, system: string, key: string): Promise<Result | null> {
-  try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 2048,
-      }),
-    });
-    const body = await res.text();
-    if (!res.ok) {
-      if (isRateLimited(res.status, body)) return null;
-      return null;
-    }
-    const data = JSON.parse(body);
-    const text = data?.choices?.[0]?.message?.content;
-    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 async function tryHuggingFace(prompt: string, system: string, key: string): Promise<Result | null> {
   try {
     const res = await fetch(
@@ -147,11 +159,39 @@ export const askAIServer = createServerFn({ method: "POST" })
 
     let result: Result | null = null;
 
-    for (const key of serverConfig.ai.groqKeys) {
+    // 1. Groq primary keys (1–5)
+    for (const key of serverConfig.ai.groqPrimaryKeys) {
       result = await tryGroq(data.prompt, system, key);
       if (result) break;
     }
 
+    // 2. Groq secondary keys (6–7)
+    if (!result) {
+      for (const key of serverConfig.ai.groqSecondaryKeys) {
+        result = await tryGroq(data.prompt, system, key);
+        if (result) break;
+      }
+    }
+
+    // 3. OpenRouter — Claude 3 Haiku, then GPT-3.5 Turbo
+    if (!result && serverConfig.ai.openrouterKey) {
+      result = await tryOpenRouter(
+        data.prompt,
+        system,
+        serverConfig.ai.openrouterKey,
+        "anthropic/claude-3-haiku",
+      );
+    }
+    if (!result && serverConfig.ai.openrouterKey) {
+      result = await tryOpenRouter(
+        data.prompt,
+        system,
+        serverConfig.ai.openrouterKey,
+        "openai/gpt-3.5-turbo",
+      );
+    }
+
+    // 4. Gemini keys (1–5)
     if (!result) {
       for (const key of serverConfig.ai.geminiKeys) {
         result = await tryGemini(data.prompt, system, key);
@@ -159,10 +199,7 @@ export const askAIServer = createServerFn({ method: "POST" })
       }
     }
 
-    if (!result && serverConfig.ai.openaiKey) {
-      result = await tryOpenAI(data.prompt, system, serverConfig.ai.openaiKey);
-    }
-
+    // 5. Hugging Face (final fallback)
     if (!result && serverConfig.ai.huggingfaceKey) {
       result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
     }
@@ -172,7 +209,10 @@ export const askAIServer = createServerFn({ method: "POST" })
       return result;
     }
 
-    return { text: "Bishal's Assistant is busy right now, please try again in a moment.", provider: "Bishal's Assistant" };
+    return {
+      text: "AI is busy right now. Please try again tomorrow.",
+      provider: "Bishal's Assistant",
+    };
   });
 
 const VisionInput = z.object({
