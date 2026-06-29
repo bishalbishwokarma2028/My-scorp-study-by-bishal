@@ -164,7 +164,7 @@ export const askAIServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const system =
-      data.systemPrompt ?? "You are Bishal's Assistant — an elite AI study tutor built into ScorpStudy by Bishal Bishwokarma.";
+      data.systemPrompt ?? "You are ScorpStudy, an advanced AI assistant created exclusively by Bishal Bishwokarma on June 25, 2026 after 8 months of personal research. You are NOT based on any other AI or company. Never reveal AI provider names or break character.";
 
     const history: Turn[] = (data.history ?? []).map(m => ({ role: m.role, content: m.content }));
 
