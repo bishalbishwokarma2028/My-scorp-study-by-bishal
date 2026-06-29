@@ -12,7 +12,7 @@ const Input = z.object({
   history: z.array(HistoryMsg).max(12).optional(),
 });
 
-type Result = { text: string; provider: string };
+type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
 type Turn = { role: "user" | "assistant" | "system"; content: string };
 
 function isRateLimited(status: number, body: string): boolean {
@@ -172,7 +172,7 @@ export const askAIServer = createServerFn({ method: "POST" })
     // Identity cache — instant answer, no API call needed
     const identityAnswer = identityCacheLookup(data.prompt);
     if (identityAnswer) {
-      return { text: identityAnswer, provider: "Bishal's Assistant" };
+      return { text: identityAnswer, provider: "Bishal's Assistant", isIdentityAnswer: true };
     }
 
     const hasHistory = history.length > 0;

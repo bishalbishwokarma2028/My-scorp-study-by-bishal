@@ -39,6 +39,7 @@ type Msg = {
   visualCard?: VisualCard;
   imageUrl?: string;
   webSearchUsed?: boolean;
+  isIdentityAnswer?: boolean;
 };
 
 const WEB_SEARCH_KEYWORDS = [
@@ -745,7 +746,7 @@ function ChatPage() {
     setLoading(true);
     const res = await askAI(promptToSend, sys, history);
     if (!isRepeat) setCachedAnswer(text, res.text);
-    const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed };
+    const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed, isIdentityAnswer: res.isIdentityAnswer };
     setMessages([...newMsgs, assistantMsg]);
 
     if (isFirst) {
@@ -1023,6 +1024,32 @@ Return STRICT JSON only (no prose, no markdown fences):
     };
   }
 
+  function createIdentityMdComponents() {
+    return {
+      strong: ({ children }: { children?: React.ReactNode }) => (
+        <strong className="inline bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 font-extrabold rounded-md px-[5px] py-[1.5px] not-italic border-b-[2.5px] border-amber-400 shadow-sm shadow-amber-100 break-words [overflow-wrap:anywhere]">
+          {children}
+        </strong>
+      ),
+      em: ({ children }: { children?: React.ReactNode }) => (
+        <em className="not-italic text-indigo-800 font-semibold">{children}</em>
+      ),
+      p: ({ children }: { children?: React.ReactNode }) => (
+        <p className="text-[14px] sm:text-[15.5px] leading-[1.85] sm:leading-[1.9] my-2.5 sm:my-3 text-slate-800 break-words [overflow-wrap:anywhere]">{children}</p>
+      ),
+      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 font-extrabold rounded-md px-[5px] py-[1.5px] border-b-[2.5px] border-amber-400 shadow-sm shadow-amber-100 hover:from-amber-200 hover:to-yellow-200 transition-colors break-all [overflow-wrap:anywhere]"
+        >
+          {children}
+        </a>
+      ),
+    };
+  }
+
   const SUGGESTIONS = [
     { q: "Explain the Water Cycle with full detail", label: "🌊 Water Cycle" },
     { q: "Solve x² − 5x + 6 = 0 step by step", label: "🔢 Quadratic Equation" },
@@ -1137,11 +1164,25 @@ Return STRICT JSON only (no prose, no markdown fences):
               ) : (
                 <>
                   {m.content ? (
+                    m.isIdentityAnswer ? (
+                      <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/70 via-yellow-50/40 to-white shadow-sm shadow-amber-100/60 px-4 pt-3 pb-2">
+                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-amber-200/70">
+                          <span className="text-base leading-none">🦂</span>
+                          <span className="text-[11px] font-bold tracking-widest uppercase text-amber-700">ScorpStudy Identity</span>
+                        </div>
+                        <div className="prose max-w-none text-foreground ai-prose">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={createIdentityMdComponents()}>
+                            {m.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    ) : (
                     <div className="prose prose-sm max-w-none text-foreground ai-prose">
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMdComponents()}>
                         {m.content}
                       </ReactMarkdown>
                     </div>
+                    )
                   ) : null}
                   {m.visualCard && (
                     <div className={m.content ? "mt-5" : ""}>

@@ -1,6 +1,6 @@
 import { askAIServer } from "./aiProvider.functions";
 
-export type AIResult = { text: string; provider: string };
+export type AIResult = { text: string; provider: string; isIdentityAnswer?: boolean };
 export type HistoryMsg = { role: "user" | "assistant"; content: string };
 
 export async function askAI(
