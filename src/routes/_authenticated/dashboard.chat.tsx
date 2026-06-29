@@ -526,17 +526,14 @@ function ChatPage() {
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()?.toString().trim() ?? "";
+    if (sel.length > 5) setSelectedText(sel);
+  }, []);
+
+  const handleMsgMouseUp = useCallback((msgIdx: number) => {
+    const sel = window.getSelection()?.toString().trim() ?? "";
     if (sel.length > 5) {
       setSelectedText(sel);
-      const node = window.getSelection()?.anchorNode;
-      if (node) {
-        let el: HTMLElement | null = node.nodeType === 3 ? node.parentElement : node as HTMLElement;
-        while (el) {
-          const idx = (el as HTMLElement).dataset?.msgidx;
-          if (idx !== undefined) { selectedMsgIdxRef.current = parseInt(idx, 10); break; }
-          el = el.parentElement;
-        }
-      }
+      selectedMsgIdxRef.current = msgIdx;
     }
   }, []);
 
@@ -653,11 +650,8 @@ function ChatPage() {
   }
 
   async function generateVisual() {
-    const concept = selectedText || (() => {
-      const last = [...messages].reverse().find(m => m.role === "assistant" && !m.visualCard);
-      return last?.content.slice(0, 400) ?? "";
-    })();
-    if (!concept.trim()) return toast.info("Select text from an answer first, then click Visual");
+    const concept = selectedText.trim();
+    if (!concept) return toast.info("Highlight some text from an answer first, then click Visual");
     setVisualLoading(true);
 
     const prompt = `Create a visual study infographic card for this concept: "${concept.slice(0, 400)}"
@@ -1003,7 +997,10 @@ Return STRICT JSON only (no prose, no markdown fences):
                 ? <User className="h-3 w-3 sm:h-4 sm:w-4" />
                 : <img src={logoUrl} alt="" width={16} height={16} className="object-contain sm:w-5 sm:h-5" />}
             </div>
-            <div className={`min-w-0 ${m.role === "user" ? "max-w-[88%] rounded-2xl px-2.5 py-2 sm:px-4 sm:py-3 bg-blue-600 text-white" : "flex-1 pt-0.5"}`}>
+            <div
+              className={`min-w-0 ${m.role === "user" ? "max-w-[88%] rounded-2xl px-2.5 py-2 sm:px-4 sm:py-3 bg-blue-600 text-white" : "flex-1 pt-0.5"}`}
+              onMouseUp={m.role === "assistant" ? () => handleMsgMouseUp(i) : undefined}
+            >
               {m.role === "user" ? (
                 <div>
                   {m.imageUrl && (
