@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Copy, RefreshCw, BookOpen, Plus, GraduationCap, ImageIcon, Paperclip, User, Loader2, X, ChevronDown, ChevronUp, Sparkles, Globe } from "lucide-react";
+import { Send, Copy, RefreshCw, BookOpen, Plus, GraduationCap, ImageIcon, Paperclip, User, Loader2, X, ChevronDown, ChevronUp, Sparkles, Globe, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
