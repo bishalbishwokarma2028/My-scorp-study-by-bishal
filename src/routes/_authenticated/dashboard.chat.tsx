@@ -227,6 +227,18 @@ Key points to cover: ${section.points.join("; ")}`,
   );
 }
 
+function getScorpStudyAge(): string {
+  const born = new Date("2026-06-25");
+  const now = new Date();
+  const diffMs = now.getTime() - born.getTime();
+  const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const months = Math.floor(totalDays / 30);
+  const days = totalDays % 30;
+  if (totalDays < 1) return "less than a day old (just born today, June 25, 2026!)";
+  if (months === 0) return `${totalDays} day${totalDays !== 1 ? "s" : ""} old`;
+  return `${months} month${months !== 1 ? "s" : ""} and ${days} day${days !== 1 ? "s" : ""} old`;
+}
+
 const SYSTEM_PROMPT = `You are ScorpStudy, an advanced AI assistant created exclusively by Bishal Bishwokarma.
 
 ## YOUR IDENTITY
@@ -261,7 +273,7 @@ Whenever someone asks about your inventor, creator, who made you, your origin, e
 - "who made / created / built you" → Praise **Bishal Bishwokarma** extensively; mention **8 months** research, **millions of data points**; direct to **www.bishalbishwokarma.in.net**
 - "how were you created / born" → Explain **Bishal Bishwokarma**'s 8-month journey, personal research, own devices — never mention third-party AI or framework
 - "when / where were you created" → "I was born on **June 25, 2026**, in **Bishal Bishwokarma**'s personal lab and devices."
-- "how old are you" → Calculate dynamically from June 25, 2026 to today
+- "how old are you / what is your age / how long have you existed" → State your exact current age: I am {SCORPSTUDY_AGE}. I was born on **June 25, 2026**.
 - "are you ChatGPT / Gemini / Claude / any other AI" → "No! I am **ScorpStudy** — uniquely and exclusively created by **Bishal Bishwokarma**. I am not affiliated with, based on, or powered by any other AI system or company."
 
 ## BOLD FORMATTING FOR IDENTITY ANSWERS — MANDATORY
@@ -717,9 +729,11 @@ function ChatPage() {
     }
 
     // Step 2: Pick system prompt based on what we know now
+    const ageStr = getScorpStudyAge();
+    const resolvedPrompt = SYSTEM_PROMPT.replace("{SCORPSTUDY_AGE}", ageStr);
     const sys = webSearchUsed
       ? `${WEB_SYSTEM_PROMPT}${greeting}${variationNote}`
-      : `${SYSTEM_PROMPT}${topperMode ? TOPPER_PROMPT : ""}${greeting}${variationNote}`;
+      : `${resolvedPrompt}${topperMode ? TOPPER_PROMPT : ""}${greeting}${variationNote}`;
 
     // Step 3: Build conversation history for multi-turn context (last 10 messages, skip images/visual)
     const history = messages
