@@ -74,17 +74,29 @@ function VisualInfoCard({ data }: { data: VisualCard }) {
     }
     setLoadingIdx(idx);
     const res = await askAI(
-      `Give a comprehensive, student-friendly deep-dive explanation of "${section.heading}" in the context of "${data.title}".
+      `Give a clear, step-by-step explanation of "${section.heading}" as it relates to "${data.title}".
 
-Structure your answer like this:
-**What it is:** [2-3 clear sentences — define it simply, use an analogy]
-**Why it matters:** [2 sentences on real importance — academic + real world]
-**Real-World Example:** [One vivid, specific example with names/places/data]
-**Key insight to remember:** [One memorable fact or rule of thumb]
-**Common mistake:** [One thing students often get wrong about this]
+Use this exact structure (keep each section short and focused):
 
-Key points from the card to address: ${section.points.join("; ")}`,
-      "You are Bishal's Assistant — a world-class study tutor. Use markdown formatting: **bold** for key terms, use clear paragraphs. Be thorough but easy to understand. Never reveal AI provider names.",
+**What it is:** [2–3 sentences. Define it plainly. Use one analogy starting with "Think of it like..."]
+
+**Why it matters:**
+- [Academic importance — 1 line]
+- [Real-world relevance — 1 line]
+
+**How it works — step by step:**
+1. [Step 1: what happens, in simple words]
+2. [Step 2: what happens]
+3. [Step 3: result or outcome]
+
+**Real Example:** [One specific, vivid example with actual names, numbers, or places]
+
+**Key Rule:** [One memorable formula, rule of thumb, or fact to never forget]
+
+**Common Mistake:** ❌ [what students get wrong] → ✅ [the correct way]
+
+Key points to cover: ${section.points.join("; ")}`,
+      "You are Bishal's Assistant — a world-class study tutor. Use proper markdown: **bold** for critical terms (max 4–5 per answer), *italics* for analogies. Give accurate, educational content. Never reveal AI provider names.",
     );
     setExpanded(prev => ({ ...prev, [idx]: res.text }));
     setLoadingIdx(null);
@@ -136,18 +148,31 @@ Key points from the card to address: ${section.points.join("; ")}`,
                 </ul>
 
                 {isExpanded && expanded[i] && (
-                  <div className={`mt-3 rounded-xl border-2 p-4 ${c.exp}`}>
+                  <div className="mt-4 pt-4 border-t border-slate-200/70">
                     <div className={`flex items-center gap-1.5 mb-3 ${c.head}`}>
-                      <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
-                      <p className="text-[10px] font-bold uppercase tracking-widest">Bishal's Deep-Dive Explanation</p>
+                      <Sparkles className="h-3 w-3 flex-shrink-0" />
+                      <p className="text-[10px] font-bold uppercase tracking-widest">Deep Explanation</p>
                     </div>
-                    <div className={`text-sm leading-relaxed space-y-2 ${c.text}`}>
-                      {expanded[i].split("\n").filter(Boolean).map((line, li) => {
-                        const bold = line.replace(/\*\*(.+?)\*\*/g, (_m, t) => `<strong>${t}</strong>`);
-                        return (
-                          <p key={li} dangerouslySetInnerHTML={{ __html: bold }} className="leading-7" />
-                        );
-                      })}
+                    <div className={`text-[13px] leading-relaxed ${c.text} [&_strong]:font-bold [&_strong]:text-indigo-900 [&_strong]:bg-sky-100 [&_strong]:rounded [&_strong]:px-1 [&_em]:not-italic [&_em]:text-blue-900 [&_em]:font-semibold [&_ul]:space-y-1 [&_ol]:space-y-1 [&_li]:flex [&_li]:gap-2 [&_p]:mb-2`}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          ul: ({ children }) => <ul className="pl-0 list-none space-y-1.5 my-2">{children}</ul>,
+                          ol: ({ children }) => <ol className="pl-0 list-none space-y-1.5 my-2 counter-reset-item">{children}</ol>,
+                          li: ({ children }) => (
+                            <li className="flex items-start gap-2 leading-relaxed">
+                              <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${c.head.replace("text-", "bg-")}`} />
+                              <span>{children}</span>
+                            </li>
+                          ),
+                          p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+                          strong: ({ children }) => <strong className="font-bold text-indigo-900 bg-sky-100 rounded px-1 py-0.5">{children}</strong>,
+                          em: ({ children }) => <em className="not-italic text-blue-900 font-semibold">{children}</em>,
+                          code: ({ children }) => <code className="bg-slate-100 text-violet-700 rounded px-1.5 py-[1px] text-[0.82em] font-mono font-semibold">{children}</code>,
+                        }}
+                      >
+                        {expanded[i]}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 )}
@@ -477,6 +502,7 @@ function ChatPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const askedQuestionsRef = useRef<Set<string>>(new Set());
+  const selectedMsgIdxRef = useRef<number | null>(null);
 
   useEffect(() => {
     try {
@@ -500,7 +526,18 @@ function ChatPage() {
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()?.toString().trim() ?? "";
-    if (sel.length > 5) setSelectedText(sel);
+    if (sel.length > 5) {
+      setSelectedText(sel);
+      const node = window.getSelection()?.anchorNode;
+      if (node) {
+        let el: HTMLElement | null = node.nodeType === 3 ? node.parentElement : node as HTMLElement;
+        while (el) {
+          const idx = (el as HTMLElement).dataset?.msgidx;
+          if (idx !== undefined) { selectedMsgIdxRef.current = parseInt(idx, 10); break; }
+          el = el.parentElement;
+        }
+      }
+    }
   }, []);
 
   async function send(prompt?: string) {
@@ -649,7 +686,15 @@ Return STRICT JSON only (no prose, no markdown fences):
       return;
     }
 
-    setMessages(prev => [...prev, { role: "assistant", content: "", visualCard: card, provider: "Bishal's Assistant" }]);
+    const targetIdx = selectedMsgIdxRef.current;
+    if (targetIdx !== null) {
+      setMessages(prev => prev.map((msg, i) =>
+        i === targetIdx ? { ...msg, visualCard: card } : msg
+      ));
+      selectedMsgIdxRef.current = null;
+    } else {
+      setMessages(prev => [...prev, { role: "assistant", content: "", visualCard: card, provider: "Bishal's Assistant" }]);
+    }
     setSelectedText("");
     setVisualLoading(false);
     toast.success("Visual study card generated! Click each section to expand it.");
@@ -755,7 +800,7 @@ Return STRICT JSON only (no prose, no markdown fences):
 
     return {
       strong: ({ children }: { children?: React.ReactNode }) => (
-        <strong className="bg-amber-100 text-amber-800 font-bold rounded px-[5px] py-[1.5px] not-italic border-b-[2px] border-amber-300">
+        <strong className="bg-sky-100 text-indigo-900 font-bold rounded px-[5px] py-[1.5px] not-italic border-b-[2px] border-sky-300">
           {children}
         </strong>
       ),
@@ -798,7 +843,7 @@ Return STRICT JSON only (no prose, no markdown fences):
             </div>
             <span className="text-[10px] font-mono text-slate-400 tracking-widest uppercase">code</span>
           </div>
-          <pre className="bg-slate-900 p-4 overflow-x-auto text-[12.5px] font-mono leading-relaxed m-0">{children}</pre>
+          <pre className="bg-slate-900 p-4 text-[12.5px] font-mono leading-relaxed m-0 whitespace-pre-wrap break-words overflow-x-hidden">{children}</pre>
           </div>
         ),
       ol: ({ children }: { children?: React.ReactNode }) => {
@@ -952,13 +997,13 @@ Return STRICT JSON only (no prose, no markdown fences):
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={`flex items-start gap-1 sm:gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
+          <div key={i} data-msgidx={i} className={`flex items-start gap-1 sm:gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
             <div className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-sm sm:h-9 sm:w-9 ${m.role === "user" ? "bg-slate-200 text-slate-600" : "bg-gradient-to-br from-blue-500 to-violet-600"}`}>
               {m.role === "user"
                 ? <User className="h-3 w-3 sm:h-4 sm:w-4" />
                 : <img src={logoUrl} alt="" width={16} height={16} className="object-contain sm:w-5 sm:h-5" />}
             </div>
-            <div className={`min-w-0 rounded-2xl px-2.5 py-2 sm:px-4 sm:py-3 ${m.role === "user" ? "max-w-[88%] bg-blue-600 text-white" : "flex-1 border border-border bg-white text-foreground shadow-sm"}`}>
+            <div className={`min-w-0 ${m.role === "user" ? "max-w-[88%] rounded-2xl px-2.5 py-2 sm:px-4 sm:py-3 bg-blue-600 text-white" : "flex-1 pt-0.5"}`}>
               {m.role === "user" ? (
                 <div>
                   {m.imageUrl && (
@@ -966,22 +1011,29 @@ Return STRICT JSON only (no prose, no markdown fences):
                   )}
                   <p className="text-sm font-medium whitespace-pre-wrap">{m.content}</p>
                 </div>
-              ) : m.visualCard ? (
-                <VisualInfoCard data={m.visualCard} />
               ) : (
                 <>
-                  <div className="prose prose-sm max-w-none text-foreground ai-prose">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMdComponents()}>
-                      {m.content}
-                    </ReactMarkdown>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2">
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(m.content); toast.success("Copied!"); }}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                    >
-                      <Copy className="h-3 w-3" /> Copy
-                    </button>
+                  {m.content ? (
+                    <div className="prose prose-sm max-w-none text-foreground ai-prose">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMdComponents()}>
+                        {m.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : null}
+                  {m.visualCard && (
+                    <div className={m.content ? "mt-5" : ""}>
+                      <VisualInfoCard data={m.visualCard} />
+                    </div>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+                    {m.content && (
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(m.content); toast.success("Copied!"); }}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                      >
+                        <Copy className="h-3 w-3" /> Copy
+                      </button>
+                    )}
                     <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                       ● Bishal's Assistant
                     </span>
@@ -990,7 +1042,7 @@ Return STRICT JSON only (no prose, no markdown fences):
                         <Globe className="h-3 w-3" /> Web Search Used
                       </span>
                     )}
-                    {i === messages.length - 1 && m.role === "assistant" && (
+                    {i === messages.length - 1 && m.role === "assistant" && m.content && (
                       <button
                         onClick={() => {
                           const lastUser = [...messages].reverse().find(x => x.role === "user");
