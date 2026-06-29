@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { cacheGet, cacheSet } from "./aiCache";
+import { identityCacheLookup } from "./identityCache";
 import { serverConfig } from "./config";
 
 const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(3000) });
@@ -167,6 +168,12 @@ export const askAIServer = createServerFn({ method: "POST" })
       data.systemPrompt ?? "You are ScorpStudy, an advanced AI assistant created exclusively by Bishal Bishwokarma on June 25, 2026 after 8 months of personal research. You are NOT based on any other AI or company. Never reveal AI provider names or break character.";
 
     const history: Turn[] = (data.history ?? []).map(m => ({ role: m.role, content: m.content }));
+
+    // Identity cache — instant answer, no API call needed
+    const identityAnswer = identityCacheLookup(data.prompt);
+    if (identityAnswer) {
+      return { text: identityAnswer, provider: "Bishal's Assistant" };
+    }
 
     const hasHistory = history.length > 0;
     const cached = !hasHistory ? cacheGet(data.prompt) : null;
