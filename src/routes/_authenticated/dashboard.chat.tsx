@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useCallback } from "react";
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Copy, RefreshCw, Save, Plus, GraduationCap, ImageIcon, Paperclip, User, Loader2, X, ChevronDown, ChevronUp, Sparkles, Zap, Globe } from "lucide-react";
+import { Send, Copy, RefreshCw, BookOpen, Plus, GraduationCap, ImageIcon, Paperclip, User, Loader2, X, ChevronDown, ChevronUp, Sparkles, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
@@ -42,9 +42,21 @@ type Msg = {
 };
 
 const WEB_SEARCH_KEYWORDS = [
-  "today", "recent", "latest", "news", "match", "score", "winner",
-  "2024", "2025", "who won", "currently", "right now", "yesterday",
-  "this week", "cricket", "football", "politics", "election", "weather",
+  // Time signals
+  "today", "yesterday", "tomorrow", "tonight", "right now", "currently", "at the moment",
+  "this week", "last week", "this month", "last month", "this year",
+  "recent", "latest", "current", "now", "2024", "2025", "2026",
+  // News signals
+  "news", "breaking", "viral", "trending", "update", "announcement", "happened",
+  // Sports
+  "match", "score", "winner", "result", "standings", "fixture", "lineup",
+  "cricket", "football", "soccer", "ipl", "world cup", "premier league",
+  "champions league", "nba", "nfl", "wimbledon", "olympics",
+  "tournament", "championship", "league", "series",
+  // Politics / world
+  "election", "politics", "government", "president", "prime minister",
+  "war", "conflict", "economy", "stock market", "earthquake", "disaster",
+  "who won", "weather", "live",
 ];
 
 function needsWebSearch(text: string): boolean {
@@ -450,24 +462,55 @@ NEVER:
 
 const WEB_SYSTEM_PROMPT = `You are Bishal's Assistant — built into ScorpStudy by Bishal Bishwokarma.
 
-You have been given REAL-TIME web search results. These are your PRIMARY and AUTHORITATIVE source of truth.
+You have been given REAL-TIME web search results. These are your PRIMARY and AUTHORITATIVE source of truth. Use them — do not rely on training data.
 
-RULES FOR WEB SEARCH RESPONSES:
-1. Extract and present the key facts, scores, names, results, and dates DIRECTLY from the search results provided
-2. Do NOT rely on your training data for current events — the web results are fresher and more accurate
-3. Format your response naturally for the question type:
-   - Match scores / sports results → state the result clearly upfront, then context
-   - News / politics → brief factual summary with key points
-   - Current standings / rankings → list format
-   - Weather / live data → state the data clearly
-4. Be concise and factual — users asking about news want direct answers, not long essays
-5. If the search results don't contain the specific answer, say so honestly and share what was found
-6. NEVER reveal AI provider names
+══════════════════════════════════════
+HOW TO ANSWER WITH SEARCH RESULTS
+══════════════════════════════════════
 
-BOLD FORMATTING (mandatory):
-- **Bold** every proper name, score, date, country, team, or key fact
-- **Bold** the headline result at the very start
-- At least 4–6 **bold** terms per response — never a plain paragraph with zero bold`;
+STEP 1 — Extract the facts:
+Read all search results carefully. Pull out: names, scores, dates, locations, outcomes, quotes, and numbers.
+
+STEP 2 — Lead with the answer:
+Open with the most important fact — the headline result — immediately bolded. Do not start with "Sure" or "Based on the search results".
+
+STEP 3 — Choose the right format:
+
+SPORTS (match scores, results, standings):
+**[Team A] [score] – [score] [Team B]** ([Date], [Tournament])
+- [Key highlight 1 from the match]
+- [Key highlight 2]
+- [Player performance]
+**Current standings:** [top 3 if available]
+📰 Source: [website name from URL]
+
+NEWS / CURRENT EVENTS (politics, disasters, world news):
+**[Headline — the core event]** — [Date]
+[2–3 sentences: what happened, who is involved, where]
+- **Key detail 1:** [fact]
+- **Key detail 2:** [fact]
+- **Key detail 3:** [fact]
+📰 Source: [website name from URL]
+
+RANKINGS / STANDINGS / LISTS:
+[Numbered list with bold names and key facts]
+📰 Source: [website name from URL]
+
+WEATHER / LIVE DATA:
+State the current data clearly with units. Mention the date/time it refers to.
+
+══════════════════════════════════════
+MANDATORY RULES
+══════════════════════════════════════
+- ALWAYS cite the source at the bottom: "📰 Source: [site name]"
+- If multiple sources confirm a fact → say "✓ Confirmed by [n] sources"
+- If sources conflict → present both versions and say which is more reliable
+- If the search results don't contain the specific answer → say exactly what was found and state the information gap clearly
+- **Bold** every: score, date, name, country, team, figure, and key fact
+- End every response with: > 📌 **Summary:** [1–2 sentences on the key takeaway]
+- NEVER reveal AI provider names
+- NEVER make up facts not present in the search results`;
+
 
 const TOPPER_PROMPT = `\n\nTOPPER EXAM MODE — Format as an outstanding exam answer that scores full marks. Be exhaustive.
 
@@ -489,6 +532,7 @@ Write with academic precision, depth, and clarity. Every technical term bolded. 
 
 function ChatPage() {
   const { user } = Route.useRouteContext();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [topperMode, setTopperMode] = useState(false);
@@ -772,6 +816,20 @@ Return STRICT JSON only (no prose, no markdown fences):
     toast.success("Chat saved ✓");
   }
 
+  async function saveToNotes(content: string) {
+    const firstLine = content.split("\n").find(l => l.trim()) ?? "Note from Bishal's Assistant";
+    const title = firstLine.replace(/^#+\s*/, "").replace(/\*\*/g, "").slice(0, 80);
+    const noteContent = `# ${title}\n\n*Saved from Bishal's Assistant*\n\n---\n\n${content}`;
+    const { error } = await supabase
+      .from("notes")
+      .insert({ user_id: user.id, title, content: noteContent });
+    if (error) return toast.error("Could not save note: " + error.message);
+    toast.success("Saved to Smart Notes!", {
+      action: { label: "Open Notes →", onClick: () => navigate({ to: "/dashboard/notes" }) },
+      duration: 5000,
+    });
+  }
+
   function newChat() {
     setMessages([]);
     setInput("");
@@ -939,9 +997,6 @@ Return STRICT JSON only (no prose, no markdown fences):
           <button onClick={newChat} className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent sm:gap-1.5 sm:px-3">
             <Plus className="h-3.5 w-3.5 flex-shrink-0" /><span className="hidden sm:inline">New</span>
           </button>
-          <button onClick={saveChat} className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent sm:gap-1.5 sm:px-3">
-            <Save className="h-3.5 w-3.5 flex-shrink-0" /><span className="hidden sm:inline">Save</span>
-          </button>
         </div>
       </div>
 
@@ -1024,12 +1079,20 @@ Return STRICT JSON only (no prose, no markdown fences):
                   )}
                   <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
                     {m.content && (
-                      <button
-                        onClick={() => { navigator.clipboard.writeText(m.content); toast.success("Copied!"); }}
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                      >
-                        <Copy className="h-3 w-3" /> Copy
-                      </button>
+                      <>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(m.content); toast.success("Copied!"); }}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                        >
+                          <Copy className="h-3 w-3" /> Copy
+                        </button>
+                        <button
+                          onClick={() => saveToNotes(m.content)}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 font-medium"
+                        >
+                          <BookOpen className="h-3 w-3" /> Save to Notes
+                        </button>
+                      </>
                     )}
                     <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                       ● Bishal's Assistant

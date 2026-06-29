@@ -12,30 +12,49 @@ type SearchResult = {
   snippet: string;
 };
 
+const NEWS_KEYWORDS = [
+  "news", "match", "score", "result", "today", "yesterday", "latest",
+  "election", "cricket", "football", "soccer", "politics", "breaking",
+  "trending", "viral", "war", "disaster", "weather", "winner", "standings",
+];
+
+function isNewsQuery(query: string): boolean {
+  const lower = query.toLowerCase();
+  return NEWS_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 async function tryTavily(query: string, key: string): Promise<SearchResult[] | null> {
   try {
+    const newsQuery = isNewsQuery(query);
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         api_key: key,
         query,
-        search_depth: "basic",
-        max_results: 5,
+        search_depth: "advanced",
+        max_results: 8,
         include_answer: true,
+        include_raw_content: false,
+        ...(newsQuery ? { topic: "news" } : {}),
       }),
     });
     if (!res.ok) return null;
     const data = await res.json() as {
-      results?: { title?: string; url?: string; content?: string }[];
+      answer?: string;
+      results?: { title?: string; url?: string; content?: string; published_date?: string }[];
     };
     const results = data.results ?? [];
     if (!results.length) return null;
-    return results.map((r) => ({
+    const mapped = results.map((r) => ({
       title: r.title ?? "",
       url: r.url ?? "",
-      snippet: r.content ?? "",
+      snippet: [r.published_date ? `[Published: ${r.published_date}]` : "", r.content ?? ""].filter(Boolean).join(" "),
     }));
+    if (data.answer) {
+      mapped.unshift({ title: "Quick Answer", url: "", snippet: `DIRECT ANSWER: ${data.answer}` });
+    }
+    return mapped;
   } catch {
     return null;
   }
