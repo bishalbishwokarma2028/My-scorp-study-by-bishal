@@ -5,7 +5,7 @@ import {
   FileText, Layers, BookOpen, TrendingUp, Star, ArrowRight, Brain,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useDailyTip } from "@/components/ai-ui";
+import { useDailyTip } from "@/hooks/useDailyTip";
 
 export const Route = createFileRoute("/_authenticated/dashboard/")({
   component: DashboardOverview,
