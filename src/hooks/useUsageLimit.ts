@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { getUsageServer, bumpUsageServer } from "@/lib/usageLimit.functions";
 import type { FeatureKey } from "@/lib/usageLimit.config";
+import { FEATURE_LIMITS } from "@/lib/usageLimit.config";
 
 export type QuotaState = {
   used: number;
@@ -8,38 +8,57 @@ export type QuotaState = {
   remaining: number;
 };
 
-/**
- * Fetches the current server-side daily quota for `feature` and provides
- * a `bump()` function that atomically increments the count after a
- * successful AI response.
- *
- * The backend is always the single source of truth — no localStorage used.
- */
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function storageKey(userId: string, feature: FeatureKey): string {
+  return `scorp_quota_${userId}_${feature}`;
+}
+
+function readLocal(userId: string, feature: FeatureKey): QuotaState {
+  const limit = FEATURE_LIMITS[feature];
+  try {
+    const raw = localStorage.getItem(storageKey(userId, feature));
+    if (!raw) return { used: 0, limit, remaining: limit };
+    const parsed = JSON.parse(raw) as { date: string; used: number };
+    if (parsed.date !== todayKey()) return { used: 0, limit, remaining: limit };
+    const used = parsed.used ?? 0;
+    return { used, limit, remaining: Math.max(0, limit - used) };
+  } catch {
+    return { used: 0, limit, remaining: limit };
+  }
+}
+
+function writeLocal(userId: string, feature: FeatureKey, used: number): QuotaState {
+  const limit = FEATURE_LIMITS[feature];
+  try {
+    localStorage.setItem(
+      storageKey(userId, feature),
+      JSON.stringify({ date: todayKey(), used }),
+    );
+  } catch {
+    /* storage full — ignore */
+  }
+  return { used, limit, remaining: Math.max(0, limit - used) };
+}
+
 export function useUsageLimit(userId: string, feature: FeatureKey) {
   const [quota, setQuota] = useState<QuotaState | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(true);
 
   useEffect(() => {
-    setQuotaLoading(true);
-    getUsageServer({ data: { userId, feature } })
-      .then(setQuota)
-      .catch(() => { /* silently degrade — app still works */ })
-      .finally(() => setQuotaLoading(false));
+    setQuota(readLocal(userId, feature));
+    setQuotaLoading(false);
   }, [userId, feature]);
 
-  /**
-   * Call this after a successful AI response.
-   * Returns { allowed: false } if the user was already at their daily limit
-   * (edge case: concurrent requests from multiple tabs).
-   */
   const bump = useCallback(async (): Promise<{ allowed: boolean }> => {
-    try {
-      const result = await bumpUsageServer({ data: { userId, feature } });
-      setQuota({ used: result.used, limit: result.limit, remaining: result.remaining });
-      return { allowed: result.allowed };
-    } catch {
-      return { allowed: true }; // fail open so a network error doesn't block the UI
-    }
+    const current = readLocal(userId, feature);
+    if (current.remaining <= 0) return { allowed: false };
+    const newUsed = current.used + 1;
+    const newQuota = writeLocal(userId, feature, newUsed);
+    setQuota(newQuota);
+    return { allowed: true };
   }, [userId, feature]);
 
   return { quota, quotaLoading, bump };
