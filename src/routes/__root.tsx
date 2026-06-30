@@ -193,6 +193,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON_LD }}
+          suppressHydrationWarning
         />
       </head>
       <body>
