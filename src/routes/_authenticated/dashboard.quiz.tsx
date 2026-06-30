@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { ProviderBadge } from "@/components/ai-ui";
-import { canUseAI, bumpAIUsage, QUOTA_MSG, getAIUsedToday, AI_DAILY_LIMIT } from "@/lib/dailyLimits";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard/quiz")({
   component: QuizPage,
@@ -73,6 +75,7 @@ function QuizPage() {
   const [done, setDone] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
   const [showAnswers, setShowAnswers] = useState<boolean[]>([]);
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "quiz");
 
   useEffect(() => {
     const seed = sessionStorage.getItem("scorp_quiz_topic");
@@ -84,12 +87,12 @@ function QuizPage() {
 
   async function generate() {
     if (!topic.trim()) return toast.error("Enter a topic");
-    if (!canUseAI()) return toast.error(QUOTA_MSG);
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); setQuestions(null); setDone(false); setCurrent(0); setAnswers([]); setShowAnswers([]);
     const prompt = buildPrompt(topic, difficulty, type, count);
-    bumpAIUsage();
     const res = await askAI(prompt, "Output only valid JSON arrays. No code fences.");
     setProvider(res.provider);
+    await bump();
     const parsed = extractJSON<Q[]>(res.text);
     if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
       toast.error("Couldn't parse questions, try again");
@@ -238,7 +241,10 @@ function QuizPage() {
 
   return (
     <div className="card-soft mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
-      <h2 className="text-lg font-semibold">Generate a quiz</h2>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Generate a quiz</h2>
+        <QuotaBadge quota={quota} loading={quotaLoading} />
+      </div>
       <div>
         <label className="text-sm font-medium">Topic or notes</label>
         <textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={4} placeholder="e.g. 'Cell biology — mitosis and meiosis'" className="mt-1 w-full rounded-lg border border-input bg-background p-3 text-sm" />

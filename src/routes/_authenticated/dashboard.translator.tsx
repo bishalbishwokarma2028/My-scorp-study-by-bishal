@@ -5,7 +5,9 @@ import { Loader2, Volume2, Copy, ArrowLeftRight, Save, Languages, Sparkles, Tras
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { canTranslate, bumpTranslateUsage, TRANSLATE_LIMIT_MSG, getTranslateUsedToday, TRANSLATE_DAILY_LIMIT } from "@/lib/dailyLimits";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard/translator")({
   component: TranslatorPage,
@@ -37,6 +39,7 @@ function TranslatorPage() {
   const [target, setTarget] = useState("Spanish");
   const [loading, setLoading] = useState(false);
   const [auto] = useState(false);
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "translator");
 
   // Restore from history
   useEffect(() => {
@@ -62,8 +65,7 @@ function TranslatorPage() {
   async function translate() {
     if (!text.trim()) return toast.error("Type something to translate");
     if (text.length > MAX_CHARS) return toast.error(`Limit ${MAX_CHARS} characters`);
-    if (!canTranslate()) return toast.error(TRANSLATE_LIMIT_MSG);
-    bumpTranslateUsage();
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
     setResult("");
     const isAutoDetect = source === "Auto-detect";
@@ -85,6 +87,7 @@ ${text}`,
       `You are a precise multilingual translator. You understand romanized/transliterated text in any language. When source is a non-Latin language but text is in Latin script, convert transliteration to native script first, then translate. Output ONLY the final translation.`,
     );
     setResult(res.text.trim().replace(/^["']|["']$/g, ""));
+    await bump();
     setLoading(false);
   }
 
@@ -156,6 +159,13 @@ ${text}`,
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">30+ languages, auto-detect, listen & save — powered by Bishal's Assistant.</p>
         </div>
+        <QuotaBadge quota={quota} loading={quotaLoading} />
+      </div>
+
+      {/* Beta disclaimer */}
+      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <span className="mt-0.5 text-base leading-none">⚠️</span>
+        <p><span className="font-semibold">Beta feature:</span> Translations are AI-generated and may not be perfectly accurate. Always verify important translations with a native speaker or professional service.</p>
       </div>
 
       <div className="rounded-2xl border border-border bg-white p-5">

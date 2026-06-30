@@ -5,7 +5,9 @@ import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { ProviderBadge } from "@/components/ai-ui";
-import { canUseAI, bumpAIUsage, QUOTA_MSG, getAIUsedToday, AI_DAILY_LIMIT } from "@/lib/dailyLimits";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard/summarizer")({
   component: SummarizerPage,
@@ -28,6 +30,7 @@ function SummarizerPage() {
   const [output, setOutput] = useState<Output | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "summarizer");
 
   useEffect(() => {
     try {
@@ -63,8 +66,7 @@ function SummarizerPage() {
   async function summarize() {
     const source = text.trim();
     if (source.length < 50) return toast.error("Please enter at least 50 characters");
-    if (!canUseAI()) return toast.error(QUOTA_MSG);
-    bumpAIUsage();
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
     setOutput(null);
     const prompt = `Summarize the following text.
@@ -78,6 +80,7 @@ ${source.slice(0, 12000)}`;
     setProvider(res.provider);
     const parsed = extractJSON<Output>(res.text);
     setOutput(parsed ?? { summary: res.text, keyPoints: [], examQuestions: [], vocabulary: [] });
+    await bump();
     setLoading(false);
   }
 
@@ -107,9 +110,12 @@ ${source.slice(0, 12000)}`;
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
-          <FileText className="h-6 w-6 text-violet-600" /> PDF & Notes Summarizer
-        </h1>
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <h1 className="flex items-center gap-2 text-2xl font-bold">
+            <FileText className="h-6 w-6 text-violet-600" /> PDF & Notes Summarizer
+          </h1>
+          <QuotaBadge quota={quota} loading={quotaLoading} />
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">Paste text or upload a file — PDF, image, or document — for an instant AI-powered study breakdown.</p>
       </div>
 

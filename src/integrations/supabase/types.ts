@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      daily_usage: {
+        Row: {
+          id: string
+          user_id: string
+          feature: string
+          usage_date: string
+          count: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          feature: string
+          usage_date?: string
+          count?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          feature?: string
+          usage_date?: string
+          count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_history: {
         Row: {
           created_at: string

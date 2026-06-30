@@ -12,7 +12,9 @@ import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
 import { supabase } from "@/integrations/supabase/client";
 import logoUrl from "@/assets/scorpstudy-logo.png";
-import { canEnhance, bumpEnhanceUsage, ENHANCE_LIMIT_MSG, getEnhanceUsedToday, ENHANCE_DAILY_LIMIT } from "@/lib/dailyLimits";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard/notes")({
   component: NotesPage,
@@ -145,6 +147,7 @@ function NotesPage() {
   const [aiLoading, setAiLoading] = useState<null | string>(null);
   const [tmplOpen, setTmplOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "notes");
 
   const { data: notes } = useQuery({
     queryKey: ["notes", user.id],
@@ -265,23 +268,25 @@ function NotesPage() {
 
   async function aiEnhance() {
     if (!content.trim()) return toast.error("Write something first");
-    if (!canEnhance()) return toast.error(ENHANCE_LIMIT_MSG);
-    bumpEnhanceUsage();
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setAiLoading("enhance");
     const res = await askAI(
       `Improve, structure and polish these study notes. Keep meaning, fix grammar, use clear Markdown headings/bullets. Bold the key terms with **.\n\nNotes:\n${content}`,
     );
     setContent(res.text);
     setDirty(true);
+    await bump();
     setAiLoading(null);
     toast.success("Enhanced");
   }
   async function aiSummarize() {
     if (!content.trim()) return toast.error("Write something first");
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setAiLoading("summarize");
     const res = await askAI(`Summarize these notes as crisp bullet points with bolded key terms:\n${content}`);
     setContent(`${content}\n\n---\n\n## ✨ Summary\n${res.text}`);
     setDirty(true);
+    await bump();
     setAiLoading(null);
     toast.success("Summary appended");
   }
@@ -592,6 +597,7 @@ function NotesPage() {
             <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /> Summarize</AiBtn>
             <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /> Quiz Me</AiBtn>
             <AiBtn onClick={exportPDF}><Download className="h-3 w-3" /> Export PDF</AiBtn>
+            <QuotaBadge quota={quota} loading={quotaLoading} />
             <button onClick={() => persist(true)} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 font-semibold text-white shadow-md hover:opacity-90">
               <Save className="h-3 w-3" /> Save
             </button>

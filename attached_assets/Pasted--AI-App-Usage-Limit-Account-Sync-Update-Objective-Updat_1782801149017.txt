@@ -1,0 +1,156 @@
+# AI App Usage Limit & Account Sync Update
+
+## Objective
+Update the application so that all daily usage limits are tracked per authenticated user account instead of per device. The same user must always see the same remaining quota regardless of which device or browser they use.
+
+---
+
+## Global Requirements
+
+- Use the authenticated Supabase user ID as the unique identifier.
+- Store and validate all usage on the backend.
+- Do NOT use localStorage, sessionStorage, cookies, or any client-side storage for enforcing limits.
+- The backend must always be the single source of truth.
+- Daily limits must reset automatically once every 24 hours (or at midnight based on the chosen reset strategy).
+- Prevent users from bypassing limits by:
+  - Switching devices
+  - Switching browsers
+  - Clearing browser data
+  - Refreshing the page
+  - Opening multiple tabs
+
+Only increment the usage count after a successful AI response.
+
+---
+
+# Daily Limits
+
+## Bishal's Assistant
+Daily Limit:
+20 requests per user
+
+Display:
+- Remaining
+- Used Today
+
+---
+
+## Summarizer
+Daily Limit:
+5 uses
+
+---
+
+## Quiz Generator
+Daily Limit:
+5 uses
+
+---
+
+## Flashcards
+Daily Limit:
+5 uses
+
+---
+
+## Smart Notes
+
+The following tools should share one combined quota:
+
+- Enhance
+- Summarize
+- Quiz Me
+
+Combined Daily Limit:
+10 uses
+
+Example:
+
+Enhance → 3
+
+Summarize → 4
+
+Quiz Me → 2
+
+Total Used → 9/10
+
+---
+
+## Translator
+
+Daily Limit:
+20 uses
+
+Display this message above the translation result:
+
+"This Translator is still under development and training.
+Translations may occasionally be inaccurate or incomplete.
+Please verify important translations before relying on them."
+
+---
+
+## Calculator → Formula Helper
+
+Daily Limit:
+15 uses
+
+---
+
+# Limit Reached Message
+
+For every feature, once the daily quota has been exhausted, stop processing the request immediately and display exactly this message:
+
+"You crossed today's free quota limit. Try again tomorrow!"
+
+Do not call the AI API after the limit has been reached.
+
+---
+
+# User Interface
+
+Each feature should clearly display:
+
+Remaining:
+X / Limit
+
+Used Today:
+X
+
+
+---
+
+# Expected Behaviour
+
+Example:
+
+User logs into Device A.
+
+Uses 8 Assistant requests.
+
+Remaining:
+12/20
+
+The same user logs into Device B.
+
+It must immediately show:
+
+Remaining:
+12/20
+
+NOT
+
+20/20
+
+The remaining quota must always stay synchronized across every device for the same account.
+
+---
+
+# Code Requirements
+
+- Write clean, modular, and reusable code.
+- Use one reusable usage-limit service for every feature.
+- Avoid duplicate logic.
+- Handle concurrent requests safely.
+- Keep the UI responsive.
+- Display proper loading states and error handling.
+- Ensure the implementation is scalable so future features can easily have their own limits.

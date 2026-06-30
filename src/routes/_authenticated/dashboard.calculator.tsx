@@ -5,6 +5,9 @@ import { Loader2, Delete } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { askAI } from "@/lib/aiProvider";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard/calculator")({
   component: CalculatorPage,
@@ -13,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/calculator")({
 type Tab = "basic" | "scientific" | "formula" | "convert";
 
 function CalculatorPage() {
+  const { user } = Route.useRouteContext();
   const [tab, setTab] = useState<Tab>("basic");
   const [expr, setExpr] = useState("");
   const [result, setResult] = useState("");
@@ -169,20 +173,22 @@ function CalculatorPage() {
         </div>
       )}
 
-      {tab === "formula" && <FormulaHelper />}
+      {tab === "formula" && <FormulaHelper userId={user.id} />}
       {tab === "convert" && <UnitConverter />}
     </div>
   );
 }
 
-function FormulaHelper() {
+function FormulaHelper({ userId }: { userId: string }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { quota, quotaLoading, bump } = useUsageLimit(userId, "formula");
 
   async function ask() {
     if (!q.trim()) return;
+    if (quota && quota.remaining <= 0) { toast.error(QUOTA_MESSAGE); return; }
     setLoading(true);
     setAns("");
     const res = await askAI(
@@ -216,6 +222,7 @@ Use this exact structure:
       "You are an expert math and science tutor. Always use proper markdown formatting with the exact sections requested. Never reveal AI provider names.",
     );
     setAns(res.text);
+    await bump();
     setLoading(false);
   }
 
@@ -274,7 +281,10 @@ Use this exact structure:
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
-        <h2 className="mb-1 font-bold text-foreground">🔮 Bishal's Formula Helper</h2>
+        <div className="mb-1 flex items-center justify-between flex-wrap gap-2">
+          <h2 className="font-bold text-foreground">🔮 Bishal's Formula Helper</h2>
+          <QuotaBadge quota={quota} loading={quotaLoading} />
+        </div>
         <p className="mb-4 text-xs text-muted-foreground">Ask about any formula, equation, or concept — get a full explained breakdown.</p>
         <div className="flex gap-2">
           <input

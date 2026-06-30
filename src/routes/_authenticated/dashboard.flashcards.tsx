@@ -4,7 +4,9 @@ import { Loader2, Shuffle, Check, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { supabase } from "@/integrations/supabase/client";
-import { canUseAI, bumpAIUsage, QUOTA_MSG } from "@/lib/dailyLimits";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
 
 export const Route = createFileRoute("/_authenticated/dashboard/flashcards")({
   component: FlashcardsPage,
@@ -48,6 +50,7 @@ function FlashcardsPage() {
   const [typed, setTyped] = useState("");
   const [matches, setMatches] = useState<{ q: number; a: number }[]>([]);
   const [selQ, setSelQ] = useState<number | null>(null);
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "flashcards");
 
   useEffect(() => {
     try {
@@ -62,11 +65,11 @@ function FlashcardsPage() {
 
   async function generate() {
     if (!topic.trim()) return toast.error("Topic required");
-    if (!canUseAI()) return toast.error(QUOTA_MSG);
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
-    bumpAIUsage();
     const prompt = buildFlashcardPrompt(topic, count, cardType);
     const res = await askAI(prompt, "Output JSON only.");
+    await bump();
     const parsed = extractJSON<Card[]>(res.text);
     if (parsed && parsed.length) {
       setCards(parsed); setIdx(0); setFlipped(false); setKnown(new Set()); setTyped(""); setMatches([]);
@@ -100,7 +103,10 @@ function FlashcardsPage() {
   if (!cards) {
     return (
       <div className="card-soft mx-auto max-w-xl space-y-5 p-4 sm:p-6">
-        <h2 className="text-lg font-semibold">Make flashcards</h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Make flashcards</h2>
+          <QuotaBadge quota={quota} loading={quotaLoading} />
+        </div>
         <textarea value={topic} onChange={(e) => setTopic(e.target.value)} rows={4} placeholder="Topic or notes to study..." className="w-full rounded-lg border border-input bg-background p-3 text-sm" />
 
         <div>

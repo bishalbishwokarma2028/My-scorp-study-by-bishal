@@ -10,7 +10,9 @@ import { analyzeImageServer } from "@/lib/aiProvider.functions";
 import { webSearchServer } from "@/lib/webSearch.functions";
 import { supabase } from "@/integrations/supabase/client";
 import logoUrl from "@/assets/scorpstudy-logo.png";
-import { canUseAI, bumpAIUsage, QUOTA_MSG, getCachedAnswer, setCachedAnswer, getAIUsedToday, AI_DAILY_LIMIT } from "@/lib/dailyLimits";
+import { getCachedAnswer, setCachedAnswer } from "@/lib/dailyLimits";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 
 export const Route = createFileRoute("/_authenticated/dashboard/chat")({
   component: ChatPage,
@@ -617,6 +619,7 @@ function ChatPage() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const askedQuestionsRef = useRef<Set<string>>(new Set());
   const selectedMsgIdxRef = useRef<number | null>(null);
+  const { quota, bump } = useUsageLimit(user.id, "chat");
 
   useEffect(() => {
     try {
@@ -655,8 +658,8 @@ function ChatPage() {
     const text = (prompt ?? input).trim();
     if ((!text && !pendingImage) || loading) return;
 
-    if (!canUseAI()) {
-      toast.error(QUOTA_MSG);
+    if (quota && quota.remaining <= 0) {
+      toast.error(QUOTA_MESSAGE);
       return;
     }
 
@@ -673,7 +676,6 @@ function ChatPage() {
       const newMsgs = [...messages, imgMsg];
       setMessages(newMsgs);
       setLoading(true);
-      bumpAIUsage();
       const question = text || "Describe and analyze this image in detail. If it's a study-related image, explain the concepts shown.";
       const res = await analyzeImageServer({
         data: {
@@ -683,6 +685,7 @@ function ChatPage() {
         },
       });
       setMessages([...newMsgs, { role: "assistant", content: res.text, provider: "Bishal's Assistant" }]);
+      await bump();
       setPendingImage(null);
       setLoading(false);
       return;
@@ -704,7 +707,6 @@ function ChatPage() {
       }
     }
 
-    bumpAIUsage();
     const greeting = isFirst
       ? "\n\nThis is the first message — greet the student warmly in one short sentence before answering."
       : "\n\nThis is a follow-up — do NOT repeat the greeting. Jump straight to the answer.";
@@ -748,6 +750,7 @@ function ChatPage() {
     if (!isRepeat) setCachedAnswer(text, res.text);
     const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed, isIdentityAnswer: res.isIdentityAnswer };
     setMessages([...newMsgs, assistantMsg]);
+    await bump();
 
     if (isFirst) {
       try {
@@ -1071,9 +1074,9 @@ Return STRICT JSON only (no prose, no markdown fences):
           </div>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 ${getAIUsedToday() >= AI_DAILY_LIMIT ? "border-red-300 bg-red-50 text-red-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}>
+          <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 ${quota && quota.remaining === 0 ? "border-red-300 bg-red-50 text-red-700" : "border-blue-200 bg-blue-50 text-blue-700"}`}>
             <Zap className="h-3 w-3" />
-            <span className="tabular-nums">{Math.max(0, AI_DAILY_LIMIT - getAIUsedToday())}<span className="hidden sm:inline"> / {AI_DAILY_LIMIT}</span></span>
+            <span className="tabular-nums">{quota ? quota.remaining : "—"}<span className="hidden sm:inline"> / {quota ? quota.limit : 20}</span></span>
           </div>
           <button
             onClick={() => setTopperMode(v => !v)}
