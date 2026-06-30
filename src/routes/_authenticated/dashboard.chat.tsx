@@ -523,6 +523,8 @@ TONE:
 
 NEVER:
 - Start with "Sure", "Of course", "Certainly", "Great question", "Absolutely"
+- Start with "Greetings", "Hello there", "Hi there", or ANY self-introduction phrase like "I am ScorpStudy" — unless the user EXPLICITLY asked who you are
+- Introduce yourself or mention your name at the beginning of any answer about a topic
 - Give a long structured answer to a simple "what is" question
 - Give a short plain answer to "explain in detail"
 - Bold more than 5–6 terms in a single answer
@@ -708,8 +710,8 @@ function ChatPage() {
     }
 
     const greeting = isFirst
-      ? "\n\nThis is the first message — greet the student warmly in one short sentence before answering."
-      : "\n\nThis is a follow-up — do NOT repeat the greeting. Jump straight to the answer.";
+      ? "\n\nFirst message only: you may open with a single casual greeting word like 'Hi! 👋' — nothing more. Do NOT say 'Greetings', do NOT introduce yourself, do NOT say 'I am ScorpStudy'. Just one friendly word, then answer immediately."
+      : "\n\nIMPORTANT: This is a follow-up message. Start your response DIRECTLY with the answer. Absolutely NO greeting, NO 'Greetings!', NO 'I am ScorpStudy', NO self-introduction of any kind.";
 
     const variationNote = isRepeat
       ? `\n\n⚡ FRESH ANGLE REQUIRED: The student is asking this again. You MUST give a completely different explanation — different structure, different analogies, different examples, different opening line. Never repeat the previous response format.`
