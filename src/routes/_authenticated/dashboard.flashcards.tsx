@@ -25,15 +25,35 @@ const CARD_TYPE_INFO: Record<CardType, { icon: string; desc: string; frontLabel:
 
 function buildFlashcardPrompt(topic: string, count: number, cardType: CardType): string {
   if (cardType === "Term / Definition") {
-    return `Create ${count} flashcards for studying: "${topic}". Return STRICT JSON array: [{"front":"key term or concept","back":"clear definition"}]. No prose.`;
+    return `Create exactly ${count} Term/Definition flashcards for studying: "${topic}".
+STRICT RULES:
+- "front" must be a key term, concept, or keyword — NOT a question.
+- "back" must be a clear, concise definition of that term (1–3 sentences).
+Return STRICT JSON array only — no prose, no markdown fences:
+[{"front":"term or concept","back":"definition of the term"}]`;
   }
   if (cardType === "Very Short Answer") {
-    return `Create ${count} flashcards for: "${topic}". Each card has a question on front and a 1–5 word answer on back (a key fact, date, name, or term). Return STRICT JSON: [{"front":"question","back":"1-5 word answer"}]. No prose.`;
+    return `Create exactly ${count} Very Short Answer flashcards for: "${topic}".
+STRICT RULES:
+- "front" must be a question (ending with "?").
+- "back" must be the answer in 1–5 words ONLY — a key fact, date, name, number, or term. No full sentences.
+Return STRICT JSON array only — no prose, no markdown fences:
+[{"front":"question?","back":"1-5 word answer"}]`;
   }
   if (cardType === "Short Answer") {
-    return `Create ${count} flashcards for: "${topic}". Each card has a question on front and a 1–3 sentence answer on back. Return STRICT JSON: [{"front":"question","back":"1-3 sentence answer"}]. No prose.`;
+    return `Create exactly ${count} Short Answer flashcards for: "${topic}".
+STRICT RULES:
+- "front" must be a question (ending with "?").
+- "back" must be a complete answer in 1–3 sentences. Not a single word. Not a paragraph.
+Return STRICT JSON array only — no prose, no markdown fences:
+[{"front":"question?","back":"1-3 sentence answer"}]`;
   }
-  return `Create ${count} flashcards for: "${topic}". Each card has a question on front and a detailed paragraph answer (6–10 sentences) on back, covering key concepts, examples, and significance. Return STRICT JSON: [{"front":"question","back":"detailed paragraph answer"}]. No prose.`;
+  return `Create exactly ${count} Long Answer flashcards for: "${topic}".
+STRICT RULES:
+- "front" must be a detailed question (ending with "?") asking for an in-depth explanation.
+- "back" must be a comprehensive paragraph of 6–10 sentences covering key concepts, how it works, examples, and significance.
+Return STRICT JSON array only — no prose, no markdown fences:
+[{"front":"detailed question?","back":"comprehensive 6-10 sentence paragraph answer"}]`;
 }
 
 function FlashcardsPage() {

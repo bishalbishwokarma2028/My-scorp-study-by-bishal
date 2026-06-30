@@ -57,9 +57,46 @@ Each answer must be comprehensive and detailed (10+ sentences), covering all asp
 Return STRICT JSON array: [{"question":"...","answer":"comprehensive essay-style answer","explanation":"2-3 sentences"}].
 No prose outside JSON.`;
   }
-  return `Create a ${difficulty.toLowerCase()} ${type} quiz with exactly ${count} questions about: "${topic}".
-Return STRICT JSON array. Each question: {"question":"...","options":["A","B","C","D"] (for MCQ/True-False, omit for fill-in-blank),"answer":"exact correct option text or value","explanation":"1-2 sentences"}.
-No prose outside the JSON.`;
+  if (type === "MCQ") {
+    return `Create exactly ${count} ${difficulty.toLowerCase()} multiple-choice questions about: "${topic}".
+STRICT RULES:
+- Each question must have EXACTLY 4 answer options.
+- The "answer" field must be the exact text of the correct option (copy it word-for-word from options).
+- Options must be full answer phrases, NOT letters like "A", "B", "C", "D".
+Return STRICT JSON array only — no prose, no markdown:
+[{"question":"question text","options":["option 1","option 2","option 3","option 4"],"answer":"exact correct option text","explanation":"1-2 sentences"}]`;
+  }
+  if (type === "True/False") {
+    return `Create exactly ${count} ${difficulty.toLowerCase()} True/False questions about: "${topic}".
+STRICT RULES:
+- Each question must be a declarative statement (NOT a question ending in "?").
+- The statement is either factually True or factually False.
+- The "options" array must be EXACTLY ["True", "False"] — nothing else.
+- The "answer" must be exactly "True" or "False".
+Return STRICT JSON array only — no prose, no markdown:
+[{"question":"declarative statement","options":["True","False"],"answer":"True","explanation":"1-2 sentences explaining why"}]`;
+  }
+  if (type === "Fill in the Blank") {
+    return `Create exactly ${count} ${difficulty.toLowerCase()} fill-in-the-blank questions about: "${topic}".
+STRICT RULES:
+- Each question is a sentence with one blank shown as "___".
+- Do NOT include an "options" field — leave it out entirely.
+- The "answer" is the exact word or short phrase that fills the blank.
+Return STRICT JSON array only — no prose, no markdown:
+[{"question":"sentence with ___ blank","answer":"word or phrase","explanation":"1-2 sentences"}]`;
+  }
+  if (type === "Mixed") {
+    return `Create exactly ${count} ${difficulty.toLowerCase()} questions about: "${topic}".
+Mix question types: some MCQ (4 options), some True/False (options: ["True","False"]), some fill-in-the-blank (no options field).
+STRICT RULES:
+- MCQ: "options" has exactly 4 items; "answer" is the exact correct option text.
+- True/False: "options" is exactly ["True","False"]; "answer" is "True" or "False"; question is a statement not a "?" question.
+- Fill in the Blank: no "options" field; question has "___"; "answer" fills the blank.
+Return STRICT JSON array only — no prose, no markdown:
+[{"question":"...","options":["opt1","opt2",...] or omit,"answer":"correct answer","explanation":"1-2 sentences"}]`;
+  }
+  return `Create exactly ${count} ${difficulty.toLowerCase()} questions about: "${topic}".
+Return STRICT JSON array only: [{"question":"...","options":["opt1","opt2","opt3","opt4"],"answer":"correct option text","explanation":"1-2 sentences"}]`;
 }
 
 function QuizPage() {
