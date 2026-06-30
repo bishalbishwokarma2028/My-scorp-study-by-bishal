@@ -10,10 +10,18 @@ import logoUrl from "@/assets/scorpstudy-logo.png";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ScorpStudy by Bishal — Study Smarter with Bishal's Assistant" },
-      { name: "description", content: "Your personal study companion powered by Bishal's Assistant. Ask questions, solve problems, create quizzes, summarize textbooks, make flashcards — all in one place." },
-      { property: "og:title", content: "ScorpStudy by Bishal" },
-      { property: "og:description", content: "Bishal's Learning Platform. 60+ languages. 24/7. Free." },
+      { title: "ScorpStudy by Bishal – AI Student Learning Platform 🚀" },
+      { name: "description", content: "ScorpStudy by Bishal is an AI-powered learning platform for students. Get study help, notes, quizzes, mock tests and personalized AI tutoring. Study Smart. Learn Faster. Achieve More." },
+      { name: "keywords", content: "ScorpStudy, ScorpStudy by Bishal, Bishal's Assistant, AI study tutor, AI learning platform, online study help, quiz generator, flashcard maker, smart notes, PDF summarizer, mind maps, exam preparation, free study app, Bishal Bishwokarma, student learning, study smarter, SEE exam Nepal, +2 science help" },
+      { property: "og:title", content: "ScorpStudy by Bishal – AI Student Learning Platform 🚀" },
+      { property: "og:description", content: "ScorpStudy by Bishal is an AI-powered learning platform for students. Get study help, notes, quizzes, mock tests and personalized AI tutoring. Study Smart. Learn Faster. Achieve More." },
+      { property: "og:url", content: "https://scorpstudy.in.net/" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:title", content: "ScorpStudy by Bishal – AI Student Learning Platform 🚀" },
+      { name: "twitter:description", content: "ScorpStudy by Bishal is an AI-powered learning platform for students. Get study help, notes, quizzes, mock tests and personalized AI tutoring." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://scorpstudy.in.net/" },
     ],
   }),
   component: Landing,

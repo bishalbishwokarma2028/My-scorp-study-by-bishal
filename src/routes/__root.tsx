@@ -55,18 +55,48 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const SITE_URL = "https://scorpstudy.in.net";
+const SITE_NAME = "ScorpStudy by Bishal";
+const SITE_TITLE = "ScorpStudy by Bishal – AI Student Learning Platform 🚀";
+const SITE_DESCRIPTION = "ScorpStudy by Bishal is an AI-powered learning platform for students. Get study help, notes, quizzes, mock tests and personalized AI tutoring. Study Smart. Learn Faster. Achieve More.";
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "ScorpStudy by Bishal — Study Smarter with Bishal's Assistant" },
-      { name: "description", content: "ScorpStudy by Bishal Bishwokarma — Bishal's Assistant for students. Chat, quizzes, flashcards, summaries, mind maps and more." },
+      { title: SITE_TITLE },
+      { name: "description", content: SITE_DESCRIPTION },
+      { name: "keywords", content: "ScorpStudy, ScorpStudy by Bishal, Bishal's Assistant, AI study tutor, AI learning platform, online study help, quiz generator, flashcard maker, smart notes, PDF summarizer, mind maps, exam preparation, free study app, Bishal Bishwokarma, student learning, study smarter" },
+      { name: "author", content: "Bishal Bishwokarma" },
+      { name: "robots", content: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" },
+      { name: "googlebot", content: "index, follow" },
+      { name: "theme-color", content: "#7c3aed" },
+      { name: "application-name", content: SITE_NAME },
+      { name: "generator", content: "ScorpStudy" },
+      { property: "og:type", content: "website" },
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:title", content: SITE_TITLE },
+      { property: "og:description", content: SITE_DESCRIPTION },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:image", content: `${SITE_URL}/favicon.png` },
+      { property: "og:image:width", content: "512" },
+      { property: "og:image:height", content: "512" },
+      { property: "og:image:alt", content: "ScorpStudy by Bishal – AI Student Learning Platform" },
+      { property: "og:locale", content: "en_US" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: SITE_TITLE },
+      { name: "twitter:description", content: SITE_DESCRIPTION },
+      { name: "twitter:image", content: `${SITE_URL}/favicon.png` },
+      { name: "twitter:image:alt", content: "ScorpStudy by Bishal – AI Student Learning Platform" },
+      { name: "twitter:creator", content: "@BishalStudy" },
+      { name: "twitter:site", content: "@BishalStudy" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "apple-touch-icon", href: "/favicon.png" },
+      { rel: "canonical", href: SITE_URL },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" },
@@ -78,10 +108,92 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const JSON_LD = JSON.stringify([
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": SITE_NAME,
+    "alternateName": ["ScorpStudy", "Bishal's Assistant", "ScorpStudy AI"],
+    "url": SITE_URL,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": `${SITE_URL}/dashboard/chat?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": SITE_NAME,
+    "url": SITE_URL,
+    "logo": {
+      "@type": "ImageObject",
+      "url": `${SITE_URL}/favicon.png`,
+      "width": 512,
+      "height": 512,
+    },
+    "founder": {
+      "@type": "Person",
+      "name": "Bishal Bishwokarma",
+      "url": "https://www.bishalbishwokarma.in.net",
+    },
+    "description": SITE_DESCRIPTION,
+    "sameAs": ["https://www.bishalbishwokarma.in.net"],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": SITE_NAME,
+    "url": SITE_URL,
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "en",
+    "isAccessibleForFree": true,
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "description": SITE_DESCRIPTION,
+    "image": `${SITE_URL}/favicon.png`,
+    "author": { "@type": "Person", "name": "Bishal Bishwokarma" },
+    "featureList": [
+      "Bishal's Assistant – 24/7 AI Study Help",
+      "Study Notes – Chapter-wise Notes",
+      "Quizzes & Tests – Practice & Improve",
+      "PDF to Notes – Smart AI Tool",
+      "Track Progress – Streaks & Badges",
+      "Flashcard Maker – Spaced Repetition",
+      "Mind Maps – Visual Learning",
+      "Universal Translator – 60+ Languages",
+      "Image Question Solver",
+      "Smart Calculator",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "ScorpStudy Features",
+    "url": SITE_URL,
+    "itemListElement": [
+      { "@type": "SiteLinksAction", "name": "Bishal's Assistant", "url": `${SITE_URL}/dashboard/chat`, "position": 1 },
+      { "@type": "SiteLinksAction", "name": "Study Notes", "url": `${SITE_URL}/dashboard/notes`, "position": 2 },
+      { "@type": "SiteLinksAction", "name": "Quizzes & Tests", "url": `${SITE_URL}/dashboard/quiz`, "position": 3 },
+      { "@type": "SiteLinksAction", "name": "Flashcards", "url": `${SITE_URL}/dashboard/flashcards`, "position": 4 },
+      { "@type": "SiteLinksAction", "name": "Login", "url": `${SITE_URL}/auth`, "position": 5 },
+    ],
+  },
+]);
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
+      <head>
+        <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON_LD }}
+        />
+      </head>
       <body>
         {children}
         <Scripts />
