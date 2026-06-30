@@ -74,6 +74,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#7c3aed" },
       { name: "application-name", content: SITE_NAME },
       { name: "generator", content: "ScorpStudy" },
+      { name: "google-site-verification", content: "PJqLFpQz3gwF6tTRq91WUt9sx7AETq40SboDOdWtnoU" },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: SITE_NAME },
       { property: "og:title", content: SITE_TITLE },
