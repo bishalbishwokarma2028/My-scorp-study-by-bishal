@@ -13,14 +13,17 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
+import { Route as AuthenticatedDashboardVisualExplainerRouteImport } from './routes/_authenticated/dashboard.visual-explainer'
 import { Route as AuthenticatedDashboardTranslatorRouteImport } from './routes/_authenticated/dashboard.translator'
 import { Route as AuthenticatedDashboardSummarizerRouteImport } from './routes/_authenticated/dashboard.summarizer'
+import { Route as AuthenticatedDashboardResearchRouteImport } from './routes/_authenticated/dashboard.research'
 import { Route as AuthenticatedDashboardQuizRouteImport } from './routes/_authenticated/dashboard.quiz'
 import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
 import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
 import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
+import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
 import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
 import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
 import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
@@ -45,6 +48,12 @@ const AuthenticatedDashboardIndexRoute =
     path: '/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardVisualExplainerRoute =
+  AuthenticatedDashboardVisualExplainerRouteImport.update({
+    id: '/dashboard/visual-explainer',
+    path: '/dashboard/visual-explainer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardTranslatorRoute =
   AuthenticatedDashboardTranslatorRouteImport.update({
     id: '/dashboard/translator',
@@ -55,6 +64,12 @@ const AuthenticatedDashboardSummarizerRoute =
   AuthenticatedDashboardSummarizerRouteImport.update({
     id: '/dashboard/summarizer',
     path: '/dashboard/summarizer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardResearchRoute =
+  AuthenticatedDashboardResearchRouteImport.update({
+    id: '/dashboard/research',
+    path: '/dashboard/research',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardQuizRoute =
@@ -93,6 +108,12 @@ const AuthenticatedDashboardFlashcardsRoute =
     path: '/dashboard/flashcards',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardCompareRoute =
+  AuthenticatedDashboardCompareRouteImport.update({
+    id: '/dashboard/compare',
+    path: '/dashboard/compare',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardCodeTutorRoute =
   AuthenticatedDashboardCodeTutorRouteImport.update({
     id: '/dashboard/code-tutor',
@@ -118,14 +139,17 @@ export interface FileRoutesByFullPath {
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
+  '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
+  '/dashboard/research': typeof AuthenticatedDashboardResearchRoute
   '/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
+  '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRoutesByTo {
@@ -134,14 +158,17 @@ export interface FileRoutesByTo {
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
+  '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
+  '/dashboard/research': typeof AuthenticatedDashboardResearchRoute
   '/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
+  '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRoutesById {
@@ -152,14 +179,17 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/_authenticated/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/_authenticated/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
+  '/_authenticated/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/_authenticated/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/_authenticated/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/_authenticated/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/_authenticated/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
+  '/_authenticated/dashboard/research': typeof AuthenticatedDashboardResearchRoute
   '/_authenticated/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/_authenticated/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
+  '/_authenticated/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRouteTypes {
@@ -170,14 +200,17 @@ export interface FileRouteTypes {
     | '/dashboard/calculator'
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
+    | '/dashboard/compare'
     | '/dashboard/flashcards'
     | '/dashboard/history'
     | '/dashboard/image-gen'
     | '/dashboard/mindmap'
     | '/dashboard/notes'
     | '/dashboard/quiz'
+    | '/dashboard/research'
     | '/dashboard/summarizer'
     | '/dashboard/translator'
+    | '/dashboard/visual-explainer'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -186,14 +219,17 @@ export interface FileRouteTypes {
     | '/dashboard/calculator'
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
+    | '/dashboard/compare'
     | '/dashboard/flashcards'
     | '/dashboard/history'
     | '/dashboard/image-gen'
     | '/dashboard/mindmap'
     | '/dashboard/notes'
     | '/dashboard/quiz'
+    | '/dashboard/research'
     | '/dashboard/summarizer'
     | '/dashboard/translator'
+    | '/dashboard/visual-explainer'
     | '/dashboard'
   id:
     | '__root__'
@@ -203,14 +239,17 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/calculator'
     | '/_authenticated/dashboard/chat'
     | '/_authenticated/dashboard/code-tutor'
+    | '/_authenticated/dashboard/compare'
     | '/_authenticated/dashboard/flashcards'
     | '/_authenticated/dashboard/history'
     | '/_authenticated/dashboard/image-gen'
     | '/_authenticated/dashboard/mindmap'
     | '/_authenticated/dashboard/notes'
     | '/_authenticated/dashboard/quiz'
+    | '/_authenticated/dashboard/research'
     | '/_authenticated/dashboard/summarizer'
     | '/_authenticated/dashboard/translator'
+    | '/_authenticated/dashboard/visual-explainer'
     | '/_authenticated/dashboard/'
   fileRoutesById: FileRoutesById
 }
@@ -250,6 +289,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/visual-explainer': {
+      id: '/_authenticated/dashboard/visual-explainer'
+      path: '/dashboard/visual-explainer'
+      fullPath: '/dashboard/visual-explainer'
+      preLoaderRoute: typeof AuthenticatedDashboardVisualExplainerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/translator': {
       id: '/_authenticated/dashboard/translator'
       path: '/dashboard/translator'
@@ -262,6 +308,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/summarizer'
       fullPath: '/dashboard/summarizer'
       preLoaderRoute: typeof AuthenticatedDashboardSummarizerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/research': {
+      id: '/_authenticated/dashboard/research'
+      path: '/dashboard/research'
+      fullPath: '/dashboard/research'
+      preLoaderRoute: typeof AuthenticatedDashboardResearchRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard/quiz': {
@@ -306,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardFlashcardsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/compare': {
+      id: '/_authenticated/dashboard/compare'
+      path: '/dashboard/compare'
+      fullPath: '/dashboard/compare'
+      preLoaderRoute: typeof AuthenticatedDashboardCompareRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/code-tutor': {
       id: '/_authenticated/dashboard/code-tutor'
       path: '/dashboard/code-tutor'
@@ -334,14 +394,17 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardCalculatorRoute: typeof AuthenticatedDashboardCalculatorRoute
   AuthenticatedDashboardChatRoute: typeof AuthenticatedDashboardChatRoute
   AuthenticatedDashboardCodeTutorRoute: typeof AuthenticatedDashboardCodeTutorRoute
+  AuthenticatedDashboardCompareRoute: typeof AuthenticatedDashboardCompareRoute
   AuthenticatedDashboardFlashcardsRoute: typeof AuthenticatedDashboardFlashcardsRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
   AuthenticatedDashboardMindmapRoute: typeof AuthenticatedDashboardMindmapRoute
   AuthenticatedDashboardNotesRoute: typeof AuthenticatedDashboardNotesRoute
   AuthenticatedDashboardQuizRoute: typeof AuthenticatedDashboardQuizRoute
+  AuthenticatedDashboardResearchRoute: typeof AuthenticatedDashboardResearchRoute
   AuthenticatedDashboardSummarizerRoute: typeof AuthenticatedDashboardSummarizerRoute
   AuthenticatedDashboardTranslatorRoute: typeof AuthenticatedDashboardTranslatorRoute
+  AuthenticatedDashboardVisualExplainerRoute: typeof AuthenticatedDashboardVisualExplainerRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
 }
 
@@ -349,14 +412,18 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardCalculatorRoute: AuthenticatedDashboardCalculatorRoute,
   AuthenticatedDashboardChatRoute: AuthenticatedDashboardChatRoute,
   AuthenticatedDashboardCodeTutorRoute: AuthenticatedDashboardCodeTutorRoute,
+  AuthenticatedDashboardCompareRoute: AuthenticatedDashboardCompareRoute,
   AuthenticatedDashboardFlashcardsRoute: AuthenticatedDashboardFlashcardsRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
   AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
   AuthenticatedDashboardMindmapRoute: AuthenticatedDashboardMindmapRoute,
   AuthenticatedDashboardNotesRoute: AuthenticatedDashboardNotesRoute,
   AuthenticatedDashboardQuizRoute: AuthenticatedDashboardQuizRoute,
+  AuthenticatedDashboardResearchRoute: AuthenticatedDashboardResearchRoute,
   AuthenticatedDashboardSummarizerRoute: AuthenticatedDashboardSummarizerRoute,
   AuthenticatedDashboardTranslatorRoute: AuthenticatedDashboardTranslatorRoute,
+  AuthenticatedDashboardVisualExplainerRoute:
+    AuthenticatedDashboardVisualExplainerRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
 }
 
