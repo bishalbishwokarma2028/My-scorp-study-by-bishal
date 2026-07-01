@@ -1,18 +1,10 @@
-/** Per-feature daily limits — single source of truth for server and client */
-export const FEATURE_LIMITS = {
-  chat:             20,
-  summarizer:        5,
-  quiz:              5,
-  flashcards:        5,
-  notes:            10,
-  translator:       20,
-  formula:          15,
-  code_tutor:       10,
-  compare:           8,
-  research:          5,
-  visual_explainer:  8,
-} as const;
+/** Unified daily credit pool — all features share this single balance */
+export const DAILY_CREDIT_LIMIT = 30;
 
-export type FeatureKey = keyof typeof FEATURE_LIMITS;
+/** The shared pool key stored in the DB for every user */
+export const GLOBAL_POOL_KEY = "global" as const;
 
-export const QUOTA_MESSAGE = "You crossed today's free quota limit. Try again tomorrow!";
+/** Kept for backward-compatibility — every call still passes a feature name but the server ignores it */
+export type FeatureKey = string;
+
+export const QUOTA_MESSAGE = "You've used all 30 of your daily credits. Come back tomorrow!";

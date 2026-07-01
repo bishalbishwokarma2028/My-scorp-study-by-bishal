@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Loader2, GitCompare, RefreshCw, Lightbulb, BookOpen, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAIJSON } from "@/lib/aiProvider";
 import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -110,12 +110,11 @@ Return STRICT JSON only — no prose, no markdown fences:
   "examTip": "The single most important thing to remember in an exam about these two concepts"
 }`;
 
-    const res = await askAI(prompt, "Output only valid JSON. No explanation, no code fences.");
-    setProvider(res.provider);
+    const { data: parsed, provider: prov } = await askAIJSON<Comparison>(prompt);
+    setProvider(prov);
     await bump();
-    const parsed = extractJSON<Comparison>(res.text);
     if (!parsed || !parsed.conceptA || !parsed.conceptB) {
-      toast.error("Couldn't parse the comparison, try again");
+      toast.error("Couldn't build the comparison — please try again");
     } else {
       setResult(parsed);
     }

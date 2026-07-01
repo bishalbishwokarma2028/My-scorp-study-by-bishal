@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { Loader2, Eye, Download, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAIJSON } from "@/lib/aiProvider";
 import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -527,12 +527,11 @@ function VisualExplainerPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); setDiagram(null); setSelected(null);
     const prompt = buildPrompt(topic.trim(), diagramType);
-    const res = await askAI(prompt, "Output only valid JSON. No code fences, no explanation outside JSON.");
-    setProvider(res.provider);
+    const { data: parsed, provider: prov } = await askAIJSON<DiagramData>(prompt);
+    setProvider(prov);
     await bump();
-    const parsed = extractJSON<DiagramData>(res.text);
     if (!parsed || !parsed.type) {
-      toast.error("Couldn't generate diagram, try again or rephrase your topic");
+      toast.error("Couldn't generate diagram — please try again or rephrase your topic");
     } else {
       setDiagram(parsed);
     }

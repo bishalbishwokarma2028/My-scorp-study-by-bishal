@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getUsageServer, bumpUsageServer } from "@/lib/usageLimit.functions";
-import type { FeatureKey } from "@/lib/usageLimit.config";
-import { FEATURE_LIMITS } from "@/lib/usageLimit.config";
+import { DAILY_CREDIT_LIMIT } from "@/lib/usageLimit.config";
 
 export type QuotaState = {
   used: number;
@@ -13,45 +12,46 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function localKey(userId: string, feature: FeatureKey): string {
-  return `scorp_quota_${userId}_${feature}`;
+function localKey(userId: string): string {
+  return `scorp_quota_${userId}_global`;
 }
 
-function readLocal(userId: string, feature: FeatureKey): QuotaState {
-  const limit = FEATURE_LIMITS[feature];
+function readLocal(userId: string): QuotaState {
   try {
-    const raw = localStorage.getItem(localKey(userId, feature));
-    if (!raw) return { used: 0, limit, remaining: limit };
+    const raw = localStorage.getItem(localKey(userId));
+    if (!raw) return { used: 0, limit: DAILY_CREDIT_LIMIT, remaining: DAILY_CREDIT_LIMIT };
     const parsed = JSON.parse(raw) as { date: string; used: number };
-    if (parsed.date !== todayKey()) return { used: 0, limit, remaining: limit };
+    if (parsed.date !== todayKey()) return { used: 0, limit: DAILY_CREDIT_LIMIT, remaining: DAILY_CREDIT_LIMIT };
     const used = parsed.used ?? 0;
-    return { used, limit, remaining: Math.max(0, limit - used) };
+    return { used, limit: DAILY_CREDIT_LIMIT, remaining: Math.max(0, DAILY_CREDIT_LIMIT - used) };
   } catch {
-    return { used: 0, limit, remaining: limit };
+    return { used: 0, limit: DAILY_CREDIT_LIMIT, remaining: DAILY_CREDIT_LIMIT };
   }
 }
 
-function writeLocal(userId: string, feature: FeatureKey, used: number): QuotaState {
-  const limit = FEATURE_LIMITS[feature];
+function writeLocal(userId: string, used: number): QuotaState {
   try {
-    localStorage.setItem(localKey(userId, feature), JSON.stringify({ date: todayKey(), used }));
+    localStorage.setItem(localKey(userId), JSON.stringify({ date: todayKey(), used }));
   } catch { /* storage full */ }
-  return { used, limit, remaining: Math.max(0, limit - used) };
+  return { used, limit: DAILY_CREDIT_LIMIT, remaining: Math.max(0, DAILY_CREDIT_LIMIT - used) };
 }
 
-export function useUsageLimit(userId: string, feature: FeatureKey) {
+/**
+ * Shared daily credit pool — all features share the same 30-credit balance.
+ * The `feature` param is accepted for call-site backward-compat but is ignored.
+ */
+export function useUsageLimit(userId: string, feature?: string) {
+  void feature; // accepted but unused — server uses the global pool
   const [quota, setQuota] = useState<QuotaState | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(true);
 
   useEffect(() => {
     setQuotaLoading(true);
-    // Show local value instantly, then sync with server
-    const local = readLocal(userId, feature);
+    const local = readLocal(userId);
     setQuota(local);
 
-    getUsageServer({ data: { userId, feature } })
+    getUsageServer({ data: { userId } })
       .then((serverQuota) => {
-        // Use whichever count is higher (server is source of truth across devices)
         const used = Math.max(serverQuota.used, local.used);
         const synced: QuotaState = {
           used,
@@ -59,36 +59,33 @@ export function useUsageLimit(userId: string, feature: FeatureKey) {
           remaining: Math.max(0, serverQuota.limit - used),
         };
         setQuota(synced);
-        writeLocal(userId, feature, used);
+        writeLocal(userId, used);
       })
       .catch(() => { /* keep local value on network error */ })
       .finally(() => setQuotaLoading(false));
-  }, [userId, feature]);
+  }, [userId]);
 
   const bump = useCallback(async (): Promise<{ allowed: boolean }> => {
-    const current = readLocal(userId, feature);
+    const current = readLocal(userId);
     if (current.remaining <= 0) return { allowed: false };
 
-    // Optimistic local update first (instant UI feedback)
-    const optimistic = writeLocal(userId, feature, current.used + 1);
+    const optimistic = writeLocal(userId, current.used + 1);
     setQuota(optimistic);
 
-    // Then sync with server
     try {
-      const result = await bumpUsageServer({ data: { userId, feature } });
+      const result = await bumpUsageServer({ data: { userId } });
       const synced: QuotaState = {
         used: result.used,
         limit: result.limit,
         remaining: result.remaining,
       };
       setQuota(synced);
-      writeLocal(userId, feature, result.used);
+      writeLocal(userId, result.used);
       return { allowed: result.allowed };
     } catch {
-      // Keep optimistic update on server error — feature still worked
       return { allowed: true };
     }
-  }, [userId, feature]);
+  }, [userId]);
 
   return { quota, quotaLoading, bump };
 }
