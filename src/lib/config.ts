@@ -48,8 +48,8 @@ export const serverConfig = {
         .map((i) => getEnv(`GROQ_API_KEY_${i}`))
         .filter(Boolean),
       openrouterKey: getEnv("OPENROUTER_API_KEY"),
-      geminiKeys: [1, 2, 3, 4, 5]
-        .map((i) => getEnv(`GEMINI_API_KEY_${i}`))
+      cerebrasKeys: [1, 2, 3, 4, 5, 6]
+        .map((i) => getEnv(`CEREBRAS_API_KEY_${i}`))
         .filter(Boolean),
       huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
     };
@@ -81,12 +81,12 @@ export function validateConfig(): string[] {
     ai.groqPrimaryKeys.length > 0 ||
     ai.groqSecondaryKeys.length > 0 ||
     !!ai.openrouterKey ||
-    ai.geminiKeys.length > 0 ||
+    ai.cerebrasKeys.length > 0 ||
     !!ai.huggingfaceKey;
 
   if (!hasAnyAI)
     missing.push(
-      "at least one AI key — GROQ_API_KEY_1, GEMINI_API_KEY_1, OPENROUTER_API_KEY, or HUGGINGFACE_API_KEY",
+      "at least one AI key — GROQ_API_KEY_1, CEREBRAS_API_KEY_1, OPENROUTER_API_KEY, or HUGGINGFACE_API_KEY",
     );
 
   if (missing.length > 0) {

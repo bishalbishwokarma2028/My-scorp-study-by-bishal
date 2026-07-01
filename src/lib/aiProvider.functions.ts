@@ -134,6 +134,37 @@ async function tryGemini(
   }
 }
 
+async function tryCerebras(
+  prompt: string,
+  system: string,
+  key: string,
+  history: Turn[],
+): Promise<Result | null> {
+  try {
+    const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
+    const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "llama-3.3-70b",
+        messages,
+        max_tokens: 3000,
+      }),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      if (isRateLimited(res.status, body)) return null;
+      return null;
+    }
+    const data = JSON.parse(body);
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function tryHuggingFace(prompt: string, system: string, key: string): Promise<Result | null> {
   try {
     const res = await fetch(
@@ -203,8 +234,8 @@ export const askAIServer = createServerFn({ method: "POST" })
     }
 
     if (!result) {
-      for (const key of serverConfig.ai.geminiKeys) {
-        result = await tryGemini(data.prompt, system, key, history);
+      for (const key of serverConfig.ai.cerebrasKeys) {
+        result = await tryCerebras(data.prompt, system, key, history);
         if (result) break;
       }
     }
