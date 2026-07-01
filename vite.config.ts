@@ -10,32 +10,26 @@ function pickEnv(...keys: string[]): string {
 }
 
 /**
- * Plugin that injects Supabase env vars at request-time so that
- * Replit Secrets (which are injected after module load) are always
- * picked up correctly.
+ * Plugin that injects Supabase public env vars at transform-time per request,
+ * so Replit Secrets injected after module load are always picked up.
  */
 function runtimeEnvPlugin(): Plugin {
   return {
     name: "runtime-env-inject",
-    configResolved() {},
     transform(code, id) {
-      if (!id.includes("supabase") && !id.includes("client")) return;
-      return null;
-    },
-    config() {
+      if (!id.includes("supabase/client")) return null;
+
       const SUPABASE_URL = pickEnv("SUPABASE_URL", "VITE_SUPABASE_URL");
       const SUPABASE_KEY = pickEnv(
         "SUPABASE_ANON_KEY",
         "SUPABASE_PUBLISHABLE_KEY",
         "VITE_SUPABASE_PUBLISHABLE_KEY",
       );
-      return {
-        define: {
-          "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(SUPABASE_URL),
-          "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(SUPABASE_KEY),
-          "import.meta.env.SUPABASE_ANON_KEY": JSON.stringify(SUPABASE_KEY),
-        },
-      };
+
+      return code
+        .replace(/import\.meta\.env\.VITE_SUPABASE_URL/g, JSON.stringify(SUPABASE_URL))
+        .replace(/import\.meta\.env\.VITE_SUPABASE_PUBLISHABLE_KEY/g, JSON.stringify(SUPABASE_KEY))
+        .replace(/import\.meta\.env\.SUPABASE_ANON_KEY/g, JSON.stringify(SUPABASE_KEY));
     },
   };
 }
