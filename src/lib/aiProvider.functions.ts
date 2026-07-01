@@ -146,7 +146,7 @@ async function tryCerebras(
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: "llama-3.3-70b",
+        model: "gpt-oss-120b",
         messages,
         max_tokens: 3000,
       }),
