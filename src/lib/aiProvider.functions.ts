@@ -230,34 +230,111 @@ const VisionInput = z.object({
   mimeType: z.string().default("image/jpeg"),
 });
 
+const GEMINI_VISION_MODELS = [
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+];
+
+const OPENROUTER_VISION_MODELS = [
+  "google/gemini-2.0-flash-lite-001",
+  "google/gemini-flash-1.5-8b",
+  "meta-llama/llama-3.2-11b-vision-instruct:free",
+  "microsoft/phi-3.5-mini-128k-instruct",
+];
+
+async function tryGeminiVision(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  key: string,
+  model: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: `You are Bishal's Assistant — an expert study AI. ${prompt}` },
+              { inlineData: { mimeType, data: imageBase64 } },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 4096 },
+        }),
+      },
+    );
+    const body = await res.text();
+    if (!res.ok) return null;
+    const parsed = JSON.parse(body);
+    const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return (typeof text === "string" && text.trim()) ? text.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function tryOpenRouterVision(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  key: string,
+  model: string,
+): Promise<string | null> {
+  try {
+    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+        "HTTP-Referer": "https://scorpstudy.in.net",
+        "X-Title": "ScorpStudy",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: `You are Bishal's Assistant — an expert study AI. ${prompt}` },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        }],
+        max_tokens: 4096,
+      }),
+    });
+    const body = await res.text();
+    if (!res.ok) return null;
+    const parsed = JSON.parse(body);
+    const text = parsed?.choices?.[0]?.message?.content;
+    return (typeof text === "string" && text.trim()) ? text.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
-    for (const key of serverConfig.ai.geminiKeys) {
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: `You are Bishal's Assistant — an expert study AI. ${data.prompt}` },
-                  { inlineData: { mimeType: data.mimeType, data: data.imageBase64 } },
-                ],
-              }],
-            }),
-          },
-        );
-        const body = await res.text();
-        if (!res.ok) continue;
-        const parsed = JSON.parse(body);
-        const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
-      } catch {
-        continue;
+    // Try all Gemini keys × all Gemini vision models
+    for (const model of GEMINI_VISION_MODELS) {
+      for (const key of serverConfig.ai.geminiKeys) {
+        const text = await tryGeminiVision(data.prompt, data.imageBase64, data.mimeType, key, model);
+        if (text) return { text, provider: "Bishal's Assistant" };
       }
     }
+
+    // Fallback: OpenRouter vision models
+    if (serverConfig.ai.openrouterKey) {
+      for (const model of OPENROUTER_VISION_MODELS) {
+        const text = await tryOpenRouterVision(data.prompt, data.imageBase64, data.mimeType, serverConfig.ai.openrouterKey, model);
+        if (text) return { text, provider: "Bishal's Assistant" };
+      }
+    }
+
     return { text: "Could not analyze the image. Please try again.", provider: "Bishal's Assistant" };
   });
