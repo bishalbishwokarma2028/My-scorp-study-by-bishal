@@ -1399,20 +1399,6 @@ Return STRICT JSON only (no prose, no markdown fences):
       {/* Input area */}
       <div className="border-t border-border bg-white px-3 py-2.5 sm:px-4 sm:py-3" style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
         <div className="flex items-end gap-2 sm:gap-3">
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex-shrink-0 grid h-10 w-10 place-items-center rounded-xl border border-border bg-slate-50 text-muted-foreground hover:bg-violet-50 hover:border-violet-300 hover:text-violet-600 transition"
-            title="Upload PDF, image, or text file"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.txt,.md,.csv,.json,.py,.js,.ts,.tsx,.jsx,.html,.css,.xml,.yaml,.yml,.jpg,.jpeg,.png,.gif,.webp"
-            onChange={handleFile}
-          />
           <textarea
             ref={inputRef}
             value={input}
