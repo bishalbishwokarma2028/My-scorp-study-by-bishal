@@ -21,6 +21,7 @@ import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_aut
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
 import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
+import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
 import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
 import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
 
@@ -92,6 +93,12 @@ const AuthenticatedDashboardFlashcardsRoute =
     path: '/dashboard/flashcards',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardCodeTutorRoute =
+  AuthenticatedDashboardCodeTutorRouteImport.update({
+    id: '/dashboard/code-tutor',
+    path: '/dashboard/code-tutor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardChatRoute =
   AuthenticatedDashboardChatRouteImport.update({
     id: '/dashboard/chat',
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
+  '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
@@ -125,6 +133,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
+  '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
@@ -142,6 +151,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/_authenticated/dashboard/chat': typeof AuthenticatedDashboardChatRoute
+  '/_authenticated/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/_authenticated/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard/calculator'
     | '/dashboard/chat'
+    | '/dashboard/code-tutor'
     | '/dashboard/flashcards'
     | '/dashboard/history'
     | '/dashboard/image-gen'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard/calculator'
     | '/dashboard/chat'
+    | '/dashboard/code-tutor'
     | '/dashboard/flashcards'
     | '/dashboard/history'
     | '/dashboard/image-gen'
@@ -190,6 +202,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard/calculator'
     | '/_authenticated/dashboard/chat'
+    | '/_authenticated/dashboard/code-tutor'
     | '/_authenticated/dashboard/flashcards'
     | '/_authenticated/dashboard/history'
     | '/_authenticated/dashboard/image-gen'
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardFlashcardsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/code-tutor': {
+      id: '/_authenticated/dashboard/code-tutor'
+      path: '/dashboard/code-tutor'
+      fullPath: '/dashboard/code-tutor'
+      preLoaderRoute: typeof AuthenticatedDashboardCodeTutorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/chat': {
       id: '/_authenticated/dashboard/chat'
       path: '/dashboard/chat'
@@ -313,6 +333,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardCalculatorRoute: typeof AuthenticatedDashboardCalculatorRoute
   AuthenticatedDashboardChatRoute: typeof AuthenticatedDashboardChatRoute
+  AuthenticatedDashboardCodeTutorRoute: typeof AuthenticatedDashboardCodeTutorRoute
   AuthenticatedDashboardFlashcardsRoute: typeof AuthenticatedDashboardFlashcardsRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
@@ -327,6 +348,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardCalculatorRoute: AuthenticatedDashboardCalculatorRoute,
   AuthenticatedDashboardChatRoute: AuthenticatedDashboardChatRoute,
+  AuthenticatedDashboardCodeTutorRoute: AuthenticatedDashboardCodeTutorRoute,
   AuthenticatedDashboardFlashcardsRoute: AuthenticatedDashboardFlashcardsRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
   AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
