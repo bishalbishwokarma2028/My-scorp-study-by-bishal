@@ -1,7 +1,6 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
-// Resolve a value from multiple possible env-var names (portability fallbacks)
-function env(...keys: string[]): string {
+function pickEnv(...keys: string[]): string {
   for (const key of keys) {
     const val = process.env[key];
     if (val && val.trim()) return val.trim();
@@ -9,8 +8,8 @@ function env(...keys: string[]): string {
   return "";
 }
 
-const SUPABASE_URL = env("SUPABASE_URL", "VITE_SUPABASE_URL");
-const SUPABASE_KEY = env(
+const SUPABASE_URL = pickEnv("SUPABASE_URL", "VITE_SUPABASE_URL");
+const SUPABASE_KEY = pickEnv(
   "SUPABASE_ANON_KEY",
   "SUPABASE_PUBLISHABLE_KEY",
   "VITE_SUPABASE_PUBLISHABLE_KEY",
@@ -31,6 +30,13 @@ export default defineConfig({
       strictPort: true,
       host: "0.0.0.0",
       allowedHosts: true,
+      watch: {
+        ignored: [
+          "**/.cache/bun/**",
+          "**/node_modules/**",
+          "**/.local/state/**",
+        ],
+      },
     },
   },
 });
