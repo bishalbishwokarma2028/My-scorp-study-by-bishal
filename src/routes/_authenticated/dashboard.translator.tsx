@@ -68,14 +68,15 @@ function TranslatorPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
     setResult("");
-    const isAutoDetect = source === "Auto-detect";
-    const from = isAutoDetect ? "the detected language" : source;
-    const romanizedNote = !isAutoDetect && ["Nepali","Hindi","Arabic","Chinese","Japanese","Korean","Bengali","Tamil","Telugu","Urdu","Punjabi","Marathi","Greek","Hebrew","Russian","Thai","Vietnamese"].includes(source)
-      ? `IMPORTANT: The source language is ${source} which uses a non-Latin script. If the input text is written in Roman/Latin letters (romanized/transliterated ${source}), you MUST first mentally convert it to the native ${source} script, then translate it to ${target}. Examples of romanized ${source}: Nepali — "mero naam Bishal ho" = "मेरो नाम बिशाल हो", "tapai lai kasto chha" = "तपाईलाई कस्तो छ"; Hindi — "mujhe bhook lagi hai" = "मुझे भूख लगी है", "aap kaise hain" = "आप कैसे हैं". Apply the same logic for other languages.`
-      : isAutoDetect ? `IMPORTANT: Auto-detect the language. If the text appears to be romanized/transliterated (written in Latin letters but representing a non-Latin language like Nepali, Hindi, Arabic, etc.), detect the intended language, convert to native script, then translate.`
-      : "";
-    const res = await askAI(
-      `You are an expert multilingual translator and transliteration specialist.
+    try {
+      const isAutoDetect = source === "Auto-detect";
+      const from = isAutoDetect ? "the detected language" : source;
+      const romanizedNote = !isAutoDetect && ["Nepali","Hindi","Arabic","Chinese","Japanese","Korean","Bengali","Tamil","Telugu","Urdu","Punjabi","Marathi","Greek","Hebrew","Russian","Thai","Vietnamese"].includes(source)
+        ? `IMPORTANT: The source language is ${source} which uses a non-Latin script. If the input text is written in Roman/Latin letters (romanized/transliterated ${source}), you MUST first mentally convert it to the native ${source} script, then translate it to ${target}. Examples of romanized ${source}: Nepali — "mero naam Bishal ho" = "मेरो नाम बिशाल हो", "tapai lai kasto chha" = "तपाईलाई कस्तो छ"; Hindi — "mujhe bhook lagi hai" = "मुझे भूख लगी है", "aap kaise hain" = "आप कैसे हैं". Apply the same logic for other languages.`
+        : isAutoDetect ? `IMPORTANT: Auto-detect the language. If the text appears to be romanized/transliterated (written in Latin letters but representing a non-Latin language like Nepali, Hindi, Arabic, etc.), detect the intended language, convert to native script, then translate.`
+        : "";
+      const res = await askAI(
+        `You are an expert multilingual translator and transliteration specialist.
 
 ${romanizedNote}
 
@@ -84,11 +85,21 @@ Output ONLY the translated text in ${target}. No explanations, no notes, no quot
 
 TEXT:
 ${text}`,
-      `You are a precise multilingual translator. You understand romanized/transliterated text in any language. When source is a non-Latin language but text is in Latin script, convert transliteration to native script first, then translate. Output ONLY the final translation.`,
-    );
-    setResult(res.text.trim().replace(/^["']|["']$/g, ""));
-    await bump();
-    setLoading(false);
+        `You are a precise multilingual translator. You understand romanized/transliterated text in any language. When source is a non-Latin language but text is in Latin script, convert transliteration to native script first, then translate. Output ONLY the final translation.`,
+      );
+      const translated = res.text.trim().replace(/^["']|["']$/g, "").replace(/^Translation:\s*/i, "").trim();
+      if (!translated) {
+        toast.error("Translation returned empty — please try again");
+      } else {
+        setResult(translated);
+        await bump();
+      }
+    } catch (err) {
+      toast.error("Translation failed — please try again");
+      console.error("[Translator]", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Auto-translate (debounced)

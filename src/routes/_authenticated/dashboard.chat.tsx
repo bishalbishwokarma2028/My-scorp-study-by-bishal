@@ -22,6 +22,8 @@ type VisualSection = {
   emoji: string;
   heading: string;
   color: string;
+  type?: "narrative" | "steps" | "examples" | "facts";
+  narrative?: string;
   points: string[];
 };
 
@@ -153,14 +155,61 @@ Key points to cover: ${section.points.join("; ")}`,
                 </span>
               </button>
               <div className="px-4 pb-4">
-                <ul className={`space-y-1.5 text-sm ${c.text}`}>
-                  {s.points.map((pt, j) => (
-                    <li key={j} className="flex items-start gap-2">
-                      <span className={`mt-1.5 flex-shrink-0 h-1.5 w-1.5 rounded-full ${c.head.replace("text-", "bg-")}`} />
-                      <span className="leading-relaxed">{pt}</span>
-                    </li>
-                  ))}
-                </ul>
+                {s.type === "narrative" ? (
+                  <div className="space-y-2">
+                    {s.narrative && (
+                      <p className={`text-sm ${c.text} leading-relaxed`}>{s.narrative}</p>
+                    )}
+                    {s.points.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-current/10">
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${c.head} mb-1.5`}>Key Terms</p>
+                        <ul className="space-y-1">
+                          {s.points.map((pt, j) => (
+                            <li key={j} className={`text-xs ${c.text} flex items-start gap-1.5`}>
+                              <span className={`mt-1 flex-shrink-0 h-1.5 w-1.5 rounded-full ${c.head.replace("text-","bg-")}`} />
+                              <span>{pt}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : s.type === "steps" ? (
+                  <ol className="space-y-2">
+                    {s.points.map((pt, j) => (
+                      <li key={j} className={`flex items-start gap-2.5 text-sm ${c.text}`}>
+                        <span className={`flex-shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white ${c.head.replace("text-","bg-")}`}>{j + 1}</span>
+                        <span className="leading-relaxed">{pt}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : s.type === "examples" ? (
+                  <div className="space-y-2">
+                    {s.points.map((pt, j) => (
+                      <div key={j} className={`rounded-lg border border-current/10 bg-white/60 px-3 py-2 text-sm ${c.text} leading-relaxed`}>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${c.head} block mb-0.5`}>#{j + 1}</span>
+                        {pt}
+                      </div>
+                    ))}
+                  </div>
+                ) : s.type === "facts" ? (
+                  <ul className="space-y-1.5">
+                    {s.points.map((pt, j) => (
+                      <li key={j} className={`rounded-lg border border-current/15 bg-white/70 px-3 py-2 text-sm ${c.text} leading-relaxed`}>
+                        {pt}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <ul className={`space-y-1.5 text-sm ${c.text}`}>
+                    {s.points.map((pt, j) => (
+                      <li key={j} className="flex items-start gap-2">
+                        <span className={`mt-1.5 flex-shrink-0 h-1.5 w-1.5 rounded-full ${c.head.replace("text-", "bg-")}`} />
+                        <span className="leading-relaxed">{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 {isExpanded && expanded[i] && (
                   <div className="mt-4 pt-4 border-t border-slate-200/70">
@@ -621,6 +670,7 @@ function ChatPage() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const askedQuestionsRef = useRef<Set<string>>(new Set());
   const selectedMsgIdxRef = useRef<number | null>(null);
+  const chatIdRef = useRef<string | null>(null);
   const { quota, bump } = useUsageLimit(user.id, "chat");
 
   useEffect(() => {
@@ -642,6 +692,33 @@ function ChatPage() {
 
   // No auto-scroll — user scrolls manually to read answers
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Mobile-compatible text selection: selectionchange works on both touch and mouse
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      const text = sel?.toString().trim() ?? "";
+      if (text.length > 5 && messagesRef.current) {
+        try {
+          const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+          if (range && messagesRef.current.contains(range.commonAncestorContainer)) {
+            setSelectedText(text);
+            // Walk up the DOM to find the message index
+            let node: Node | null = range.commonAncestorContainer;
+            while (node && node !== messagesRef.current) {
+              if (node instanceof Element) {
+                const idx = node.getAttribute("data-msgidx");
+                if (idx !== null) { selectedMsgIdxRef.current = parseInt(idx); break; }
+              }
+              node = node.parentNode;
+            }
+          }
+        } catch { /* silent */ }
+      }
+    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, []);
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()?.toString().trim() ?? "";
@@ -756,13 +833,20 @@ function ChatPage() {
 
     if (isFirst) {
       try {
-        await supabase.from("chat_history").insert({
+        const { data: saved } = await supabase.from("chat_history").insert({
           user_id: user.id,
           title: text.slice(0, 60),
           subject: "General",
           messages: [...newMsgs, assistantMsg] as never,
           provider: "Bishal's Assistant",
-        });
+        }).select("id").maybeSingle();
+        if (saved?.id) chatIdRef.current = saved.id;
+      } catch { /* silent */ }
+    } else if (chatIdRef.current) {
+      try {
+        await supabase.from("chat_history").update({
+          messages: [...newMsgs, assistantMsg] as never,
+        }).eq("id", chatIdRef.current);
       } catch { /* silent */ }
     }
 
@@ -775,18 +859,43 @@ function ChatPage() {
     if (!concept) return toast.info("Highlight some text from an answer first, then click Visual");
     setVisualLoading(true);
 
-    const prompt = `Create a visual study infographic card for this concept: "${concept.slice(0, 400)}"
+    const prompt = `Create a visual study card for this concept: "${concept.slice(0, 400)}"
 
 Return STRICT JSON only (no prose, no markdown fences):
 {
   "emoji": "🔬",
   "title": "CONCEPT NAME IN CAPS",
-  "overview": "One clear sentence: what this concept is and why it matters",
+  "overview": "One clear sentence: what this concept is and why it matters for students",
   "sections": [
-    {"emoji": "📌", "heading": "Definition", "color": "purple", "points": ["concise accurate point 1", "point 2", "point 3"]},
-    {"emoji": "⚙️", "heading": "How It Works", "color": "blue", "points": ["step/fact 1", "step 2", "step 3"]},
-    {"emoji": "💡", "heading": "Real Example", "color": "amber", "points": ["specific real-world example", "application in daily life"]},
-    {"emoji": "✅", "heading": "Why It Matters", "color": "emerald", "points": ["academic importance", "real-world significance"]}
+    {
+      "emoji": "📖",
+      "heading": "Definition & Background",
+      "color": "purple",
+      "type": "narrative",
+      "narrative": "Write 3-4 rich sentences: what exactly this concept IS, where it came from or who discovered/coined it, its historical context or origin, and why it is important in this field of study.",
+      "points": ["Key term 1: precise definition", "Key term 2: precise definition", "Key term 3: precise definition"]
+    },
+    {
+      "emoji": "⚙️",
+      "heading": "How It Works — Step by Step",
+      "color": "blue",
+      "type": "steps",
+      "points": ["Step 1: describe the first thing that happens or the initial condition in detail", "Step 2: what occurs next and why it happens", "Step 3: the intermediate stage or transformation", "Step 4: the final result, output, or consequence"]
+    },
+    {
+      "emoji": "🌍",
+      "heading": "Real-World Examples",
+      "color": "amber",
+      "type": "examples",
+      "points": ["Example 1: a specific named real-world case with actual data, numbers, or place names where this concept applies", "Example 2: a different context or field where the same concept appears — with specific details", "Example 3: an everyday application students can directly observe or relate to in daily life"]
+    },
+    {
+      "emoji": "🎯",
+      "heading": "Exam Guide & Key Facts",
+      "color": "emerald",
+      "type": "facts",
+      "points": ["✅ Must Know: the single most critical fact that examiners always test on", "⚠️ Common Mistake: what students usually get wrong, and the correct version", "📝 Formula/Rule: the key equation, law, or rule of thumb to memorize", "💡 Exam Tip: exactly what to include in your exam answer to score full marks"]
+    }
   ],
   "keyTerms": ["term1", "term2", "term3", "term4", "term5"],
   "formula": "relevant formula or equation if applicable, otherwise null"
@@ -803,9 +912,11 @@ Return STRICT JSON only (no prose, no markdown fences):
 
     const targetIdx = selectedMsgIdxRef.current;
     if (targetIdx !== null) {
-      setMessages(prev => prev.map((msg, i) =>
-        i === targetIdx ? { ...msg, visualCard: card } : msg
-      ));
+      setMessages(prev => {
+        const next = [...prev];
+        next.splice(targetIdx + 1, 0, { role: "assistant", content: "", visualCard: card, provider: "Bishal's Assistant" });
+        return next;
+      });
       selectedMsgIdxRef.current = null;
     } else {
       setMessages(prev => [...prev, { role: "assistant", content: "", visualCard: card, provider: "Bishal's Assistant" }]);
@@ -912,6 +1023,7 @@ Return STRICT JSON only (no prose, no markdown fences):
     setInput("");
     setSelectedText("");
     setPendingImage(null);
+    chatIdRef.current = null;
     try { sessionStorage.removeItem("scorp_chat_msgs"); } catch { /* silent */ }
     setTimeout(() => inputRef.current?.focus(), 50);
   }

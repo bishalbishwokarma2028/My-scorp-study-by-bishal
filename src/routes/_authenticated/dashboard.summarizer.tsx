@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Download, Save, ListChecks, Paperclip, FileText, BookOpen, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
+import { analyzeImageServer } from "@/lib/aiProvider.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { ProviderBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
@@ -51,16 +52,74 @@ function SummarizerPage() {
     if (!file) return;
     if (file.size > MAX_BYTES) return toast.error("File too large. Max 2 MB.");
     const ext = file.name.toLowerCase().split(".").pop() ?? "";
+
     if (["txt", "md", "csv"].includes(ext)) {
       setText(await file.text());
       toast.success(`Loaded ${file.name}`);
-    } else if (file.type.startsWith("image/")) {
-      toast.message("Image uploaded — please paste the text content for now.");
-    } else if (ext === "pdf") {
-      toast.message("PDF uploaded — please copy & paste the text into the box.");
-    } else {
-      toast.error("Unsupported file type");
+      e.target.value = "";
+      return;
     }
+
+    if (ext === "pdf") {
+      toast.info("Reading PDF, please wait…");
+      try {
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+        const buf = await file.arrayBuffer();
+        const doc = await pdfjs.getDocument({ data: buf }).promise;
+        let extracted = "";
+        for (let i = 1; i <= Math.min(doc.numPages, 30); i++) {
+          const page = await doc.getPage(i);
+          const content = await page.getTextContent();
+          extracted += content.items.map((item: unknown) => {
+            const it = item as { str?: string };
+            return it.str ?? "";
+          }).join(" ") + "\n";
+        }
+        extracted = extracted.replace(/\s+/g, " ").trim().slice(0, 12000);
+        if (!extracted) return toast.error("Could not extract text from this PDF");
+        setText(extracted);
+        toast.success(`PDF loaded (${doc.numPages} pages) — ready to summarize`);
+      } catch {
+        toast.error("Failed to read PDF — try a different file");
+      }
+      e.target.value = "";
+      return;
+    }
+
+    if (file.type.startsWith("image/")) {
+      toast.info("Extracting text from image…");
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(",")[1];
+          const mimeType = file.type || "image/jpeg";
+          const res = await analyzeImageServer({
+            data: {
+              prompt: "Extract ALL visible text from this image exactly as it appears. If there is study content (notes, diagrams with labels, textbook pages), describe what you see and transcribe all text. Output only the extracted text content, no commentary.",
+              imageBase64: base64,
+              mimeType,
+            },
+          });
+          const extracted = res.text.trim();
+          if (!extracted || extracted.length < 10) {
+            toast.error("Could not extract text from this image — try a clearer photo");
+          } else {
+            setText(extracted);
+            toast.success("Text extracted from image — ready to summarize");
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch {
+        toast.error("Failed to read image");
+      }
+      e.target.value = "";
+      return;
+    }
+
+    toast.error("Unsupported file type");
+    e.target.value = "";
   }
 
   async function summarize() {

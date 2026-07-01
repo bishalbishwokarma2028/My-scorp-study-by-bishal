@@ -2,7 +2,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2, BookOpen, Zap, Brain, Trophy, Star } from "lucide-react";
+import { Eye, EyeOff, Loader2, BookOpen, Zap, Brain, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signUpWithAutoConfirm } from "@/integrations/supabase/auth.functions";
 import logoUrl from "@/assets/scorpstudy-logo.png";
@@ -131,20 +131,18 @@ function AuthPage() {
             ))}
           </div>
 
-          <div className="mt-12 flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {["B", "R", "S", "A"].map((l) => (
-                <div key={l} className="h-8 w-8 rounded-full bg-gradient-to-br from-fuchsia-400 to-violet-600 ring-2 ring-purple-900 flex items-center justify-center text-white text-xs font-bold">
-                  {l}
-                </div>
-              ))}
-            </div>
-            <div>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map(i => <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />)}
+          <div className="mt-12 grid grid-cols-2 gap-3">
+            {[
+              { n: "24/7", l: "Always Available" },
+              { n: "9+", l: "Study Tools" },
+              { n: "60+", l: "Languages" },
+              { n: "Free", l: "Forever" },
+            ].map((s) => (
+              <div key={s.l} className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 text-center">
+                <div className="text-lg font-bold text-white">{s.n}</div>
+                <div className="text-xs text-violet-300 mt-0.5">{s.l}</div>
               </div>
-              <p className="text-violet-300 text-xs mt-0.5">Loved by students everywhere</p>
-            </div>
+            ))}
           </div>
         </div>
 

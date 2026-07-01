@@ -54,12 +54,6 @@ const subjects = [
   { name: "Arts & Design", icon: Palette, color: "bg-fuchsia-100 text-fuchsia-700" },
 ];
 
-const testimonials = [
-  { name: "Sanjay P.", grade: "Grade 12 Student", text: "ScorpStudy helped me ace my physics exam. Bishal's Assistant explained every concept better than my textbook!", avatar: "S", color: "from-blue-500 to-violet-500" },
-  { name: "Ritu M.", grade: "Bachelor's, Computer Science", text: "The quiz generator is amazing — I practice every day before exams. It's like having a personal tutor available 24/7.", avatar: "R", color: "from-fuchsia-500 to-pink-500" },
-  { name: "Aarav K.", grade: "SEE Student", text: "I love the Mind Maps feature. It makes complex topics so easy to understand. My grades went up significantly!", avatar: "A", color: "from-emerald-500 to-cyan-500" },
-  { name: "Priya T.", grade: "+2 Science Student", text: "Smart Notes saves me hours every week. I write rough notes and Bishal's Assistant makes them exam-ready. Incredible!", avatar: "P", color: "from-amber-500 to-orange-500" },
-];
 
 function visitCreator() {
   const parts = ["https://www.", "bishalbishwokarm", "a.in.net"];
@@ -123,21 +117,10 @@ function Landing() {
             <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-fuchsia-600" /> Setup in 30 seconds</span>
           </div>
 
-          {/* Social proof strip */}
-          <div className="mt-10 flex items-center justify-center gap-3">
-            <div className="flex -space-x-2">
-              {["S", "R", "A", "P", "K"].map((l, i) => (
-                <div key={i} className={`h-8 w-8 rounded-full ring-2 ring-white flex items-center justify-center text-white text-xs font-bold bg-gradient-to-br ${["from-blue-500 to-violet-500","from-fuchsia-500 to-pink-500","from-emerald-500 to-cyan-500","from-amber-500 to-orange-500","from-rose-500 to-pink-600"][i]}`}>
-                  {l}
-                </div>
-              ))}
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-1">
-                {[1,2,3,4,5].map(i => <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">Loved by students everywhere</p>
-            </div>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-200 px-4 py-1.5 text-xs font-semibold text-violet-700"><Brain className="h-3.5 w-3.5" /> AI-powered study tutor</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-4 py-1.5 text-xs font-semibold text-emerald-700"><Shield className="h-3.5 w-3.5" /> 100% Free — no paywalls</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-4 py-1.5 text-xs font-semibold text-blue-700"><Zap className="h-3.5 w-3.5" /> 9 study tools in one app</span>
           </div>
         </div>
       </section>
@@ -230,27 +213,26 @@ function Landing() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Why ScorpStudy */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
         <div className="text-center">
-          <div className="text-xs font-bold tracking-widest text-violet-600 uppercase">Student Stories</div>
-          <h2 className="mt-2 text-3xl font-bold sm:text-4xl">Loved by students everywhere</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">See what students are saying about studying with Bishal's Assistant.</p>
+          <div className="text-xs font-bold tracking-widest text-violet-600 uppercase">Why ScorpStudy</div>
+          <h2 className="mt-2 text-3xl font-bold sm:text-4xl">Built specifically for students</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">Every feature is designed to help you understand topics faster, retain more, and score higher — in any language, any subject.</p>
         </div>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {testimonials.map((t) => (
-            <div key={t.name} className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition">
-              <div className="flex items-center gap-1 mb-3">
-                {[1,2,3,4,5].map(i => <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />)}
+          {[
+            { icon: Brain, color: "from-violet-500 to-fuchsia-500", title: "Instant Understanding", desc: "Ask any question and get structured, detailed explanations — like having a personal tutor available 24/7." },
+            { icon: Zap, color: "from-amber-500 to-orange-500", title: "Exam-Ready Answers", desc: "Topper Mode formats answers with headings, points, formulas, and examples — exactly how toppers write." },
+            { icon: Globe, color: "from-blue-500 to-cyan-500", title: "Any Language", desc: "Study in Nepali, Hindi, English, or 60+ languages. Bishal's Assistant adapts to your preferred language instantly." },
+            { icon: Shield, color: "from-emerald-500 to-teal-500", title: "Always Free", desc: "No subscription fees, no credit card, no hidden paywalls. ScorpStudy is free for every student, forever." },
+          ].map((item) => (
+            <div key={item.title} className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition">
+              <div className={`mb-4 grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br ${item.color} text-white shadow-md`}>
+                <item.icon className="h-5 w-5" />
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed italic">"{t.text}"</p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className={`h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br ${t.color} flex-shrink-0`}>{t.avatar}</div>
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs text-muted-foreground">{t.grade}</p>
-                </div>
-              </div>
+              <h3 className="font-semibold text-foreground">{item.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
