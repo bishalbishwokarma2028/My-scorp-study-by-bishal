@@ -7,6 +7,7 @@ import { Send, Copy, RefreshCw, BookOpen, Plus, GraduationCap, ImageIcon, Paperc
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
+import { extractPdfText } from "@/lib/pdfExtract";
 import { webSearchServer } from "@/lib/webSearch.functions";
 import { supabase } from "@/integrations/supabase/client";
 import logoUrl from "@/assets/scorpstudy-logo.png";
@@ -932,26 +933,16 @@ Return STRICT JSON only (no prose, no markdown fences):
     const ext = file.name.toLowerCase().split(".").pop() ?? "";
 
     if (ext === "pdf") {
-      if (file.size > 10_000_000) return toast.error("PDF too large — max 10 MB");
-      toast.info("Reading PDF, please wait...");
+      if (file.size > 20_000_000) return toast.error("PDF too large — max 20 MB");
+      toast.info("Reading PDF, please wait…");
       try {
-        const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-        const buf = await file.arrayBuffer();
-        const doc = await pdfjs.getDocument({ data: buf }).promise;
-        let text = "";
-        for (let i = 1; i <= Math.min(doc.numPages, 30); i++) {
-          const page = await doc.getPage(i);
-          const content = await page.getTextContent();
-          text += content.items.map((item: unknown) => {
-            const it = item as { str?: string };
-            return it.str ?? "";
-          }).join(" ") + "\n";
-        }
-        text = text.replace(/\s+/g, " ").trim().slice(0, 12000);
-        if (!text) return toast.error("Could not extract text from this PDF");
-        setInput(prev => prev ? `${prev}\n\n[PDF: ${file.name}]\n${text}` : `[PDF: ${file.name}]\n${text}`);
-        toast.success(`PDF loaded (${doc.numPages} pages) — ask your question above and send`);
+        const result = await extractPdfText(file, analyzeImageServer, (page, total) => {
+          if (page % 10 === 0 || page === total) toast.info(`Reading page ${page} of ${total}…`);
+        });
+        if (!result.text) return toast.error("Could not extract text from this PDF");
+        const scannedNote = result.scannedPages > 0 ? ` · ${result.scannedPages} scanned pages read via AI vision` : "";
+        setInput(prev => prev ? `${prev}\n\n[PDF: ${file.name}]\n${result.text}` : `[PDF: ${file.name}]\n${result.text}`);
+        toast.success(`PDF loaded — ${result.pageCount} pages${scannedNote} — ask your question and send`);
       } catch {
         toast.error("Failed to read PDF — please try a different file");
       }
