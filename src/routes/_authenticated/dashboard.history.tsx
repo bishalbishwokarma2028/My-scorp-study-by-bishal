@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/history")({
 
 const COLORS = ["#2563EB", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#EF4444", "#84CC16"];
 
-const FILTERS = ["All", "Chat", "Quiz", "Note", "Flashcard", "Image", "Summary", "Translation"] as const;
+const FILTERS = ["All", "Chat", "Quiz", "Note", "Flashcard", "Image", "Summary", "Translation", "Compare", "Research", "Visual"] as const;
 
 const TYPE_TO_ROUTE: Record<string, string> = {
   Chat: "/dashboard/chat",
@@ -22,6 +22,9 @@ const TYPE_TO_ROUTE: Record<string, string> = {
   Image: "/dashboard/image-gen",
   Summary: "/dashboard/summarizer",
   Translation: "/dashboard/translator",
+  Compare: "/dashboard/compare",
+  Research: "/dashboard/research",
+  Visual: "/dashboard/visual-explainer",
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

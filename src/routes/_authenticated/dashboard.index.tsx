@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   MessageSquare, ListChecks, StickyNote, Image as ImageIcon, Sparkles, Flame,
   FileText, Layers, BookOpen, TrendingUp, Star, ArrowRight, Brain,
+  Code2, GitCompare, Search, Eye, Languages, Calculator,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDailyTip } from "@/hooks/useDailyTip";
@@ -12,13 +13,18 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
 });
 
 const quickStart = [
-  { to: "/dashboard/chat", label: "Bishal's Assistant", sub: "Ask anything, get explained", icon: MessageSquare, grad: "from-blue-500 to-cyan-500" },
-  { to: "/dashboard/summarizer", label: "Summarizer", sub: "Condense any content fast", icon: FileText, grad: "from-violet-500 to-purple-500" },
-  { to: "/dashboard/quiz", label: "Quiz Yourself", sub: "Custom practice tests", icon: ListChecks, grad: "from-fuchsia-500 to-purple-500" },
-  { to: "/dashboard/flashcards", label: "Flashcards", sub: "Spaced repetition study", icon: Layers, grad: "from-pink-500 to-rose-500" },
-  { to: "/dashboard/image-gen", label: "Image Generator", sub: "Visualize any concept", icon: ImageIcon, grad: "from-rose-500 to-pink-600" },
-  { to: "/dashboard/notes", label: "Smart Notes", sub: "Smart note editor", icon: BookOpen, grad: "from-red-500 to-rose-500" },
-
+  { to: "/dashboard/chat",             label: "AI Assistant",      sub: "Ask anything, get explained",   icon: MessageSquare, grad: "from-blue-500 to-cyan-500" },
+  { to: "/dashboard/summarizer",       label: "Summarizer",        sub: "Condense any content fast",     icon: FileText,      grad: "from-violet-500 to-purple-500" },
+  { to: "/dashboard/quiz",             label: "Quiz Yourself",     sub: "Custom practice tests",         icon: ListChecks,    grad: "from-fuchsia-500 to-purple-500" },
+  { to: "/dashboard/flashcards",       label: "Flashcards",        sub: "Spaced repetition study",       icon: Layers,        grad: "from-pink-500 to-rose-500" },
+  { to: "/dashboard/compare",          label: "Compare Concepts",  sub: "Side-by-side deep comparison",  icon: GitCompare,    grad: "from-indigo-500 to-blue-600" },
+  { to: "/dashboard/research",         label: "Deep Research",     sub: "Web-powered research reports",  icon: Search,        grad: "from-teal-500 to-cyan-600" },
+  { to: "/dashboard/visual-explainer", label: "Visual Explainer",  sub: "Click-to-explain diagrams",     icon: Eye,           grad: "from-emerald-500 to-teal-600" },
+  { to: "/dashboard/code-tutor",       label: "Code Tutor",        sub: "Analyze & generate code",       icon: Code2,         grad: "from-slate-600 to-gray-700" },
+  { to: "/dashboard/notes",            label: "Smart Notes",       sub: "Smart note editor",             icon: BookOpen,      grad: "from-red-500 to-rose-500" },
+  { to: "/dashboard/translator",       label: "Translator",        sub: "Translate any language",        icon: Languages,     grad: "from-amber-500 to-orange-500" },
+  { to: "/dashboard/image-gen",        label: "Image Generator",   sub: "Visualize any concept",         icon: ImageIcon,     grad: "from-rose-500 to-pink-600" },
+  { to: "/dashboard/calculator",       label: "Calculator",        sub: "Step-by-step math solver",      icon: Calculator,    grad: "from-green-500 to-emerald-600" },
 ];
 
 function greeting() {
@@ -125,7 +131,7 @@ function DashboardOverview() {
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-100 text-amber-600"><Sparkles className="h-4 w-4" /></span>
           Quick Start
         </h2>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {quickStart.map((q) => (
             <Link key={q.to} to={q.to} className="group rounded-2xl border border-border bg-gradient-to-br from-white to-violet-50/40 p-2.5 text-center transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/10 sm:p-4">
               <div className={`mx-auto mb-2 grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br sm:mb-3 sm:h-12 sm:w-12 sm:rounded-2xl ${q.grad} text-white shadow-md`}>
