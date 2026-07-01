@@ -261,53 +261,12 @@ const VisionInput = z.object({
   mimeType: z.string().default("image/jpeg"),
 });
 
-const GEMINI_VISION_MODELS = [
-  "gemini-2.0-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-];
-
 const OPENROUTER_VISION_MODELS = [
-  "google/gemini-2.0-flash-lite-001",
-  "google/gemini-flash-1.5-8b",
-  "meta-llama/llama-3.2-11b-vision-instruct:free",
-  "microsoft/phi-3.5-mini-128k-instruct",
+  "meta-llama/llama-3.2-11b-vision-instruct",
+  "anthropic/claude-3-haiku",
+  "openai/gpt-4o-mini",
+  "openai/gpt-4-vision-preview",
 ];
-
-async function tryGeminiVision(
-  prompt: string,
-  imageBase64: string,
-  mimeType: string,
-  key: string,
-  model: string,
-): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: `You are Bishal's Assistant — an expert study AI. ${prompt}` },
-              { inlineData: { mimeType, data: imageBase64 } },
-            ],
-          }],
-          generationConfig: { maxOutputTokens: 4096 },
-        }),
-      },
-    );
-    const body = await res.text();
-    if (!res.ok) return null;
-    const parsed = JSON.parse(body);
-    const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return (typeof text === "string" && text.trim()) ? text.trim() : null;
-  } catch {
-    return null;
-  }
-}
 
 async function tryOpenRouterVision(
   prompt: string,
@@ -323,7 +282,7 @@ async function tryOpenRouterVision(
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
-        "HTTP-Referer": "https://scorpstudy.in.net",
+        "HTTP-Referer": "https://scorpstudy.app",
         "X-Title": "ScorpStudy",
       },
       body: JSON.stringify({
@@ -351,18 +310,15 @@ async function tryOpenRouterVision(
 export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
-    // Try all Gemini keys × all Gemini vision models
-    for (const model of GEMINI_VISION_MODELS) {
-      for (const key of serverConfig.ai.geminiKeys) {
-        const text = await tryGeminiVision(data.prompt, data.imageBase64, data.mimeType, key, model);
-        if (text) return { text, provider: "Bishal's Assistant" };
-      }
-    }
-
-    // Fallback: OpenRouter vision models
     if (serverConfig.ai.openrouterKey) {
       for (const model of OPENROUTER_VISION_MODELS) {
-        const text = await tryOpenRouterVision(data.prompt, data.imageBase64, data.mimeType, serverConfig.ai.openrouterKey, model);
+        const text = await tryOpenRouterVision(
+          data.prompt,
+          data.imageBase64,
+          data.mimeType,
+          serverConfig.ai.openrouterKey,
+          model,
+        );
         if (text) return { text, provider: "Bishal's Assistant" };
       }
     }
