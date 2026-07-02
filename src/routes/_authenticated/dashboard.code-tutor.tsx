@@ -494,9 +494,9 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
+    <div className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:h-[calc(100vh-18rem)] lg:overflow-hidden">
       {/* Left: inputs */}
-      <div className="space-y-4">
+      <div className="space-y-4 overflow-x-hidden lg:overflow-y-auto lg:h-full lg:pr-1">
         <div className="card-soft p-4 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Language</label>
@@ -586,7 +586,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
       </div>
 
       {/* Right: analysis result */}
-      <div className="card-soft p-4 space-y-3 min-h-[400px] overflow-x-hidden">
+      <div className="card-soft p-4 space-y-3 min-h-[400px] overflow-x-hidden lg:overflow-y-auto lg:h-full">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -622,7 +622,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           </div>
         )}
         {!loading && s.result && (
-          <div className="w-full min-w-0 overflow-x-hidden">
+          <div className="w-full min-w-0 overflow-x-auto max-w-full">
             <RichMarkdown content={injectCodeSnippets(s.result, s.code)} />
           </div>
         )}

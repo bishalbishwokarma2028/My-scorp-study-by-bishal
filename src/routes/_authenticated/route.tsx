@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { clearAllPageState } from "@/lib/pageState";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, MessageSquare, FileText, ListChecks, Layers,
@@ -92,6 +93,8 @@ function AuthedLayout() {
   async function signOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
+    clearAllPageState();
+    try { sessionStorage.clear(); } catch { /* silent */ }
     await supabase.auth.signOut();
     toast.success("Signed out");
     router.navigate({ to: "/auth", replace: true });

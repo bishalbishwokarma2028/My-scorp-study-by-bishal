@@ -592,7 +592,7 @@ function VisualExplainerPage() {
   const diagramInfo = DIAGRAM_TYPES.find(d => d.id === s.diagramType);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -695,7 +695,7 @@ function VisualExplainerPage() {
           )}
 
           {/* SVG */}
-          <div ref={svgRef} className="rounded-xl border border-border overflow-hidden bg-slate-50">
+          <div ref={svgRef} className="rounded-xl border border-border overflow-x-auto overflow-y-hidden bg-slate-50 -mx-1 px-1">
             {s.diagram.type === "mindmap"    && <MindMapSVG    data={s.diagram as MindMapData}    onSelect={setSelected} />}
             {s.diagram.type === "flowchart"  && <FlowchartSVG  data={s.diagram as FlowchartData}  onSelect={setSelected} />}
             {s.diagram.type === "conceptweb" && <ConceptWebSVG data={s.diagram as ConceptWebData} onSelect={setSelected} />}

@@ -7,6 +7,16 @@ import { useState, useCallback } from "react";
 const _cache: Record<string, Record<string, unknown>> = {};
 
 /**
+ * Wipes all in-memory page state. Call on sign-out so the next
+ * user that signs in on the same device sees a clean slate.
+ */
+export function clearAllPageState(): void {
+  for (const key of Object.keys(_cache)) {
+    delete _cache[key];
+  }
+}
+
+/**
  * Drop-in replacement for multiple useState calls on a page.
  * Reads initial state from the in-memory cache (populated on previous visit)
  * and writes back on every update — so switching routes and coming back
