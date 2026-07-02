@@ -4,6 +4,7 @@ import {
   Sparkles, Globe, Clock, Star, Shield, ArrowRight, Calculator as CalcIcon, FlaskConical,
   Atom, History as HistoryIcon, Code2, Languages as LangIcon, BarChart3, Music, Palette,
   CheckCircle2, XCircle, Zap, TrendingUp, Brain, Map, ExternalLink, GraduationCap, Trophy,
+  GitCompare, Search, Eye,
 } from "lucide-react";
 import logoUrl from "@/assets/scorpstudy-logo.png";
 
@@ -37,6 +38,10 @@ const features = [
   { icon: Map, title: "Mind Maps", desc: "Generate comprehensive visual mind maps for any topic in seconds. 6 branches with detailed sub-topics — perfect for visual learners.", color: "from-emerald-500 to-teal-500" },
   { icon: LangIcon, title: "Universal Translator", desc: "Translate text between 30+ languages instantly. With auto-detect, text-to-speech, and a full history of your translations.", color: "from-sky-500 to-blue-500" },
   { icon: CalcIcon, title: "Smart Calculator", desc: "Basic, scientific, unit converter, and Bishal's Formula Helper — all in one. Solve equations and get step-by-step explanations.", color: "from-amber-500 to-orange-500" },
+  { icon: Code2, title: "Code Tutor", desc: "Paste any code and get a full line-by-line analysis, bug fixes, and explanations. Or describe what you want and generate production-quality code instantly.", color: "from-slate-600 to-gray-700" },
+  { icon: Search, title: "Deep Research", desc: "Enter any topic and get a structured, web-powered research report — with sources, key findings, and analysis you can actually use for assignments.", color: "from-teal-500 to-cyan-600" },
+  { icon: Eye, title: "Visual Explainer", desc: "Turn any topic into an interactive Mind Map, Flowchart, or Concept Web. Click any node to get a full explanation of that specific idea.", color: "from-emerald-500 to-teal-600" },
+  { icon: GitCompare, title: "Compare Concepts", desc: "Pick two topics and get a structured side-by-side comparison — definitions, key differences, similarities, and exam tips all in one place.", color: "from-indigo-500 to-blue-600" },
 ];
 
 const subjects = [

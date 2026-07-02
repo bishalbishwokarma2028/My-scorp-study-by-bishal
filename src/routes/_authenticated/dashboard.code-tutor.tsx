@@ -754,7 +754,6 @@ RULES YOU MUST FOLLOW:
               ) : (
                 <div className="w-full space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="grid h-6 w-6 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">AI</div>
                     <ProviderBadge provider={msg.provider || null} />
                   </div>
                   <div className="prose prose-sm max-w-none [&_pre]:rounded-lg [&_pre]:bg-slate-900 [&_pre]:p-4 [&_pre]:text-slate-100 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-muted [&_code:not(pre_code)]:px-1 [&_h2]:text-sm [&_h3]:text-sm">
@@ -846,7 +845,7 @@ function CodeTutorPage() {
           {s.activeTab === "analyze" ? <>
             <span>• Select the correct language for accurate analysis</span>
             <span>• Use <strong>Debug</strong> + <strong>Fix</strong> together for full bug resolution</span>
-            <span>• Hit <strong>▶ Run</strong> to execute code directly in the browser</span>
+            <span>• Ask a follow-up to refine, extend, or debug the code further</span>
             <span>• Add a specific question for targeted help</span>
           </> : <>
             <span>• Be specific — "Python function that…" beats "make a function"</span>

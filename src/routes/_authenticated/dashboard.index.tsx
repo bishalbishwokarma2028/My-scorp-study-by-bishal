@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
 });
 
 const quickStart = [
-  { to: "/dashboard/chat",             label: "AI Assistant",      sub: "Ask anything, get explained",   icon: MessageSquare, grad: "from-blue-500 to-cyan-500" },
+  { to: "/dashboard/chat",             label: "Bishal's Assistant", sub: "Ask anything, get explained",  icon: MessageSquare, grad: "from-blue-500 to-cyan-500" },
   { to: "/dashboard/summarizer",       label: "Summarizer",        sub: "Condense any content fast",     icon: FileText,      grad: "from-violet-500 to-purple-500" },
   { to: "/dashboard/quiz",             label: "Quiz Yourself",     sub: "Custom practice tests",         icon: ListChecks,    grad: "from-fuchsia-500 to-purple-500" },
   { to: "/dashboard/flashcards",       label: "Flashcards",        sub: "Spaced repetition study",       icon: Layers,        grad: "from-pink-500 to-rose-500" },

@@ -115,7 +115,7 @@ function HistoryPage() {
         // Fetch full chat messages and put them into sessionStorage so chat page restores them
         const { data } = await supabase.from("chat_history").select("messages").eq("id", x.id).maybeSingle();
         if (data?.messages) {
-          sessionStorage.setItem("scorp_chat_msgs", JSON.stringify(data.messages));
+          sessionStorage.setItem(`scorp_chat_msgs_${user.id}`, JSON.stringify(data.messages));
         }
       } else if (x.type === "Note") {
         // Store note ID so notes page can open it

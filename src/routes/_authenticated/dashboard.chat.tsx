@@ -674,9 +674,11 @@ function ChatPage() {
   const chatIdRef = useRef<string | null>(null);
   const { quota, bump } = useUsageLimit(user.id, "chat");
 
+  const chatStorageKey = `scorp_chat_msgs_${user.id}`;
+
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem("scorp_chat_msgs");
+      const saved = sessionStorage.getItem(chatStorageKey);
       if (saved) {
         const parsed = JSON.parse(saved) as Msg[];
         if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
@@ -687,7 +689,7 @@ function ChatPage() {
   useEffect(() => {
     if (messages.length === 0) return;
     try {
-      sessionStorage.setItem("scorp_chat_msgs", JSON.stringify(messages));
+      sessionStorage.setItem(chatStorageKey, JSON.stringify(messages));
     } catch { /* silent */ }
   }, [messages]);
 
@@ -1015,7 +1017,7 @@ Return STRICT JSON only (no prose, no markdown fences):
     setSelectedText("");
     setPendingImage(null);
     chatIdRef.current = null;
-    try { sessionStorage.removeItem("scorp_chat_msgs"); } catch { /* silent */ }
+    try { sessionStorage.removeItem(chatStorageKey); } catch { /* silent */ }
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
