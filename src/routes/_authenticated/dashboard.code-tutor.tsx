@@ -13,6 +13,7 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { runCodeServer } from "@/lib/codeRun.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard/code-tutor")({
   component: CodeTutorPage,
@@ -257,32 +258,8 @@ Rules:
   }
 }
 
-// ─── Execute code via Piston API (public, CORS-enabled) ───────────────────────
+// ─── Execute code via server-proxied Piston API ───────────────────────────────
 type RunResult = { stdout: string; stderr: string; exitCode: number } | { error: string };
-
-async function runCodeOnPiston(code: string, language: string): Promise<RunResult> {
-  const lang = PISTON_LANG[language];
-  if (!lang) {
-    return { error: `${language} is not supported for live execution. Supported: Python, JavaScript, TypeScript, Java, C, C++, C#, Go, Rust, PHP, Ruby, Kotlin, R, Bash, Dart, Scala.` };
-  }
-  try {
-    const res = await fetch("https://emkc.org/api/v2/piston/execute", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ language: lang, version: "*", files: [{ content: code }] }),
-    });
-    if (!res.ok) return { error: `Execution server returned ${res.status}. Try again shortly.` };
-    const data = await res.json() as { run?: { stdout?: string; stderr?: string; code?: number }; compile?: { stderr?: string } };
-    if (data.compile?.stderr) return { error: `Compile error:\n${data.compile.stderr}` };
-    return {
-      stdout:   data.run?.stdout ?? "",
-      stderr:   data.run?.stderr ?? "",
-      exitCode: data.run?.code ?? 0,
-    };
-  } catch {
-    return { error: "Could not reach the execution server. Check your internet connection and try again." };
-  }
-}
 
 // ─── Copy button ──────────────────────────────────────────────────────────────
 function CopyBtn({ text, label = "Copy" }: { text: string; label?: string }) {
@@ -337,9 +314,16 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
 
   async function runCode() {
     if (!s.code.trim()) return toast.error("Write or paste code first");
+    const lang = PISTON_LANG[s.language];
+    if (!lang) return toast.error(`${s.language} is not supported for live execution.`);
     setIsRunning(true); setShowRun(true); setRunResult(null);
-    const result = await runCodeOnPiston(s.code, s.language);
-    setRunResult(result);
+    try {
+      const result = await runCodeServer({ data: { language: lang, code: s.code } });
+      setRunResult(result);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setRunResult({ error: `Execution failed: ${msg}` });
+    }
     setIsRunning(false);
   }
 
@@ -474,7 +458,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
       </div>
 
       {/* Right: analysis result */}
-      <div className="card-soft p-4 space-y-3 min-h-[400px]">
+      <div className="card-soft p-4 space-y-3 min-h-[400px] overflow-x-hidden">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {s.result ? `${selectedMode.label} Result` : "Output"}
@@ -500,7 +484,12 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           </div>
         )}
         {!loading && s.result && (
-          <div className="prose prose-sm max-w-none overflow-auto [&_pre]:rounded-lg [&_pre]:bg-slate-900 [&_pre]:p-4 [&_pre]:text-slate-100 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-muted [&_code:not(pre_code)]:px-1 [&_code:not(pre_code)]:py-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:text-xs">
+          <div className="w-full min-w-0 overflow-x-hidden prose prose-sm max-w-none
+            [&_pre]:rounded-lg [&_pre]:bg-slate-900 [&_pre]:p-4 [&_pre]:text-slate-100 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_pre]:whitespace-pre-wrap
+            [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-muted [&_code:not(pre_code)]:px-1 [&_code:not(pre_code)]:py-0.5 [&_code:not(pre_code)]:break-all
+            [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm
+            [&_table]:text-xs [&_table]:w-full [&_table]:block [&_table]:overflow-x-auto
+            [&_p]:break-words [&_li]:break-words">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.result}</ReactMarkdown>
           </div>
         )}

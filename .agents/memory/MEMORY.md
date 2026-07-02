@@ -2,4 +2,4 @@
 - [Vite SSR env var timing](vite-ssr-env-timing.md) — Replit Secrets not visible at Vite SSR module-load time; use JS getter properties on config objects so process.env is read at request time
 - [Server-side quota system](server-side-quota.md) — per-user daily limits stored in Supabase `daily_usage` table; atomic increment via Postgres RPC `increment_daily_usage`
 - [Feature state persistence](feature-state.md) — module-level cache in `src/lib/pageState.ts`; usePageState hook applied to compare, research, visual-explainer, code-tutor; survives route changes, resets on refresh
-- [MindMap SVG text centering](mindmap-svg-fix.md) — fix text outside boxes: use dominantBaseline="middle" on individual tspan (not parent text); cap sub-items at 3 with 0.30 rad spread at R=545 for 6-branch no-overlap guarantee
+- [MindMap SVG layout](mindmap-svg-fix.md) — viewBox must be 1500×1300 (CX=750,CY=650), BRANCH_R=270, SUB_R=480; R=545 causes top/bottom nodes to clip outside viewBox

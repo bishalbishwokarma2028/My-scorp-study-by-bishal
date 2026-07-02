@@ -65,11 +65,12 @@ function SvgText({ x, y, text, maxChars, fontSize, fill, fontWeight = "normal" }
 }
 
 // ─── Mind Map ─────────────────────────────────────────────────────────────────
-// Layout constants — tuned to prevent any node overlap for 4-6 branches × 3 sub-items
-const MM_W = 1400, MM_H = 920;
-const MM_CX = MM_W / 2, MM_CY = MM_H / 2;
-const BRANCH_R   = 295;   // center → branch
-const SUB_R      = 545;   // center → sub-item
+// Layout constants — tuned so all nodes stay inside the viewBox for up to 6 branches × 3 sub-items
+// SUB_R=480: at top/bottom angles → sy = 650±480 = 170 or 1130; box half-height 26 → 144 or 1156, inside 1300
+const MM_W = 1500, MM_H = 1300;
+const MM_CX = MM_W / 2, MM_CY = MM_H / 2;   // 750, 650
+const BRANCH_R   = 270;   // center → branch
+const SUB_R      = 480;   // center → sub-item (reduced so nodes stay inside viewBox)
 const SUB_SPREAD = 0.30;  // radians between adjacent sub-items
 const MAX_SUBS   = 3;     // cap to guarantee no overlap
 const BW = 158, BH = 62;  // branch box size
