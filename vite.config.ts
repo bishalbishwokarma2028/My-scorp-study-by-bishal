@@ -47,9 +47,11 @@ export default defineConfig({
       allowedHosts: true,
       watch: {
         ignored: [
-          "**/.cache/bun/**",
+          "**/.cache/**",
           "**/node_modules/**",
-          "**/.local/state/**",
+          "**/.local/**",
+          "**/tmp/**",
+          "**/.agents/**",
         ],
       },
     },
