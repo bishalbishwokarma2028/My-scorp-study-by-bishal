@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from "react";
 import {
   Loader2, Code2, Bug, Zap, ClipboardCheck, ArrowRightLeft,
   BookOpen, Copy, Check, RotateCcw, Send, Sparkles, ChevronDown,
-  Play, Terminal, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, type HistoryMsg } from "@/lib/aiProvider";
@@ -13,7 +12,6 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { runCodeServer } from "@/lib/codeRun.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard/code-tutor")({
   component: CodeTutorPage,
@@ -30,14 +28,6 @@ const TARGET_LANGUAGES = [
   "Go","Rust","PHP","Ruby","Swift","Kotlin",
 ];
 
-// Languages supported by Piston (public code execution API)
-const PISTON_LANG: Record<string, string> = {
-  Python: "python", JavaScript: "javascript", TypeScript: "typescript",
-  Java: "java", C: "c", "C++": "c++", "C#": "csharp",
-  Go: "go", Rust: "rust", PHP: "php", Ruby: "ruby",
-  Swift: "swift", Kotlin: "kotlin", R: "r", "Bash/Shell": "bash",
-  Dart: "dart", Scala: "scala",
-};
 
 type Mode = "explain" | "debug" | "fix" | "optimize" | "review" | "convert";
 type Tab  = "analyze" | "generate";
@@ -314,8 +304,32 @@ function CodeViewer({ code, highlightedLines }: { code: string; highlightedLines
   );
 }
 
-// ─── Execute code via server-proxied Piston API ───────────────────────────────
-type RunResult = { stdout: string; stderr: string; exitCode: number } | { error: string };
+// ─── Inject inline code snippets next to line references in AI result ─────────
+function injectCodeSnippets(markdown: string, code: string): string {
+  if (!code.trim()) return markdown;
+  const codeLines = code.split("\n");
+  const total = codeLines.length;
+
+  function snippet(start: number, end: number): string {
+    start = Math.max(0, start);
+    end = Math.min(total - 1, end);
+    if (start > end) return "";
+    return codeLines.slice(start, end + 1)
+      .map((l, i) => `${String(start + i + 1).padStart(3, " ")} | ${l}`)
+      .join("\n");
+  }
+
+  // Match **Lines X–Y**: or **Line X**: patterns (bold style from AI output)
+  return markdown
+    .replace(/(\*\*[Ll]ines?\s+(\d+)\s*[–\-]\s*(\d+)\*\*:?)/g, (m, _, rs, re) => {
+      const s = snippet(parseInt(rs) - 1, parseInt(re) - 1);
+      return s ? `${m}\n\`\`\`\n${s}\n\`\`\`` : m;
+    })
+    .replace(/(\*\*[Ll]ine\s+(\d+)\*\*:?)/g, (m, _, ln) => {
+      const s = snippet(parseInt(ln) - 1, parseInt(ln) - 1);
+      return s ? `${m}\n\`\`\`\n${s}\n\`\`\`` : m;
+    });
+}
 
 // ─── Copy button ──────────────────────────────────────────────────────────────
 function CopyBtn({ text, label = "Copy" }: { text: string; label?: string }) {
@@ -347,11 +361,8 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
     result: null, provider: null,
   });
 
-  const [loading,    setLoading]    = useState(false);
-  const [isRunning,  setIsRunning]  = useState(false);
-  const [runResult,  setRunResult]  = useState<RunResult | null>(null);
-  const [showRun,    setShowRun]    = useState(false);
-  const [editMode,   setEditMode]   = useState(true);
+  const [loading,  setLoading]  = useState(false);
+  const [editMode, setEditMode] = useState(true);
 
   const selectedMode = MODES.find(m => m.id === s.mode)!;
   const highlightedLines = s.result ? parseHighlightedLines(s.result) : new Set<number>();
@@ -361,7 +372,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
     if (!s.code.trim()) return toast.error("Paste some code first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); set({ result: null });
-    setRunResult(null); setShowRun(false); setEditMode(false);
+    setEditMode(false);
 
     const prompt = buildAnalyzePrompt(s.code, s.language, s.mode, s.targetLang, s.question);
     const res = await askAI(prompt,
@@ -371,24 +382,9 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
     setLoading(false);
   }
 
-  async function runCode() {
-    if (!s.code.trim()) return toast.error("Write or paste code first");
-    const lang = PISTON_LANG[s.language];
-    if (!lang) return toast.error(`${s.language} is not supported for live execution.`);
-    setIsRunning(true); setShowRun(true); setRunResult(null);
-    try {
-      const result = await runCodeServer({ data: { language: lang, code: s.code } });
-      setRunResult(result);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setRunResult({ error: `Execution failed: ${msg}` });
-    }
-    setIsRunning(false);
-  }
-
   function reset() {
     set({ code: "", result: null, provider: null, question: "" });
-    setRunResult(null); setShowRun(false); setEditMode(true);
+    setEditMode(true);
   }
 
   return (
@@ -473,14 +469,6 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
               ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>
               : <><selectedMode.icon className="h-4 w-4" /> {selectedMode.label} Code</>}
           </button>
-          {PISTON_LANG[s.language] && (
-            <button onClick={runCode} disabled={isRunning || !s.code.trim()}
-              title={`Run ${s.language} code`}
-              className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors">
-              {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {isRunning ? "Running…" : "Run"}
-            </button>
-          )}
           {(s.result || s.code) && (
             <button onClick={reset}
               className="rounded-lg border border-border px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent">
@@ -489,48 +477,6 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           )}
         </div>
 
-        {/* Run output panel */}
-        {showRun && (
-          <div className="card-soft overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-slate-900">
-              <div className="flex items-center gap-2">
-                <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-200">{s.language} Output</span>
-                {runResult && !("error" in runResult) && (
-                  <span className={`text-[10px] rounded-full px-2 py-0.5 font-mono ${runResult.exitCode === 0 ? "bg-emerald-900 text-emerald-300" : "bg-red-900 text-red-300"}`}>
-                    exit {runResult.exitCode}
-                  </span>
-                )}
-              </div>
-              <button onClick={() => setShowRun(false)}>
-                <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-200" />
-              </button>
-            </div>
-            <div className="bg-slate-950 p-4 min-h-[80px] max-h-[260px] overflow-y-auto">
-              {isRunning && (
-                <div className="flex items-center gap-2 text-slate-400 text-xs">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Executing…
-                </div>
-              )}
-              {!isRunning && runResult && "error" in runResult && (
-                <pre className="text-xs text-red-400 whitespace-pre-wrap font-mono">{runResult.error}</pre>
-              )}
-              {!isRunning && runResult && !("error" in runResult) && (
-                <div className="space-y-2">
-                  {runResult.stdout && (
-                    <pre className="text-xs text-emerald-300 whitespace-pre-wrap font-mono">{runResult.stdout}</pre>
-                  )}
-                  {runResult.stderr && (
-                    <pre className="text-xs text-red-400 whitespace-pre-wrap font-mono">{runResult.stderr}</pre>
-                  )}
-                  {!runResult.stdout && !runResult.stderr && (
-                    <p className="text-xs text-slate-500 italic">(no output)</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Right: analysis result */}
@@ -576,7 +522,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
             [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm
             [&_table]:text-xs [&_table]:w-full [&_table]:block [&_table]:overflow-x-auto
             [&_p]:break-words [&_li]:break-words">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.result}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{injectCodeSnippets(s.result, s.code)}</ReactMarkdown>
           </div>
         )}
       </div>

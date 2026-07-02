@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, MessageSquare, FileText, ListChecks, Layers,
   Image as ImageIcon, StickyNote, Languages, Calculator, BarChart3,
-  LogOut, Menu, X, Bell, Code2, GitCompare, Search, Eye,
+  LogOut, Menu, X, Bell, Code2, GitCompare, Search, Eye, Globe,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ const navItems = [
   { to: "/dashboard/notes", label: "Smart Notes", icon: StickyNote },
   { to: "/dashboard/translator", label: "Translator", icon: Languages },
   { to: "/dashboard/calculator", label: "Calculator", icon: Calculator },
+  { to: "/dashboard/language-learning", label: "Language Learning", icon: Globe },
   { to: "/dashboard/history", label: "History", icon: BarChart3 },
 ] as const;
 
