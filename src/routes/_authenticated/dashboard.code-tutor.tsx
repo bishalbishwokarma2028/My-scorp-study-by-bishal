@@ -10,7 +10,7 @@ import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export const Route = createFileRoute("/_authenticated/dashboard/code-tutor")({
@@ -331,6 +331,112 @@ function injectCodeSnippets(markdown: string, code: string): string {
     });
 }
 
+// ─── Section colour map for h2 headings ───────────────────────────────────────
+function sectionStyle(text: string): { bg: string; border: string; fg: string } {
+  const t = text.toLowerCase();
+  if (t.includes("🧭") || t.includes("what this"))   return { bg: "bg-blue-50",    border: "border-l-4 border-blue-400",    fg: "text-blue-800"   };
+  if (t.includes("📦") || t.includes("import"))      return { bg: "bg-orange-50",  border: "border-l-4 border-orange-400",  fg: "text-orange-800" };
+  if (t.includes("🔢") || t.includes("line-by"))     return { bg: "bg-emerald-50", border: "border-l-4 border-emerald-400", fg: "text-emerald-800"};
+  if (t.includes("🧠") || t.includes("concept"))     return { bg: "bg-violet-50",  border: "border-l-4 border-violet-400",  fg: "text-violet-800" };
+  if (t.includes("🔄") || t.includes("data flow"))   return { bg: "bg-cyan-50",    border: "border-l-4 border-cyan-400",    fg: "text-cyan-800"   };
+  if (t.includes("✅") || t.includes("output"))      return { bg: "bg-teal-50",    border: "border-l-4 border-teal-400",    fg: "text-teal-800"   };
+  if (t.includes("🔍") || t.includes("scan"))        return { bg: "bg-red-50",     border: "border-l-4 border-red-400",     fg: "text-red-800"    };
+  if (t.includes("⚠️") || t.includes("note"))        return { bg: "bg-amber-50",   border: "border-l-4 border-amber-400",   fg: "text-amber-800"  };
+  if (t.includes("💡") || t.includes("tip"))         return { bg: "bg-yellow-50",  border: "border-l-4 border-yellow-400",  fg: "text-yellow-800" };
+  if (t.includes("📊") || t.includes("score"))       return { bg: "bg-indigo-50",  border: "border-l-4 border-indigo-400",  fg: "text-indigo-800" };
+  if (t.includes("🔑") || t.includes("key"))         return { bg: "bg-rose-50",    border: "border-l-4 border-rose-400",    fg: "text-rose-800"   };
+  return                                               { bg: "bg-slate-50",   border: "border-l-4 border-slate-400",   fg: "text-slate-800"  };
+}
+
+// ─── Rich markdown renderer for explain / analysis results ────────────────────
+function RichMarkdown({ content }: { content: string }) {
+  const components: Components = {
+    h1: ({ children }) => (
+      <div className="mt-6 mb-3 pb-2 border-b-2 border-primary/20">
+        <span className="text-base font-bold text-foreground">{children}</span>
+      </div>
+    ),
+    h2: ({ children }) => {
+      const text = String(children);
+      const s = sectionStyle(text);
+      return (
+        <div className={`flex items-start gap-3 mt-5 mb-3 px-4 py-2.5 rounded-lg ${s.bg} ${s.border}`}>
+          <span className={`text-sm font-bold leading-snug ${s.fg}`}>{children}</span>
+        </div>
+      );
+    },
+    h3: ({ children }) => (
+      <div className="flex items-center gap-2 mt-4 mb-1.5">
+        <span className="h-3.5 w-1 rounded-full bg-primary flex-shrink-0" />
+        <span className="text-sm font-semibold text-foreground">{children}</span>
+      </div>
+    ),
+    strong: ({ children }) => (
+      <strong className="bg-amber-100 text-amber-900 px-0.5 rounded font-semibold">{children}</strong>
+    ),
+    em: ({ children }) => (
+      <em className="text-violet-700 not-italic font-medium">{children}</em>
+    ),
+    pre: ({ children }) => (
+      <div className="my-3 rounded-xl bg-slate-900 border border-slate-700 overflow-hidden shadow-sm">
+        {children}
+      </div>
+    ),
+    code: ({ children, className }) => {
+      const isBlock = Boolean(className) || String(children).includes("\n");
+      if (isBlock) {
+        return (
+          <code className={`block p-4 text-slate-100 text-[11px] font-mono overflow-x-auto whitespace-pre leading-relaxed ${className ?? ""}`}>
+            {children}
+          </code>
+        );
+      }
+      return (
+        <code className="rounded-md bg-blue-50 border border-blue-200 text-blue-700 px-1.5 py-0.5 text-[11px] font-mono font-semibold">
+          {children}
+        </code>
+      );
+    },
+    blockquote: ({ children }) => (
+      <div className="my-3 rounded-r-lg border-l-4 border-blue-400 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        {children}
+      </div>
+    ),
+    p: ({ children }) => (
+      <p className="text-sm leading-relaxed text-foreground mb-2 break-words">{children}</p>
+    ),
+    ul: ({ children }) => <ul className="my-2 space-y-1 list-none pl-0">{children}</ul>,
+    ol: ({ children }) => <ol className="my-2 space-y-1 list-decimal pl-5">{children}</ol>,
+    li: ({ children }) => (
+      <li className="flex items-start gap-2 text-sm leading-relaxed">
+        <span className="mt-[5px] h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+        <span className="break-words min-w-0">{children}</span>
+      </li>
+    ),
+    table: ({ children }) => (
+      <div className="my-3 overflow-x-auto rounded-xl border border-border shadow-sm">
+        <table className="w-full text-xs border-collapse">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-slate-800 text-slate-100">{children}</thead>,
+    th: ({ children }) => (
+      <th className="px-3 py-2.5 text-left font-semibold text-xs tracking-wide">{children}</th>
+    ),
+    tbody: ({ children }) => <tbody>{children}</tbody>,
+    tr: ({ children }) => <tr className="border-b border-border even:bg-slate-50/70">{children}</tr>,
+    td: ({ children }) => (
+      <td className="px-3 py-2 text-sm break-words">{children}</td>
+    ),
+    hr: () => <hr className="my-4 border-border" />,
+  };
+
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      {content}
+    </ReactMarkdown>
+  );
+}
+
 // ─── Copy button ──────────────────────────────────────────────────────────────
 function CopyBtn({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -516,13 +622,8 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           </div>
         )}
         {!loading && s.result && (
-          <div className="w-full min-w-0 overflow-x-hidden prose prose-sm max-w-none
-            [&_pre]:rounded-lg [&_pre]:bg-slate-900 [&_pre]:p-4 [&_pre]:text-slate-100 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_pre]:whitespace-pre-wrap
-            [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-muted [&_code:not(pre_code)]:px-1 [&_code:not(pre_code)]:py-0.5 [&_code:not(pre_code)]:break-all
-            [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm
-            [&_table]:text-xs [&_table]:w-full [&_table]:block [&_table]:overflow-x-auto
-            [&_p]:break-words [&_li]:break-words">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{injectCodeSnippets(s.result, s.code)}</ReactMarkdown>
+          <div className="w-full min-w-0 overflow-x-hidden">
+            <RichMarkdown content={injectCodeSnippets(s.result, s.code)} />
           </div>
         )}
       </div>

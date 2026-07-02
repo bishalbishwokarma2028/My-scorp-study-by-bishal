@@ -20,7 +20,6 @@ import { Route as AuthenticatedDashboardResearchRouteImport } from './routes/_au
 import { Route as AuthenticatedDashboardQuizRouteImport } from './routes/_authenticated/dashboard.quiz'
 import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
 import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
-import { Route as AuthenticatedDashboardLanguageLearningRouteImport } from './routes/_authenticated/dashboard.language-learning'
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
 import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
@@ -91,12 +90,6 @@ const AuthenticatedDashboardMindmapRoute =
     path: '/dashboard/mindmap',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDashboardLanguageLearningRoute =
-  AuthenticatedDashboardLanguageLearningRouteImport.update({
-    id: '/dashboard/language-learning',
-    path: '/dashboard/language-learning',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedDashboardImageGenRoute =
   AuthenticatedDashboardImageGenRouteImport.update({
     id: '/dashboard/image-gen',
@@ -150,7 +143,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
-  '/dashboard/language-learning': typeof AuthenticatedDashboardLanguageLearningRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
@@ -170,7 +162,6 @@ export interface FileRoutesByTo {
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
-  '/dashboard/language-learning': typeof AuthenticatedDashboardLanguageLearningRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
@@ -192,7 +183,6 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
-  '/_authenticated/dashboard/language-learning': typeof AuthenticatedDashboardLanguageLearningRoute
   '/_authenticated/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/_authenticated/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/_authenticated/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
@@ -214,7 +204,6 @@ export interface FileRouteTypes {
     | '/dashboard/flashcards'
     | '/dashboard/history'
     | '/dashboard/image-gen'
-    | '/dashboard/language-learning'
     | '/dashboard/mindmap'
     | '/dashboard/notes'
     | '/dashboard/quiz'
@@ -234,7 +223,6 @@ export interface FileRouteTypes {
     | '/dashboard/flashcards'
     | '/dashboard/history'
     | '/dashboard/image-gen'
-    | '/dashboard/language-learning'
     | '/dashboard/mindmap'
     | '/dashboard/notes'
     | '/dashboard/quiz'
@@ -255,7 +243,6 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/flashcards'
     | '/_authenticated/dashboard/history'
     | '/_authenticated/dashboard/image-gen'
-    | '/_authenticated/dashboard/language-learning'
     | '/_authenticated/dashboard/mindmap'
     | '/_authenticated/dashboard/notes'
     | '/_authenticated/dashboard/quiz'
@@ -351,13 +338,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardMindmapRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/dashboard/language-learning': {
-      id: '/_authenticated/dashboard/language-learning'
-      path: '/dashboard/language-learning'
-      fullPath: '/dashboard/language-learning'
-      preLoaderRoute: typeof AuthenticatedDashboardLanguageLearningRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/dashboard/image-gen': {
       id: '/_authenticated/dashboard/image-gen'
       path: '/dashboard/image-gen'
@@ -418,7 +398,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardFlashcardsRoute: typeof AuthenticatedDashboardFlashcardsRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
-  AuthenticatedDashboardLanguageLearningRoute: typeof AuthenticatedDashboardLanguageLearningRoute
   AuthenticatedDashboardMindmapRoute: typeof AuthenticatedDashboardMindmapRoute
   AuthenticatedDashboardNotesRoute: typeof AuthenticatedDashboardNotesRoute
   AuthenticatedDashboardQuizRoute: typeof AuthenticatedDashboardQuizRoute
@@ -437,8 +416,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardFlashcardsRoute: AuthenticatedDashboardFlashcardsRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
   AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
-  AuthenticatedDashboardLanguageLearningRoute:
-    AuthenticatedDashboardLanguageLearningRoute,
   AuthenticatedDashboardMindmapRoute: AuthenticatedDashboardMindmapRoute,
   AuthenticatedDashboardNotesRoute: AuthenticatedDashboardNotesRoute,
   AuthenticatedDashboardQuizRoute: AuthenticatedDashboardQuizRoute,
