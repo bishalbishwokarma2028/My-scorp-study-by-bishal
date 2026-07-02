@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   MessageSquare, ListChecks, StickyNote, Image as ImageIcon, Sparkles, Flame,
   FileText, Layers, BookOpen, TrendingUp, Star, ArrowRight, Brain,
-  Code2, GitCompare, Search, Eye, Languages, Calculator,
+  Code2, GitCompare, Search, Eye, Languages, Calculator, FlaskConical, Sheet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDailyTip } from "@/hooks/useDailyTip";
@@ -24,6 +24,8 @@ const quickStart = [
   { to: "/dashboard/notes",            label: "Smart Notes",       sub: "Smart note editor",             icon: BookOpen,      grad: "from-red-500 to-rose-500" },
   { to: "/dashboard/translator",       label: "Translator",        sub: "Translate any language",        icon: Languages,     grad: "from-amber-500 to-orange-500" },
   { to: "/dashboard/image-gen",        label: "Image Generator",   sub: "Visualize any concept",         icon: ImageIcon,     grad: "from-rose-500 to-pink-600" },
+  { to: "/dashboard/formula-sheet",    label: "Formula Sheet",     sub: "Generate formula sheets",       icon: Sheet,         grad: "from-cyan-500 to-blue-600" },
+  { to: "/dashboard/mock-test",        label: "Mock Test",         sub: "Timed tests with review",       icon: FlaskConical,  grad: "from-rose-500 to-red-600" },
   { to: "/dashboard/calculator",       label: "Calculator",        sub: "Step-by-step math solver",      icon: Calculator,    grad: "from-green-500 to-emerald-600" },
 ];
 

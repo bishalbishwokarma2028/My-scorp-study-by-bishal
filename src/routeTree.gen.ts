@@ -19,9 +19,11 @@ import { Route as AuthenticatedDashboardSummarizerRouteImport } from './routes/_
 import { Route as AuthenticatedDashboardResearchRouteImport } from './routes/_authenticated/dashboard.research'
 import { Route as AuthenticatedDashboardQuizRouteImport } from './routes/_authenticated/dashboard.quiz'
 import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
+import { Route as AuthenticatedDashboardMockTestRouteImport } from './routes/_authenticated/dashboard.mock-test'
 import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
+import { Route as AuthenticatedDashboardFormulaSheetRouteImport } from './routes/_authenticated/dashboard.formula-sheet'
 import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
 import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
 import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
@@ -84,6 +86,12 @@ const AuthenticatedDashboardNotesRoute =
     path: '/dashboard/notes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardMockTestRoute =
+  AuthenticatedDashboardMockTestRouteImport.update({
+    id: '/dashboard/mock-test',
+    path: '/dashboard/mock-test',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardMindmapRoute =
   AuthenticatedDashboardMindmapRouteImport.update({
     id: '/dashboard/mindmap',
@@ -100,6 +108,12 @@ const AuthenticatedDashboardHistoryRoute =
   AuthenticatedDashboardHistoryRouteImport.update({
     id: '/dashboard/history',
     path: '/dashboard/history',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardFormulaSheetRoute =
+  AuthenticatedDashboardFormulaSheetRouteImport.update({
+    id: '/dashboard/formula-sheet',
+    path: '/dashboard/formula-sheet',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardFlashcardsRoute =
@@ -141,9 +155,11 @@ export interface FileRoutesByFullPath {
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
+  '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
+  '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
   '/dashboard/research': typeof AuthenticatedDashboardResearchRoute
@@ -160,9 +176,11 @@ export interface FileRoutesByTo {
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
+  '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
+  '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
   '/dashboard/research': typeof AuthenticatedDashboardResearchRoute
@@ -181,9 +199,11 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/_authenticated/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/_authenticated/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
+  '/_authenticated/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/_authenticated/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
+  '/_authenticated/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/_authenticated/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
   '/_authenticated/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
   '/_authenticated/dashboard/research': typeof AuthenticatedDashboardResearchRoute
@@ -202,9 +222,11 @@ export interface FileRouteTypes {
     | '/dashboard/code-tutor'
     | '/dashboard/compare'
     | '/dashboard/flashcards'
+    | '/dashboard/formula-sheet'
     | '/dashboard/history'
     | '/dashboard/image-gen'
     | '/dashboard/mindmap'
+    | '/dashboard/mock-test'
     | '/dashboard/notes'
     | '/dashboard/quiz'
     | '/dashboard/research'
@@ -221,9 +243,11 @@ export interface FileRouteTypes {
     | '/dashboard/code-tutor'
     | '/dashboard/compare'
     | '/dashboard/flashcards'
+    | '/dashboard/formula-sheet'
     | '/dashboard/history'
     | '/dashboard/image-gen'
     | '/dashboard/mindmap'
+    | '/dashboard/mock-test'
     | '/dashboard/notes'
     | '/dashboard/quiz'
     | '/dashboard/research'
@@ -241,9 +265,11 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/code-tutor'
     | '/_authenticated/dashboard/compare'
     | '/_authenticated/dashboard/flashcards'
+    | '/_authenticated/dashboard/formula-sheet'
     | '/_authenticated/dashboard/history'
     | '/_authenticated/dashboard/image-gen'
     | '/_authenticated/dashboard/mindmap'
+    | '/_authenticated/dashboard/mock-test'
     | '/_authenticated/dashboard/notes'
     | '/_authenticated/dashboard/quiz'
     | '/_authenticated/dashboard/research'
@@ -331,6 +357,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardNotesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/mock-test': {
+      id: '/_authenticated/dashboard/mock-test'
+      path: '/dashboard/mock-test'
+      fullPath: '/dashboard/mock-test'
+      preLoaderRoute: typeof AuthenticatedDashboardMockTestRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/mindmap': {
       id: '/_authenticated/dashboard/mindmap'
       path: '/dashboard/mindmap'
@@ -350,6 +383,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/history'
       fullPath: '/dashboard/history'
       preLoaderRoute: typeof AuthenticatedDashboardHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/formula-sheet': {
+      id: '/_authenticated/dashboard/formula-sheet'
+      path: '/dashboard/formula-sheet'
+      fullPath: '/dashboard/formula-sheet'
+      preLoaderRoute: typeof AuthenticatedDashboardFormulaSheetRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard/flashcards': {
@@ -396,9 +436,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardCodeTutorRoute: typeof AuthenticatedDashboardCodeTutorRoute
   AuthenticatedDashboardCompareRoute: typeof AuthenticatedDashboardCompareRoute
   AuthenticatedDashboardFlashcardsRoute: typeof AuthenticatedDashboardFlashcardsRoute
+  AuthenticatedDashboardFormulaSheetRoute: typeof AuthenticatedDashboardFormulaSheetRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
   AuthenticatedDashboardMindmapRoute: typeof AuthenticatedDashboardMindmapRoute
+  AuthenticatedDashboardMockTestRoute: typeof AuthenticatedDashboardMockTestRoute
   AuthenticatedDashboardNotesRoute: typeof AuthenticatedDashboardNotesRoute
   AuthenticatedDashboardQuizRoute: typeof AuthenticatedDashboardQuizRoute
   AuthenticatedDashboardResearchRoute: typeof AuthenticatedDashboardResearchRoute
@@ -414,9 +456,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardCodeTutorRoute: AuthenticatedDashboardCodeTutorRoute,
   AuthenticatedDashboardCompareRoute: AuthenticatedDashboardCompareRoute,
   AuthenticatedDashboardFlashcardsRoute: AuthenticatedDashboardFlashcardsRoute,
+  AuthenticatedDashboardFormulaSheetRoute:
+    AuthenticatedDashboardFormulaSheetRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
   AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
   AuthenticatedDashboardMindmapRoute: AuthenticatedDashboardMindmapRoute,
+  AuthenticatedDashboardMockTestRoute: AuthenticatedDashboardMockTestRoute,
   AuthenticatedDashboardNotesRoute: AuthenticatedDashboardNotesRoute,
   AuthenticatedDashboardQuizRoute: AuthenticatedDashboardQuizRoute,
   AuthenticatedDashboardResearchRoute: AuthenticatedDashboardResearchRoute,

@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import React from "react";
-import { Loader2, Delete } from "lucide-react";
+import { Loader2, Delete, ArrowLeftRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { askAI } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge } from "@/components/ai-ui";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/calculator")({
   component: CalculatorPage,
@@ -15,6 +16,25 @@ export const Route = createFileRoute("/_authenticated/dashboard/calculator")({
 
 type Tab = "basic" | "scientific" | "formula" | "convert";
 
+/* ─── helpers ─────────────────────────────────────────────────────────── */
+function factorial(n: number): number {
+  if (n < 0 || !Number.isInteger(n)) return NaN;
+  if (n === 0 || n === 1) return 1;
+  if (n > 170) return Infinity;
+  let r = 1;
+  for (let i = 2; i <= n; i++) r *= i;
+  return r;
+}
+function nPr(n: number, r: number): number {
+  if (r > n || n < 0 || r < 0) return NaN;
+  return factorial(n) / factorial(n - r);
+}
+function nCr(n: number, r: number): number {
+  if (r > n || n < 0 || r < 0) return NaN;
+  return factorial(n) / (factorial(r) * factorial(n - r));
+}
+
+/* ─── Main page ───────────────────────────────────────────────────────── */
 function CalculatorPage() {
   const { user } = Route.useRouteContext();
   const [tab, setTab] = useState<Tab>("basic");
@@ -23,54 +43,58 @@ function CalculatorPage() {
   const [history, setHistory] = useState<{ expr: string; result: string }[]>([]);
   const [degrees, setDegrees] = useState(true);
 
-  function press(k: string) {
-    if (k === "=") { compute(); return; }
-    if (k === "C") { setExpr(""); setResult(""); return; }
-    if (k === "⌫") { setExpr(e => e.slice(0, -1)); return; }
-    if (k === "+/-") { setExpr(e => e.startsWith("-") ? e.slice(1) : "-" + e); return; }
+  const press = useCallback((k: string) => {
+    if (k === "=")   { compute(); return; }
+    if (k === "C")   { setExpr(""); setResult(""); return; }
+    if (k === "⌫")   { setExpr(e => e.slice(0, -1)); return; }
+    if (k === "x²")  { setExpr(e => `(${e || result})^2`); return; }
+    if (k === "x³")  { setExpr(e => `(${e || result})^3`); return; }
+    if (k === "1/x") { setExpr(e => `1/(${e || result})`); return; }
+    if (k === "n!")  { setExpr(e => `fact(${e || result})`); return; }
     if (k === "%") {
       setExpr(e => {
         const match = e.match(/^(.*?)(-?\d+(?:\.\d+)?)$/);
         if (match) {
-          const base = match[1];
-          const num = parseFloat(match[2]);
+          const base = match[1], num = parseFloat(match[2]);
           if (!isNaN(num)) return base + (num / 100);
         }
         return e + "/100";
       });
       return;
     }
+    if (k === "+/-") { setExpr(e => e.startsWith("-") ? e.slice(1) : "-" + e); return; }
     setExpr(e => e + k);
-  }
+  }, [result]);
 
   function compute() {
     if (!expr.trim()) return;
     try {
       const rad = degrees ? "Math.PI/180" : "1";
       const prelude = `const _r=${rad};
-        const sin=(x)=>Math.sin(x*_r),
-              cos=(x)=>Math.cos(x*_r),
-              tan=(x)=>Math.tan(x*_r),
-              asin=(x)=>Math.asin(x)/_r,
-              acos=(x)=>Math.acos(x)/_r,
-              atan=(x)=>Math.atan(x)/_r,
-              log=Math.log10, ln=Math.log, sqrt=Math.sqrt,
+        const sin=(x)=>Math.sin(x*_r), cos=(x)=>Math.cos(x*_r), tan=(x)=>Math.tan(x*_r),
+              asin=(x)=>Math.asin(x)/_r, acos=(x)=>Math.acos(x)/_r, atan=(x)=>Math.atan(x)/_r,
+              sinh=Math.sinh, cosh=Math.cosh, tanh=Math.tanh,
+              log=Math.log10, ln=Math.log, sqrt=Math.sqrt, cbrt=Math.cbrt,
               abs=Math.abs, pow=Math.pow, floor=Math.floor, ceil=Math.ceil,
-              pi=Math.PI, e=Math.E, PI=Math.PI, E=Math.E;`;
+              round=Math.round, sign=Math.sign,
+              pi=Math.PI, e=Math.E, PI=Math.PI, E=Math.E,
+              fact=(n)=>${factorial.toString().replace("function factorial", "function fact")}(n),
+              nPr=(n,r)=>${nPr.toString()}(n,r),
+              nCr=(n,r)=>${nCr.toString()}(n,r),
+              log2=Math.log2, exp=(x)=>Math.exp(x), tenX=(x)=>Math.pow(10,x);`;
       const sanitized = expr
-        .replace(/\^/g, "**")
-        .replace(/×/g, "*")
-        .replace(/÷/g, "/");
+        .replace(/\^/g, "**").replace(/×/g, "*").replace(/÷/g, "/")
+        .replace(/mod/g, "%").replace(/π/g, "pi");
       // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const raw = Function(`"use strict"; ${prelude} return (${sanitized})`)();
       const r = typeof raw === "number"
-        ? (Number.isFinite(raw) ? (Math.abs(raw) < 1e-10 && raw !== 0 ? raw.toExponential(6) : +raw.toPrecision(12) + "") : "Error")
+        ? (Number.isFinite(raw)
+          ? (Math.abs(raw) < 1e-10 && raw !== 0 ? raw.toExponential(6) : +raw.toPrecision(12) + "")
+          : (raw === Infinity ? "∞" : "Error"))
         : String(raw);
       setResult(r);
-      setHistory(h => [{ expr, result: r }, ...h].slice(0, 15));
-    } catch {
-      setResult("Error");
-    }
+      setHistory(h => [{ expr, result: r }, ...h].slice(0, 20));
+    } catch { setResult("Error"); }
   }
 
   const BASIC_KEYS = [
@@ -81,68 +105,74 @@ function CalculatorPage() {
     ["0", ".", "⌫", "="],
   ];
 
-  const SCI_EXTRA = ["sin(", "cos(", "tan(", "asin(", "acos(", "atan(", "sqrt(", "log(", "ln(", "abs(", "pi", "e", "^", "(", ")", "%"];
+  const SCI_ROWS = [
+    ["sin(",  "cos(",  "tan(",  "log(",  "ln(",   "abs("   ],
+    ["asin(", "acos(", "atan(", "sqrt(", "cbrt(", "n!"     ],
+    ["π",     "e",     "^",     "(",     ")",     "%"      ],
+    ["x²",    "x³",    "1/x",   "mod",  "10^x",  "e^x"    ],
+    ["nCr(",  "nPr(",  "sinh(", "cosh(", "floor(","ceil("  ],
+  ];
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-white p-1.5 shadow-sm flex gap-1">
         {(["basic", "scientific", "formula", "convert"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold capitalize transition ${tab === t ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md" : "text-muted-foreground hover:bg-accent"}`}
-          >
-            {t === "convert" ? "Unit Converter" : t === "formula" ? "Formula Helper" : t}
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold capitalize transition ${tab === t ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md" : "text-muted-foreground hover:bg-accent"}`}>
+            {t === "convert" ? "Unit Converter" : t === "formula" ? "Formula Helper" : t === "scientific" ? "Scientific" : "Basic"}
           </button>
         ))}
       </div>
 
       {(tab === "basic" || tab === "scientific") && (
-        <div className="mx-auto max-w-sm">
+        <div className={`mx-auto ${tab === "scientific" ? "max-w-lg" : "max-w-sm"}`}>
           <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
             <div className="bg-slate-900 px-5 py-4 text-right min-h-[96px]">
               {tab === "scientific" && (
-                <button
-                  onClick={() => setDegrees(d => !d)}
-                  className={`mb-2 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${degrees ? "border-amber-400 text-amber-300" : "border-blue-400 text-blue-300"}`}
-                >
-                  {degrees ? "DEG" : "RAD"}
-                </button>
+                <div className="flex items-center justify-between mb-2">
+                  <button onClick={() => setDegrees(d => !d)}
+                    className={`rounded-full px-3 py-0.5 text-[11px] font-bold border transition ${degrees ? "border-amber-400 text-amber-300" : "border-blue-400 text-blue-300"}`}>
+                    {degrees ? "DEG" : "RAD"}
+                  </button>
+                  <button onClick={() => setHistory([])} className="text-[10px] text-slate-500 hover:text-slate-300">Clear history</button>
+                </div>
               )}
-              <div className="text-slate-400 text-sm font-mono min-h-[20px] truncate">{expr || "0"}</div>
+              <div className="text-slate-400 text-sm font-mono min-h-[20px] truncate text-right">{expr || "0"}</div>
               <div className="text-white text-3xl font-bold font-mono mt-1 truncate">{result || "0"}</div>
             </div>
 
             {tab === "scientific" && (
-              <div className="grid grid-cols-4 gap-px bg-slate-200 p-px">
-                {SCI_EXTRA.map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => press(k)}
-                    className="bg-slate-700 text-slate-200 py-2.5 text-xs font-mono font-semibold hover:bg-slate-600 transition"
-                  >
-                    {k}
-                  </button>
+              <div className="bg-slate-800 p-1">
+                {SCI_ROWS.map((row, ri) => (
+                  <div key={ri} className="grid grid-cols-6 gap-px mb-px">
+                    {row.map((k) => (
+                      <button key={k} onClick={() => {
+                        if (k === "10^x") { setExpr(e => `tenX(${e || result})`); }
+                        else if (k === "e^x") { setExpr(e => `exp(${e || result})`); }
+                        else { press(k); }
+                      }}
+                        className="bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 text-[11px] font-mono font-semibold transition rounded-sm">
+                        {k}
+                      </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
 
             <div className="grid grid-cols-4 gap-px bg-slate-200 p-px">
               {BASIC_KEYS.flat().map((k, idx) => {
-                const isOp = ["÷", "×", "-", "+"].includes(k);
-                const isEq = k === "=";
+                const isOp  = ["÷","×","-","+"].includes(k);
+                const isEq  = k === "=";
                 const isDel = k === "C" || k === "⌫";
                 return (
-                  <button
-                    key={`${k}-${idx}`}
-                    onClick={() => press(k)}
-                    onKeyDown={(e) => { if (e.key === "Enter") compute(); }}
+                  <button key={`${k}-${idx}`} onClick={() => press(k)}
+                    onKeyDown={(ev) => { if (ev.key === "Enter") compute(); }}
                     className={`py-4 text-sm font-semibold transition select-none
-                      ${isEq ? "bg-violet-600 text-white hover:bg-violet-500" :
-                        isOp ? "bg-amber-400 text-white hover:bg-amber-300" :
+                      ${isEq  ? "bg-violet-600 text-white hover:bg-violet-500" :
+                        isOp  ? "bg-amber-400 text-white hover:bg-amber-300" :
                         isDel ? "bg-slate-400 text-white hover:bg-slate-300" :
-                        "bg-white text-slate-900 hover:bg-slate-100"}`}
-                  >
+                                "bg-white text-slate-900 hover:bg-slate-100"}`}>
                     {k === "⌫" ? <Delete className="h-4 w-4 mx-auto" /> : k}
                   </button>
                 );
@@ -158,11 +188,8 @@ function CalculatorPage() {
               </div>
               <ul className="space-y-1">
                 {history.map((h, i) => (
-                  <li
-                    key={i}
-                    onClick={() => { setExpr(h.expr); setResult(h.result); }}
-                    className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 text-xs hover:bg-accent transition"
-                  >
+                  <li key={i} onClick={() => { setExpr(h.expr); setResult(h.result); }}
+                    className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 text-xs hover:bg-accent transition">
                     <span className="text-muted-foreground font-mono truncate">{h.expr}</span>
                     <span className="font-semibold font-mono ml-2 flex-shrink-0">= {h.result}</span>
                   </li>
@@ -173,80 +200,39 @@ function CalculatorPage() {
         </div>
       )}
 
-      {tab === "formula" && <FormulaHelper userId={user.id} />}
-      {tab === "convert" && <UnitConverter />}
+      {tab === "formula"  && <FormulaHelper userId={user.id} />}
+      {tab === "convert"  && <UnitConverter />}
     </div>
   );
 }
 
+/* ─── Formula Helper ──────────────────────────────────────────────────── */
 function FormulaHelper({ userId }: { userId: string }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const { quota, quotaLoading, bump } = useUsageLimit(userId, "formula");
 
   async function ask() {
     if (!q.trim()) return;
     if (quota && quota.remaining <= 0) { toast.error(QUOTA_MESSAGE); return; }
-    setLoading(true);
-    setAns("");
+    setLoading(true); setAns("");
     const res = await askAI(
-      `Explain this formula or mathematical/scientific concept clearly and completely:
-
-"${q}"
-
-Use this exact structure:
-## 📌 The Formula
-\`\`\`
-[Write the formula clearly]
-\`\`\`
-
-## 🔍 What Each Variable Means
-- **Variable1 (symbol):** what it represents and its unit
-- **Variable2:** ...
-
-## 💡 Step-by-Step Example
-1. [State the problem]
-2. [Substitute values]
-3. [Calculate step by step]
-4. [Final answer with units]
-
-## 🧠 Key Points to Remember
-- **Important fact 1**
-- **Important fact 2**
-- **Common mistake:** ...
-
-## ✅ Quick Recap
-[2-3 sentence summary]`,
-      "You are an expert math and science tutor. Always use proper markdown formatting with the exact sections requested. Never reveal AI provider names.",
+      `Explain this formula or mathematical/scientific concept clearly and completely:\n\n"${q}"\n\nUse this exact structure:\n## 📌 The Formula\n\`\`\`\n[Write the formula clearly]\n\`\`\`\n\n## 🔍 What Each Variable Means\n- **Variable1 (symbol):** what it represents and its unit\n\n## 💡 Step-by-Step Example\n1. [State the problem]\n2. [Substitute values]\n3. [Calculate step by step]\n4. [Final answer with units]\n\n## 🧠 Key Points to Remember\n- **Important fact**\n- **Common mistake:** ...\n\n## ✅ Quick Recap\n[2-3 sentence summary]`,
+      "You are an expert math and science tutor. Always use proper markdown formatting. Never reveal AI provider names.",
     );
-    setAns(res.text);
-    await bump();
-    setLoading(false);
+    setAns(res.text); await bump(); setLoading(false);
   }
 
-  const EXAMPLES = [
-    "Kinetic Energy formula",
-    "Quadratic formula",
-    "Ohm's Law",
-    "Newton's Second Law F=ma",
-    "Pythagorean theorem",
-    "Einstein's E=mc²",
-  ];
-
+  const EXAMPLES = ["Kinetic Energy formula","Quadratic formula","Ohm's Law","Newton's Second Law F=ma","Pythagorean theorem","Einstein's E=mc²"];
   const mdComponents = {
     strong: ({ children }: { children?: React.ReactNode }) => (
       <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5">{children}</mark>
     ),
     code: ({ inline, children }: { inline?: boolean; children?: React.ReactNode }) =>
-      inline ? (
-        <code className="bg-slate-100 text-violet-700 rounded px-1 py-0.5 font-mono text-[0.9em]">{children}</code>
-      ) : (
-        <pre className="bg-slate-900 text-green-400 rounded-xl p-3.5 overflow-x-auto font-mono text-sm my-2 leading-relaxed">
-          <code>{children}</code>
-        </pre>
-      ),
+      inline
+        ? <code className="bg-slate-100 text-violet-700 rounded px-1 py-0.5 font-mono text-[0.9em]">{children}</code>
+        : <pre className="bg-slate-900 text-green-400 rounded-xl p-3.5 overflow-x-auto font-mono text-sm my-2 leading-relaxed"><code>{children}</code></pre>,
     h2: ({ children }: { children?: React.ReactNode }) => {
       const t = String(children).toLowerCase();
       let cls = "bg-blue-50 border-blue-300 text-blue-900";
@@ -256,73 +242,42 @@ Use this exact structure:
       else if (t.includes("🧠") || t.includes("key")) cls = "bg-violet-50 border-violet-300 text-violet-900";
       return <div className={`rounded-xl border-l-4 px-3 py-2 mt-4 mb-2 ${cls}`}><h2 className="font-bold text-sm">{children}</h2></div>;
     },
-    ol: ({ children }: { children?: React.ReactNode }) => {
-      let counter = 0;
-      const items = React.Children.map(children, (c) => {
-        if (!React.isValidElement(c)) return c;
-        counter++;
-        return React.cloneElement(c as React.ReactElement, { "data-num": counter } as Record<string, unknown>);
-      });
-      return <ol className="space-y-2 my-2 pl-0 list-none">{items}</ol>;
-    },
-    li: ({ children, ...props }: { children?: React.ReactNode; [k: string]: unknown }) => {
-      const num = (props as Record<string, unknown>)["data-num"];
-      return (
-        <li className="flex items-start gap-2.5 text-sm">
-          {num !== undefined
-            ? <span className="flex-shrink-0 grid h-5 w-5 place-items-center rounded-full bg-violet-600 text-white text-[10px] font-bold">{String(num)}</span>
-            : <span className="flex-shrink-0 mt-2 h-1.5 w-1.5 rounded-full bg-violet-500" />}
-          <span className="pt-0.5">{children}</span>
-        </li>
-      );
-    },
   };
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
         <div className="mb-1 flex items-center justify-between flex-wrap gap-2">
-          <h2 className="font-bold text-foreground">🔮 Bishal's Formula Helper</h2>
+          <h2 className="font-bold">🔮 Bishal's Formula Helper</h2>
           <QuotaBadge quota={quota} loading={quotaLoading} />
         </div>
-        <p className="mb-4 text-xs text-muted-foreground">Ask about any formula, equation, or concept — get a full explained breakdown.</p>
+        <p className="mb-4 text-xs text-muted-foreground">Ask about any formula — get a full explained breakdown with example.</p>
         <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
+          <input ref={useRef<HTMLInputElement>(null)} value={q} onChange={e => setQ(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") ask(); }}
             placeholder='e.g. "Formula for kinetic energy" or "Explain E=mc²"'
             className="flex-1 rounded-xl border border-border bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
           />
-          <button
-            onClick={ask}
-            disabled={loading || !q.trim()}
-            className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90 disabled:opacity-50"
-          >
+          <button onClick={ask} disabled={loading || !q.trim()}
+            className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90 disabled:opacity-50">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Explain"}
           </button>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              onClick={() => { setQ(ex); setTimeout(() => ask(), 50); }}
-              className="rounded-full border border-border bg-white px-2.5 py-1 text-xs hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition"
-            >
+          {EXAMPLES.map(ex => (
+            <button key={ex} onClick={() => { setQ(ex); setTimeout(() => ask(), 50); }}
+              className="rounded-full border border-border bg-white px-2.5 py-1 text-xs hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition">
               {ex}
             </button>
           ))}
         </div>
       </div>
-
       {loading && (
         <div className="rounded-2xl border border-border bg-white p-8 text-center shadow-sm">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-violet-600" />
           <p className="mt-3 text-sm text-muted-foreground">Bishal's Assistant is explaining…</p>
         </div>
       )}
-
       {ans && !loading && (
         <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
           <div className="prose prose-sm max-w-none">
@@ -334,102 +289,186 @@ Use this exact structure:
   );
 }
 
+/* ─── Improved Unit Converter ─────────────────────────────────────────── */
 function UnitConverter() {
   const CATEGORIES = {
-    Length:      { m: 1, km: 1000, cm: 0.01, mm: 0.001, mi: 1609.344, ft: 0.3048, in: 0.0254, yd: 0.9144, nm: 1e-9 },
-    Weight:      { kg: 1, g: 0.001, mg: 0.000001, lb: 0.453592, oz: 0.0283495, t: 1000 },
-    Speed:       { "m/s": 1, "km/h": 1/3.6, mph: 0.44704, knot: 0.514444 },
-    Area:        { "m²": 1, "km²": 1e6, "cm²": 0.0001, "ft²": 0.092903, acre: 4046.86, ha: 10000 },
-    Volume:      { L: 0.001, mL: 1e-6, "m³": 1, gal: 0.00378541, "fl oz": 2.957e-5, cup: 2.366e-4 },
+    Length: {
+      m: 1, km: 1000, cm: 0.01, mm: 0.001, µm: 1e-6,
+      mi: 1609.344, ft: 0.3048, "in": 0.0254, yd: 0.9144,
+      nm: 1e-9, nmi: 1852,
+    },
+    Weight: {
+      kg: 1, g: 0.001, mg: 1e-6, µg: 1e-9,
+      lb: 0.453592, oz: 0.0283495, t: 1000,
+      stone: 6.35029, carat: 0.0002,
+    },
     Temperature: { "°C": "celsius", "°F": "fahrenheit", K: "kelvin" },
-    Data:        { B: 1, KB: 1024, MB: 1048576, GB: 1073741824, TB: 1099511627776 },
-    Time:        { s: 1, min: 60, hr: 3600, day: 86400, week: 604800 },
-    Pressure:    { Pa: 1, kPa: 1000, bar: 100000, atm: 101325, psi: 6894.76 },
+    Area: {
+      "m²": 1, "km²": 1e6, "cm²": 1e-4, "mm²": 1e-6,
+      "ft²": 0.092903, "in²": 6.4516e-4,
+      acre: 4046.86, ha: 10000, "mi²": 2.58999e6,
+    },
+    Volume: {
+      "m³": 1, L: 0.001, mL: 1e-6, "cm³": 1e-6,
+      gal: 0.00378541, qt: 9.4635e-4, pt: 4.7318e-4,
+      "fl oz": 2.9574e-5, cup: 2.3659e-4, tsp: 4.9289e-6, tbsp: 1.4787e-5,
+    },
+    Speed: {
+      "m/s": 1, "km/h": 1/3.6, mph: 0.44704,
+      knot: 0.514444, "ft/s": 0.3048, "mi/min": 26.8224,
+    },
+    Time: {
+      s: 1, ms: 0.001, µs: 1e-6,
+      min: 60, hr: 3600, day: 86400,
+      week: 604800, month: 2.628e6, year: 3.156e7,
+    },
+    Energy: {
+      J: 1, kJ: 1000, MJ: 1e6,
+      cal: 4.184, kcal: 4184,
+      Wh: 3600, kWh: 3.6e6,
+      BTU: 1055.06, "ft·lbf": 1.35582, eV: 1.602e-19,
+    },
+    Power: {
+      W: 1, kW: 1000, MW: 1e6, GW: 1e9,
+      HP: 745.7, "BTU/h": 0.29307, "ft·lbf/s": 1.35582,
+    },
+    Pressure: {
+      Pa: 1, kPa: 1000, MPa: 1e6,
+      bar: 1e5, atm: 101325, psi: 6894.76,
+      mmHg: 133.322, torr: 133.322, inHg: 3386.39,
+    },
+    Data: {
+      B: 1, KB: 1024, MB: 1048576, GB: 1073741824,
+      TB: 1.0995e12, PB: 1.1259e15,
+      Kbit: 125, Mbit: 125000, Gbit: 125000000,
+    },
+    Force: {
+      N: 1, kN: 1000, MN: 1e6,
+      lbf: 4.44822, kgf: 9.80665, dyn: 1e-5, "kip": 4448.22,
+    },
+    Angle: {
+      "°": 1, rad: 180 / Math.PI, grad: 0.9,
+      arcmin: 1/60, arcsec: 1/3600, turn: 360,
+    },
+    Frequency: {
+      Hz: 1, kHz: 1e3, MHz: 1e6, GHz: 1e9, THz: 1e12,
+      rpm: 1/60,
+    },
+    "Fuel Economy": {
+      "km/L": 1, "L/100km": -1, mpg: 0.425144,
+    },
   } as const;
 
   type CatKey = keyof typeof CATEGORIES;
   const [cat, setCat] = useState<CatKey>("Length");
   const units = Object.keys(CATEGORIES[cat]);
   const [from, setFrom] = useState(units[0]);
-  const [to, setTo] = useState(units[1]);
-  const [val, setVal] = useState("1");
+  const [to, setTo]     = useState(units[1]);
+  const [val, setVal]   = useState("1");
 
-  function safeSetFrom(u: string) { setFrom(u); if (u === to) setTo(from); }
-  function safeSetTo(u: string) { setTo(u); if (u === from) setFrom(to); }
-
-  function convertTemp(v: number, fromU: string, toU: string) {
-    let celsius = 0;
-    if (fromU === "°C") celsius = v;
-    else if (fromU === "°F") celsius = (v - 32) / 1.8;
-    else celsius = v - 273.15;
-    if (toU === "°C") return celsius;
-    if (toU === "°F") return celsius * 1.8 + 32;
-    return celsius + 273.15;
+  function switchCat(c: CatKey) {
+    setCat(c);
+    const us = Object.keys(CATEGORIES[c]);
+    setFrom(us[0]); setTo(us[1]); setVal("1");
   }
 
-  function getResult() {
+  function swap() {
+    const prev = from;
+    setFrom(to);
+    setTo(prev);
+  }
+
+  function convertTemp(v: number, fu: string, tu: string) {
+    let c = fu === "°C" ? v : fu === "°F" ? (v - 32) / 1.8 : v - 273.15;
+    return tu === "°C" ? c : tu === "°F" ? c * 1.8 + 32 : c + 273.15;
+  }
+
+  function getResult(): string {
     const v = parseFloat(val);
     if (isNaN(v)) return "—";
-    if (cat === "Temperature") {
-      return +convertTemp(v, from, to).toPrecision(8) + "";
+    if (cat === "Temperature") return +convertTemp(v, from, to).toPrecision(8) + "";
+    if (cat === "Fuel Economy") {
+      const tbl = CATEGORIES[cat] as Record<string, number>;
+      if (from === "L/100km" && to !== "L/100km") return +(100 / v * tbl[to]).toPrecision(6) + "";
+      if (to === "L/100km" && from !== "L/100km")  return +(100 / (v * tbl[from])).toPrecision(6) + "";
+      if (from === "L/100km" && to === "L/100km")  return String(v);
     }
     const tbl = CATEGORIES[cat] as Record<string, number>;
-    const base = v * tbl[from];
-    const out = base / tbl[to];
+    const out = (v * tbl[from]) / tbl[to];
     return +out.toPrecision(8) + "";
   }
 
+  const CAT_ICONS: Record<string, string> = {
+    Length: "📏", Weight: "⚖️", Temperature: "🌡️", Area: "□", Volume: "🫙",
+    Speed: "💨", Time: "⏱️", Energy: "⚡", Power: "🔌", Pressure: "🌬️",
+    Data: "💾", Force: "💪", Angle: "📐", Frequency: "〰️", "Fuel Economy": "⛽",
+  };
+
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="mx-auto max-w-2xl space-y-4">
       <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
-        <h2 className="mb-4 font-bold">⚖️ Unit Converter</h2>
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {(Object.keys(CATEGORIES) as CatKey[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => { setCat(c); const us = Object.keys(CATEGORIES[c]); setFrom(us[0]); setTo(us[1]); setVal("1"); }}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${cat === c ? "bg-violet-600 text-white" : "border border-border hover:bg-accent"}`}
-            >
-              {c}
+        <h2 className="mb-4 font-bold text-base">⚖️ Unit Converter</h2>
+
+        <div className="flex flex-wrap gap-1.5 mb-5">
+          {(Object.keys(CATEGORIES) as CatKey[]).map(c => (
+            <button key={c} onClick={() => switchCat(c)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${cat === c ? "bg-primary text-primary-foreground" : "border border-border hover:bg-accent"}`}>
+              {CAT_ICONS[c]} {c}
             </button>
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <select
-              value={from}
-              onChange={(e) => safeSetFrom(e.target.value)}
-              className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-violet-400"
-            >
-              {units.map((u) => <option key={u}>{u}</option>)}
-            </select>
-            <input
-              type="number"
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-violet-400"
-              placeholder="Enter value"
-            />
-          </div>
-          <div className="space-y-2">
-            <select
-              value={to}
-              onChange={(e) => safeSetTo(e.target.value)}
-              className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-violet-400"
-            >
-              {units.map((u) => <option key={u}>{u}</option>)}
-            </select>
-            <div className="rounded-xl border-2 border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-bold font-mono text-violet-900 min-h-[42px]">
-              {getResult()}
+        <div className="space-y-3">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">From</label>
+              <select value={from} onChange={e => { const v = e.target.value; setFrom(v); if (v === to) setTo(from); }}
+                className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-primary">
+                {units.map(u => <option key={u}>{u}</option>)}
+              </select>
+              <input type="number" value={val} onChange={e => setVal(e.target.value)}
+                className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-primary"
+                placeholder="Enter value" />
+            </div>
+
+            <button onClick={swap} title="Swap units"
+              className="mb-1 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white shadow-sm hover:bg-accent transition">
+              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">To</label>
+              <select value={to} onChange={e => { const v = e.target.value; setTo(v); if (v === from) setFrom(to); }}
+                className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 text-sm font-semibold outline-none focus:border-primary">
+                {units.map(u => <option key={u}>{u}</option>)}
+              </select>
+              <div className="rounded-xl border-2 border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-bold font-mono text-primary min-h-[42px] flex items-center">
+                {getResult()}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-center text-muted-foreground">
-          <span className="font-mono font-semibold text-foreground">{val || "0"} {from}</span>
-          <span className="mx-2">=</span>
-          <span className="font-mono font-semibold text-violet-700">{getResult()} {to}</span>
+          <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-center">
+            <span className="font-mono font-semibold">{val || "0"} {from}</span>
+            <span className="mx-2 text-muted-foreground">=</span>
+            <span className="font-mono font-semibold text-primary">{getResult()} {to}</span>
+          </div>
+
+          {cat === "Temperature" && (
+            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              {["°C","°F","K"].map(u => {
+                const v = parseFloat(val) || 0;
+                const c = from === "°C" ? v : from === "°F" ? (v-32)/1.8 : v-273.15;
+                const r = u === "°C" ? c : u === "°F" ? c*1.8+32 : c+273.15;
+                return (
+                  <div key={u} className="rounded-lg border border-border bg-white p-2">
+                    <div className="font-bold text-sm">{+r.toPrecision(6)}</div>
+                    <div className="text-muted-foreground">{u}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
