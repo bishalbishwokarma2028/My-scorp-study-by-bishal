@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
+import React from "react";
 import { Loader2, Download, Copy, Check, FileText, RefreshCw, BookOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -37,9 +38,9 @@ const QUICK_TOPICS: Record<string, string[]> = {
 };
 
 const FORMAT_OPTIONS = [
-  { id: "full",    label: "Full Sheet", desc: "All formulas with variable definitions & examples" },
-  { id: "compact", label: "Compact",   desc: "Formulas + variable meanings only" },
-  { id: "exam",    label: "Exam Ready", desc: "Most important formulas with quick-reference tips" },
+  { id: "full",    label: "Full Sheet",  desc: "All formulas with variable definitions & examples" },
+  { id: "compact", label: "Compact",    desc: "Formulas + variable meanings only" },
+  { id: "exam",    label: "Exam Ready", desc: "Top formulas with quick-reference tips" },
 ];
 
 type PageState = {
@@ -50,6 +51,141 @@ type PageState = {
   provider: string | null;
 };
 
+/* ─── Custom Markdown Components ──────────────────────────────────────── */
+function makeComponents() {
+  const SECTION_COLORS: Record<number, { bg: string; border: string; text: string; dot: string }> = {
+    0: { bg: "bg-violet-50",  border: "border-violet-400", text: "text-violet-900", dot: "bg-violet-500" },
+    1: { bg: "bg-blue-50",    border: "border-blue-400",   text: "text-blue-900",   dot: "bg-blue-500"   },
+    2: { bg: "bg-emerald-50", border: "border-emerald-400",text: "text-emerald-900",dot: "bg-emerald-500"},
+    3: { bg: "bg-amber-50",   border: "border-amber-400",  text: "text-amber-900",  dot: "bg-amber-500"  },
+    4: { bg: "bg-rose-50",    border: "border-rose-400",   text: "text-rose-900",   dot: "bg-rose-500"   },
+    5: { bg: "bg-cyan-50",    border: "border-cyan-400",   text: "text-cyan-900",   dot: "bg-cyan-500"   },
+  };
+  let sectionIdx = 0;
+
+  return {
+    h2({ children }: { children?: React.ReactNode }) {
+      const c = SECTION_COLORS[sectionIdx++ % 6];
+      return (
+        <div className={`flex items-center gap-3 rounded-2xl border-l-4 ${c.border} ${c.bg} px-4 py-3 mt-7 mb-4`}>
+          <span className={`h-2.5 w-2.5 rounded-full ${c.dot} flex-shrink-0`} />
+          <h2 className={`text-base font-bold ${c.text}`}>{children}</h2>
+        </div>
+      );
+    },
+
+    h3({ children }: { children?: React.ReactNode }) {
+      return (
+        <h3 className="mt-4 mb-1.5 text-sm font-semibold text-foreground flex items-center gap-1.5">
+          <span className="text-muted-foreground">▸</span> {children}
+        </h3>
+      );
+    },
+
+    blockquote({ children }: { children?: React.ReactNode }) {
+      return (
+        <div className="my-3 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-5 py-4 shadow-sm">
+          <div className="text-center text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed">
+            {children}
+          </div>
+        </div>
+      );
+    },
+
+    code({ inline, children }: { inline?: boolean; children?: React.ReactNode }) {
+      if (inline) {
+        return (
+          <code className="rounded-lg bg-violet-100 px-2 py-0.5 text-sm font-bold font-mono text-violet-700">
+            {children}
+          </code>
+        );
+      }
+      return (
+        <div className="my-3 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-5 py-4 shadow-sm text-center">
+          <span className="text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre">
+            {children}
+          </span>
+        </div>
+      );
+    },
+
+    pre({ children }: { children?: React.ReactNode }) {
+      return <>{children}</>;
+    },
+
+    strong({ children }: { children?: React.ReactNode }) {
+      return <strong className="font-bold text-foreground">{children}</strong>;
+    },
+
+    em({ children }: { children?: React.ReactNode }) {
+      return <em className="text-violet-700 font-semibold not-italic">{children}</em>;
+    },
+
+    ul({ children }: { children?: React.ReactNode }) {
+      return <ul className="my-2 space-y-1.5 pl-1">{children}</ul>;
+    },
+
+    li({ children }: { children?: React.ReactNode }) {
+      return (
+        <li className="flex items-start gap-2 text-sm text-foreground leading-snug">
+          <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+          <span>{children}</span>
+        </li>
+      );
+    },
+
+    p({ children }: { children?: React.ReactNode }) {
+      const text = String(children);
+      if (text.startsWith("💡") || text.startsWith("✅")) {
+        return (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800">
+            {children}
+          </div>
+        );
+      }
+      if (text.startsWith("⚠️") || text.startsWith("❌")) {
+        return (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-800">
+            {children}
+          </div>
+        );
+      }
+      if (text.startsWith("📌") || text.startsWith("🧠")) {
+        return (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-sm text-blue-800">
+            {children}
+          </div>
+        );
+      }
+      return <p className="my-1.5 text-sm leading-relaxed text-foreground">{children}</p>;
+    },
+
+    table({ children }: { children?: React.ReactNode }) {
+      return (
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-border shadow-sm">
+          <table className="w-full border-collapse text-sm">{children}</table>
+        </div>
+      );
+    },
+    thead({ children }: { children?: React.ReactNode }) {
+      return <thead className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white">{children}</thead>;
+    },
+    th({ children }: { children?: React.ReactNode }) {
+      return <th className="px-4 py-2.5 text-left text-xs font-bold tracking-wide">{children}</th>;
+    },
+    td({ children }: { children?: React.ReactNode }) {
+      return <td className="border-t border-border px-4 py-2 text-xs font-mono">{children}</td>;
+    },
+    tr({ children }: { children?: React.ReactNode }) {
+      return <tr className="even:bg-muted/30 transition hover:bg-violet-50/40">{children}</tr>;
+    },
+    hr() {
+      return <hr className="my-5 border-dashed border-border" />;
+    },
+  };
+}
+
+/* ─── Page ────────────────────────────────────────────────────────────── */
 function FormulaSheetPage() {
   const { user } = Route.useRouteContext();
   const [s, set] = usePageState<PageState>("formula-sheet", {
@@ -68,33 +204,81 @@ function FormulaSheetPage() {
     setLoading(true);
     set({ sheet: null, provider: null });
 
+    const subjectLabel = SUBJECTS.find(x => x.id === s.subject)?.label.replace(/[^a-zA-Z ]/g, "").trim();
+
     const formatInstr = s.format === "full"
-      ? "Include every relevant formula with: (1) the formula in a code block, (2) each variable defined with its unit, (3) a worked example, and (4) a key exam tip."
+      ? `For EACH formula:
+1. Write the formula in a code block using proper Unicode math symbols
+2. Use a bullet list to define every variable with its unit in simple words
+3. Give a step-by-step worked example a beginner can follow
+4. Add a 💡 Tip or ⚠️ Common Mistake line`
       : s.format === "compact"
-      ? "List every formula in a code block with a one-line definition of each variable. No worked examples."
-      : "List the 10-15 most exam-critical formulas. For each: formula in code block, variable meanings, one crucial exam tip or common mistake to avoid.";
+      ? `For EACH formula:
+1. Write the formula in a code block using proper Unicode math symbols
+2. Define each variable in simple one-line bullets`
+      : `List the 10–15 most exam-important formulas.
+For each:
+1. Formula in a code block with Unicode math symbols
+2. Quick variable meanings
+3. One 💡 Tip or ⚠️ Common Mistake`;
 
-    const prompt = `Generate a comprehensive formula sheet for the following:
+    const prompt = `Generate a beautiful, easy-to-understand formula sheet for:
 
-Subject: ${SUBJECTS.find(x => x.id === s.subject)?.label.replace(/[^a-zA-Z ]/g, "").trim()}
-Chapter / Topic: ${s.topic.trim()}
+Subject: ${subjectLabel}
+Topic: ${s.topic.trim()}
 Format: ${FORMAT_OPTIONS.find(x => x.id === s.format)?.label}
 
-Instructions:
-${formatInstr}
+CRITICAL RULES — follow these exactly:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Use this structure:
-- Use ## for main formula sections (e.g. ## ⚡ Kinematic Equations)
-- Use a fenced code block for each formula
-- Use **bold** for variable names
-- Use bullet points for variable definitions
-- Add a 💡 Tip or ⚠️ Common Mistake line under each formula section
-- At the end include a ## 📋 Quick Reference Table with all formulas in a markdown table
+1. FORMULA DISPLAY — Always put each formula in a fenced code block:
+\`\`\`
+v = u + at
+\`\`\`
+   Use REAL Unicode symbols, never abbreviations or words:
+   • Superscripts: ² ³ ⁴ ⁻¹ ⁻² (never write "^2" or "^3")
+   • Fractions: write as  numerator / denominator  with spaces
+   • Square root: use √ symbol (e.g. √(a² + b²))
+   • Greek letters: α β γ δ θ λ μ π σ τ ω Δ Σ Ω ρ φ ε η
+   • Arrows/operators: → ≈ ≠ ≤ ≥ × ÷ ∝ ∞ ∴ ∵
+   • Subscripts: write as v₀ v₁ v₂ or V_initial (clear labelling)
+   • Integrals: ∫ f(x) dx   Summations: Σᵢ xᵢ
+   EXAMPLES of good formula writing:
+   v² = u² + 2as
+   F = (G × m₁ × m₂) / r²
+   E = mc²
+   sin²θ + cos²θ = 1
+   x = (-b ± √(b² - 4ac)) / 2a
+   Q = mcΔT
 
-Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas for this topic.`;
+2. STRUCTURE — Use this exact format for each formula group:
+
+## [emoji] [Group Name]
+
+### [Formula Name]
+\`\`\`
+[formula with Unicode symbols]
+\`\`\`
+**Where:**
+- **symbol** — plain-English meaning (unit)
+- **symbol** — plain-English meaning (unit)
+
+[Only for Full Sheet] **Example:** [step-by-step solution a 10-year-old could follow]
+
+💡 Tip: [one clear, useful tip] OR ⚠️ Common Mistake: [one mistake to avoid]
+
+3. LANGUAGE — Explain everything in PLAIN SIMPLE English. Write variable definitions as if explaining to a student who has never seen this topic. Use everyday analogies where helpful.
+
+4. At the very end, add:
+## 📋 Quick Reference Table
+with columns: Formula | What It Finds | Key Variables
+
+5. Cover ALL major formulas for the topic. Be thorough and complete.
+
+${formatInstr}`;
 
     const res = await askAI(prompt,
-      "You are an expert academic formula-sheet generator. Generate precise, structured formula sheets in clean markdown. Use proper math notation. Never reveal AI provider names.");
+      "You are an expert teacher who makes complex formulas easy to understand. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.");
     set({ sheet: res.text, provider: res.provider });
     await bump();
     setLoading(false);
@@ -120,6 +304,8 @@ Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas fo
     toast.success("Downloaded as Markdown");
   }
 
+  const mdComponents = makeComponents();
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -128,7 +314,7 @@ Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas fo
             <FileText className="h-5 w-5 text-primary" /> Formula Sheet Generator
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Generate a complete, printable formula sheet for any subject and chapter
+            Beautiful, symbol-rich formula sheets anyone can understand
           </p>
         </div>
         <QuotaBadge quota={quota} loading={quotaLoading} />
@@ -139,7 +325,7 @@ Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas fo
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subject</label>
           <div className="mt-2 flex flex-wrap gap-2">
             {SUBJECTS.map(sub => (
-              <button key={sub.id} onClick={() => { set({ subject: sub.id, topic: "" }); }}
+              <button key={sub.id} onClick={() => set({ subject: sub.id, topic: "" })}
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${s.subject === sub.id ? "bg-primary text-primary-foreground shadow-sm" : "border border-border bg-background hover:bg-accent"}`}>
                 {sub.label}
               </button>
@@ -191,9 +377,12 @@ Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas fo
 
       {loading && (
         <div className="card-soft flex flex-col items-center gap-3 py-14 text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="relative">
+            <Loader2 className="h-12 w-12 animate-spin text-violet-300" />
+            <span className="absolute inset-0 flex items-center justify-center text-xl">📐</span>
+          </div>
           <p className="text-sm font-semibold">Building your formula sheet…</p>
-          <p className="text-xs text-muted-foreground">Collecting all formulas, variables, and examples</p>
+          <p className="text-xs text-muted-foreground">Generating formulas with proper symbols and examples</p>
         </div>
       )}
 
@@ -215,7 +404,7 @@ Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas fo
                 className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-accent transition">
                 <Download className="h-3 w-3" /> Download
               </button>
-              <button onClick={() => { set({ sheet: null, topic: "" }); }}
+              <button onClick={() => set({ sheet: null, topic: "" })}
                 className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent transition">
                 <RefreshCw className="h-3 w-3" /> New Sheet
               </button>
@@ -223,17 +412,9 @@ Make it comprehensive, accurate, and exam-ready. Cover ALL important formulas fo
           </div>
 
           <div ref={sheetRef} className="card-soft p-5 sm:p-7">
-            <div className="prose prose-sm max-w-none
-              [&_h2]:rounded-xl [&_h2]:border-l-4 [&_h2]:border-primary [&_h2]:bg-primary/5 [&_h2]:px-4 [&_h2]:py-2.5 [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-6 [&_h2]:mb-3
-              [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-4 [&_h3]:mb-2
-              [&_pre]:rounded-xl [&_pre]:bg-slate-900 [&_pre]:px-5 [&_pre]:py-4 [&_pre]:text-green-300 [&_pre]:text-sm [&_pre]:font-mono [&_pre]:overflow-x-auto [&_pre]:my-3
-              [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-violet-100 [&_code:not(pre_code)]:text-violet-800 [&_code:not(pre_code)]:px-1.5 [&_code:not(pre_code)]:py-0.5 [&_code:not(pre_code)]:text-xs [&_code:not(pre_code)]:font-mono
-              [&_strong]:text-foreground [&_strong]:font-semibold
-              [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:bg-muted/60 [&_th]:px-3 [&_th]:py-2 [&_th]:text-xs [&_th]:font-semibold
-              [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:text-xs [&_td]:font-mono
-              [&_ul]:space-y-1 [&_li]:text-sm [&_p]:text-sm [&_p]:leading-relaxed">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.sheet}</ReactMarkdown>
-            </div>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as never}>
+              {s.sheet}
+            </ReactMarkdown>
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
