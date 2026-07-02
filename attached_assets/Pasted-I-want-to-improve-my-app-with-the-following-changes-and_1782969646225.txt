@@ -1,0 +1,75 @@
+I want to improve my app with the following changes and fixes:
+
+1. Preserve Feature State
+
+My app currently has many features. When a user is using one feature, switches to another feature, and then comes back, the previous feature resets to its initial state.
+
+This should not happen.
+
+The app should preserve the user's previous state, including entered text, generated responses, scroll position, and progress. When the user returns to a feature, it should continue exactly from where they left off instead of restarting.
+
+2. Improve Back Navigation
+
+Currently, pressing the back button once immediately navigates to another feature.
+
+Instead:
+
+- The first back press should stay on the current feature or act as a confirmation.
+- Only after pressing the back button a second time should the app navigate to the previous screen or feature.
+- This should prevent accidental navigation.
+
+3. Code Tutor Improvements
+
+Analyze Code
+
+Add a Run button so users can execute their code directly within the app and view the output.
+
+Generate Code
+
+The generated code must be accurate, complete, executable, and follow best programming practices. It should not generate incorrect or incomplete code.
+
+Debug, Fix & Correct, Optimize, Code Review, and Convert
+
+These tools should provide highly accurate, reliable, and production-ready results. Responses should correctly identify issues, explain them clearly, and generate the best possible corrected or optimized code.
+
+4. Visual Explainer Improvements
+
+Mind Map
+
+Sometimes the generated mind map places text outside the boxes or overlaps content, making parts of the information invisible.
+
+Please ensure that:
+
+- Every node automatically resizes based on its content.
+- No text is clipped or hidden.
+- No nodes overlap each other.
+- The layout is clean, balanced, and fully readable on all screen sizes.
+
+Step-by-Step Process Diagrams
+
+For questions such as:
+
+- "How it works"
+- "Explain the process"
+- Workflow-related questions
+- Step-by-step procedures
+
+The Visual Explainer should automatically generate a clear process flow showing:
+
+- The starting point
+- Each intermediate step
+- The correct sequence
+- The final outcome
+
+The diagram should be easy to understand and visually organized.
+
+5. Improve History
+
+The current History feature is not working as expected.
+
+Please redesign it so that:
+
+- History includes all features of the app.
+- Every interaction is saved properly.
+- Users can revisit previous conversations, generated content, code, visual explanations, comparisons, research results, and other outputs from every section.
+- History should be well organized and easy to browse.

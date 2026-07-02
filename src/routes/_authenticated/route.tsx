@@ -53,6 +53,29 @@ function AuthedLayout() {
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
+  // Double-back guard: first browser back press shows a warning toast;
+  // second press within 2.5 s actually navigates.
+  useEffect(() => {
+    // Push a sentinel state so we have something to intercept
+    window.history.pushState({ scorpGuard: true }, "");
+    let lastBackAt = 0;
+
+    function onPopState() {
+      const now = Date.now();
+      if (now - lastBackAt < 2500) {
+        // Second press within window — let the navigation happen naturally
+        return;
+      }
+      // First press — block and warn
+      window.history.pushState({ scorpGuard: true }, "");
+      lastBackAt = now;
+      toast("Press back again to leave this page", { duration: 2000 });
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const { data: profile } = useQuery({
     queryKey: ["profile", user.id],
     queryFn: async () => {
