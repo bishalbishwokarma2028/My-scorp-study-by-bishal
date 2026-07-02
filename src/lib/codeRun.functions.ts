@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const PISTON_URL = "https://emkc.org/api/v2/piston";
+const PISTON_URL = "https://emkc.org/api/v2/piston/execute";
 
 const Input = z.object({
   language: z.string().min(1),
@@ -10,57 +10,43 @@ const Input = z.object({
 
 type RunSuccess = { stdout: string; stderr: string; exitCode: number };
 type RunError   = { error: string };
-type RunResult  = RunSuccess | RunError;
+export type RunResult = RunSuccess | RunError;
 
 export const runCodeServer = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => Input.parse(data))
   .handler(async ({ data }): Promise<RunResult> => {
     try {
-      // Fetch available runtimes to get the correct version
-      const rtRes = await fetch(`${PISTON_URL}/runtimes`, {
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!rtRes.ok) {
-        return { error: `Execution server unavailable (${rtRes.status}). Try again shortly.` };
-      }
-      const runtimes = await rtRes.json() as Array<{ language: string; version: string; aliases: string[] }>;
-
-      // Find matching runtime (by language name or alias)
-      const lang = data.language.toLowerCase();
-      const rt = runtimes.find(r =>
-        r.language === lang || r.aliases?.includes(lang)
-      );
-      if (!rt) {
-        return { error: `Language "${data.language}" is not available on the execution server.` };
-      }
-
-      const execRes = await fetch(`${PISTON_URL}/execute`, {
+      const res = await fetch(PISTON_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          language: rt.language,
-          version: rt.version,
+          language: data.language,
+          version: "*",
           files: [{ content: data.code }],
           stdin: "",
           args: [],
-          run_timeout: 10000,
-          compile_timeout: 10000,
-          compile_memory_limit: -1,
-          run_memory_limit: -1,
+          run_timeout: 15000,
+          compile_timeout: 15000,
         }),
+        signal: AbortSignal.timeout(20000),
       });
 
-      if (!execRes.ok) {
-        const txt = await execRes.text().catch(() => "");
-        return { error: `Execution failed (${execRes.status}): ${txt || "unknown error"}` };
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        return { error: `Execution server error (${res.status}): ${txt || "unknown error. Try again."}` };
       }
 
-      const result = await execRes.json() as {
+      const result = await res.json() as {
         run?: { stdout?: string; stderr?: string; code?: number; output?: string };
-        compile?: { stderr?: string; stdout?: string; code?: number };
+        compile?: { stderr?: string; code?: number };
+        message?: string;
       };
 
-      if (result.compile && result.compile.code !== 0 && result.compile.stderr) {
+      if (result.message) {
+        return { error: result.message };
+      }
+
+      if (result.compile && (result.compile.code ?? 0) !== 0 && result.compile.stderr) {
         return { error: `Compile error:\n${result.compile.stderr}` };
       }
 
@@ -71,6 +57,9 @@ export const runCodeServer = createServerFn({ method: "POST" })
       };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("timeout") || msg.includes("abort")) {
+        return { error: "Execution timed out (20s). Try a shorter program." };
+      }
       return { error: `Could not reach execution server: ${msg}` };
     }
   });

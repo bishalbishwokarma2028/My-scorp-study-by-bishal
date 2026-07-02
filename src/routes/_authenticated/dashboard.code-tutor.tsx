@@ -69,193 +69,249 @@ const MODE_ACTIVE: Record<string, string> = {
   indigo: "border-indigo-500 bg-indigo-500 text-white",
 };
 
-// ─── Improved prompts (more rigorous and production-accurate) ─────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function numberedCode(code: string): string {
+  return code.split("\n").map((l, i) => `${String(i + 1).padStart(3, " ")} | ${l}`).join("\n");
+}
+
+// ─── Deep, line-referenced prompts ────────────────────────────────────────────
 function buildAnalyzePrompt(code: string, language: string, mode: Mode, targetLang: string, question: string): string {
-  const header = `Language: ${language}\n\`\`\`${language.toLowerCase()}\n${code}\n\`\`\`\n\n`;
+  const lined = numberedCode(code);
+  const header = `Language: ${language}\n\`\`\`\n${lined}\n\`\`\`\n\n`;
+  const lineCount = code.split("\n").length;
 
   switch (mode) {
     case "explain":
-      return `${header}Explain this ${language} code clearly and educationally. Use markdown:
+      return `${header}You are an expert ${language} tutor. Explain this code completely — as if teaching a complete beginner. Every line must be covered. Use the line numbers shown above in your explanation (e.g. "**Line 5**:", "**Lines 3–7**:").
 
-## Overview
-(1-2 sentences: what does this code accomplish?)
+## 🧭 What This Code Does
+(2–4 sentences: overall purpose of the program)
 
-## How It Works — Step by Step
-(Walk through each important section/function/block in order. For each part: what it does, how it does it, and why it matters.)
+## 📦 Imports / Dependencies (if any)
+(Explain every import/include/require — what library it is and why it is needed)
 
-## Key Concepts & Techniques Used
-(List all programming concepts, data structures, algorithms, or patterns used — with brief explanations)
+## 🔢 Line-by-Line Walkthrough
+Go through ALL ${lineCount} lines in order. For every meaningful line or logical block, write:
+**Line X** (or **Lines X–Y**): [exactly what this line does, why it is written this way, what would happen if it were missing or wrong]
 
-## Inputs & Outputs
-(What does it take in? What does it return/output/print?)
+Do NOT skip any line. Even blank lines or closing braces should be briefly mentioned when relevant.
 
-## Example Execution Trace
-(Trace through 1 example run, showing how values change)
+## 🧠 Key Concepts Explained
+(List every programming concept used — loops, functions, data structures, algorithms, OOP, recursion, etc. — and explain each one from scratch as if the reader never heard of it)
 
-Be thorough, accurate, and educational. Use code snippets where helpful.`;
+## 🔄 Data Flow & Execution Order
+(Trace how data moves through the program from start to finish with a real example input)
+
+## ✅ What the Output Will Be
+(Show exactly what the program prints/returns for a sample input, step by step)
+
+Be thorough. This explanation should be complete enough that someone who has never coded can follow every step.`;
 
     case "debug":
-      return `${header}You are a precise debugger. Examine EVERY LINE of this ${language} code meticulously.
+      return `${header}You are an expert ${language} debugger. Examine EVERY SINGLE LINE of this code. Use the line numbers shown above.
 
-Find ALL bugs, errors, and issues — including:
-- Syntax errors (wrong brackets, missing semicolons, wrong keywords)
-- Logic errors (wrong conditions, off-by-one, incorrect algorithm)
-- Runtime errors (null references, division by zero, index out of bounds)
-- Type errors (wrong types, missing casts)
-- Edge case failures (empty input, zero, negative numbers)
-- Missing error handling
+## 🔍 Line-by-Line Scan
+Go through every line and classify it:
+- ✅ Correct
+- ⚠️ Warning / bad practice
+- ❌ Bug
 
-Format your response in markdown:
+Format as a table:
+| Line | Code | Status | Note |
+|------|------|--------|------|
+(fill for every line — even correct ones get ✅)
 
-## 🐛 Bugs Found
-(If no bugs: explicitly state "No bugs found — the code is correct." Otherwise list every bug:)
+## 🐛 Bugs Found (Detailed)
+For each ❌ bug found:
 
-### Bug 1: [Short name]
-- **Line**: [line number or approximate location]
-- **Type**: [Syntax / Logic / Runtime / Type error]
-- **Problem**: [What is wrong and why]
-- **Fix**: \`[corrected code snippet]\`
-
-### Bug 2: ...
-
-## 🔍 Additional Issues
-(Warnings, bad practices, or potential edge cases even if not strict bugs)
-
-## ✅ Summary
-(Total bug count, severity assessment)
-
-Be exhaustive. Missing even one bug is unacceptable.`;
-
-    case "fix":
-      return `${header}Fix ALL bugs in this ${language} code. Your fixed code must be:
-- 100% correct and runnable with zero errors
-- Logically equivalent to the original intent
-- Following ${language} best practices
-
-Format in markdown:
-
-## 🔧 Issues Found & Fixed
-(Bullet list of every problem that was fixed, with a brief explanation)
-
-## ✅ Fixed Code
+### Bug [N]: [Short descriptive name]
+- **Line**: [exact line number]
+- **Type**: Syntax / Logic / Runtime / Type / Edge-case error
+- **Root Cause**: [deep explanation of WHY this is wrong]
+- **Impact**: [what goes wrong when this runs]
+- **Fix**:
 \`\`\`${language.toLowerCase()}
-[Complete, working, corrected code — every line included, nothing omitted]
+[corrected line or block — exact replacement]
 \`\`\`
 
-## 📝 Changes Explained
-(For each change: what was wrong, what you changed, and why)
+## ⚠️ Warnings & Bad Practices
+(Line-referenced list of non-fatal issues: naming, missing error handling, edge cases, etc.)
+
+## ✅ Final Verdict
+- Total bugs: [N]
+- Severity: [Critical / Major / Minor]
+- [1-sentence conclusion]
+
+Be exhaustive — a missed bug is a failure.`;
+
+    case "fix":
+      return `${header}You are an expert ${language} engineer. Find and fix EVERY issue in this code. Use the line numbers shown above.
+
+## 🔍 Issues Found
+List every problem with its exact line number:
+- **Line X** — [what is wrong and why]
+(List ALL issues — bugs, bad practices, missing error handling, edge cases)
+
+## ✅ Complete Fixed Code
+\`\`\`${language.toLowerCase()}
+[The ENTIRE corrected code — every single line. Never write "rest remains same" or omit anything.]
+\`\`\`
+
+## 📝 Changes Explained (Line by Line)
+For every change made, explain:
+- **Line X**: Changed \`[old code]\` → \`[new code]\` because [detailed reason]
+
+## 🧪 Verification
+(Mentally run the fixed code with a sample input and show the expected output — prove it works)
 
 Rules:
-- ALWAYS include the COMPLETE corrected code — never say "rest remains the same"
-- Mentally run the code before submitting — it must execute without errors
-- If the code was already correct, say so and return it unchanged`;
+- ALWAYS include 100% complete corrected code — nothing omitted
+- If code was already correct, say so and return it unchanged with explanation`;
 
     case "optimize":
-      return `${header}Optimize this ${language} code for maximum performance, readability, and best practices.
-
-Format in markdown:
+      return `${header}You are an expert ${language} performance engineer. Optimize this code fully. Use the line numbers shown above.
 
 ## 📊 Current Code Analysis
-- **Time Complexity**: [Big O of current code]
-- **Space Complexity**: [Big O of current code]
-- **Issues**: [bullet list of inefficiencies, bad practices, or readability problems]
+- **Time Complexity**: [Big-O with explanation]
+- **Space Complexity**: [Big-O with explanation]
+- **Performance Issues** (line-referenced):
+  - **Line X**: [what is slow and why]
+- **Code Quality Issues** (line-referenced):
+  - **Line X**: [readability/style problem]
 
 ## ⚡ Optimized Code
 \`\`\`${language.toLowerCase()}
-[Complete optimized code — every line included]
+[Complete optimized code — every line]
 \`\`\`
 
-## 📈 Improvements Made
-(For each optimization: what changed, why, and the expected impact)
+## 📈 What Changed & Why (Line by Line)
+- **Line X → New Line Y**: [what changed, why it's faster/cleaner, expected impact]
 
 ## 📊 After Optimization
-- **Time Complexity**: [Big O of optimized code]
-- **Space Complexity**: [Big O of optimized code]
-- **Key Wins**: [summary of main improvements]
+- **Time Complexity**: [new Big-O]
+- **Space Complexity**: [new Big-O]
+- **Speed Improvement**: [estimated gain]
 
-Apply ALL of: algorithmic improvements, language-specific idioms, proper data structures, readable naming, reduced redundancy.`;
+Apply: algorithmic improvements, language idioms, proper data structures, readable naming, reduced redundancy.`;
 
     case "review":
-      return `${header}Perform a thorough professional code review of this ${language} code. Grade each category A-F.
+      return `${header}You are a senior ${language} engineer doing a professional code review. Use the line numbers shown above in ALL comments.
 
-Format in markdown:
+## 📋 Scorecard
 
-## 📋 Code Review Summary
+| Category | Grade | Summary |
+|----------|-------|---------|
+| Correctness | [A–F] | [1 line] |
+| Readability | [A–F] | [1 line] |
+| Performance | [A–F] | [1 line] |
+| Security | [A–F] | [1 line] |
+| Best Practices | [A–F] | [1 line] |
+| Error Handling | [A–F] | [1 line] |
 
-| Category | Grade | Notes |
-|----------|-------|-------|
-| Correctness | [A-F] | [1 line] |
-| Readability | [A-F] | [1 line] |
-| Performance | [A-F] | [1 line] |
-| Security | [A-F] | [1 line] |
-| Best Practices | [A-F] | [1 line] |
-| Error Handling | [A-F] | [1 line] |
+**Overall Grade: [A–F]**
 
-**Overall: [A-F]**
+## 🔍 Line-by-Line Commentary
+Go through every significant line or block and comment on it — what it does well, what is wrong, what could be improved. Always reference the exact line:
+- **Line X**: [comment]
 
-## 🔍 Detailed Analysis
+## 📋 Detailed Category Analysis
 
 ### Correctness
-[Does the code achieve its intended purpose? Any logic errors?]
+[Does the code correctly solve the problem? Reference specific lines where correctness issues exist]
 
 ### Readability & Maintainability
-[Naming, comments, structure, complexity. Reference specific lines.]
+[Naming conventions, comments, code structure — reference specific lines]
 
 ### Performance
-[Algorithmic complexity, unnecessary computations, memory usage. Reference specific lines.]
+[Time/space complexity issues — reference specific lines]
 
 ### Security
-[Input validation, injection risks, data exposure. If not applicable, state why.]
+[Injection risks, input validation, data exposure — reference specific lines]
 
-### Best Practices & Patterns
-[Design patterns, language idioms, error handling, testing considerations.]
+### Best Practices
+[Design patterns, error handling, testing — reference specific lines]
 
-## 🛠️ Top 5 Actionable Improvements
-(Ordered by priority — include corrected code snippets for each)
+## 🛠️ Top Improvements (Priority Order)
+For each improvement, give exact line number and corrected code:
 
-### 1. [Title]
-**Problem**: ...
+### 1. [Title] — Line X
+**Problem**: [what and why]
 **Fix**:
 \`\`\`${language.toLowerCase()}
 [corrected snippet]
 \`\`\`
 
-...
+(Repeat for all significant improvements)
 
 ## 💡 Conclusion
-[2-3 sentence overall assessment]`;
+[3–4 sentences: overall code quality, biggest strength, biggest weakness, recommended next steps]`;
 
     case "convert":
-      return `${header}Convert this ${language} code to ${targetLang}. The conversion must be:
-- 100% functionally equivalent — same logic, same behavior, same edge case handling
-- Idiomatic ${targetLang} — use native patterns, not literal translations
-- Following ${targetLang} best practices and conventions
-- Complete — every function, class, and feature converted
-
-Format in markdown:
+      return `${header}Convert this ${language} code to ${targetLang} completely and correctly.
 
 ## 🔄 Converted ${targetLang} Code
 \`\`\`${targetLang.toLowerCase()}
-[Complete converted code — never omit any part]
+[Complete converted code — NEVER omit any part or use placeholders]
 \`\`\`
 
-## 📌 Key Differences Between ${language} and ${targetLang}
-(Bullet list of important language differences that affected the conversion)
+## 📌 Key Differences: ${language} vs ${targetLang}
+(List every language feature that required a different approach, with before/after examples)
+
+## 🗺️ Line Mapping
+| Original ${language} Line | Converted ${targetLang} | Notes |
+|---|---|---|
+(Map the key lines so the developer can follow the conversion)
 
 ## ⚠️ Notes & Caveats
-(Any behavioral differences, missing features, or things the developer should know)
+(Behavioral differences, missing features, things the developer must know)
 
 Rules:
-- ALWAYS write the COMPLETE converted code — never use placeholders or "// rest of code"
-- Use ${targetLang} idioms (e.g., list comprehensions in Python, arrow functions in JS, etc.)
-- If a direct equivalent doesn't exist, explain what you used instead and why`;
+- Complete code only — no "// rest of code" or omissions
+- Use idiomatic ${targetLang} patterns, not literal translations`;
 
     default:
       if (question.trim()) {
-        return `${header}The student asks: "${question}"\n\nAnswer clearly with code examples where helpful. Use markdown formatting. Be educational and thorough.`;
+        return `${header}The student asks: "${question}"\n\nAnswer in detail with line references (e.g. "Line 5 does X because..."). Use code examples and markdown. Explain every concept from scratch.`;
       }
-      return `${header}Explain this ${language} code clearly.`;
+      return `${header}Explain this ${language} code line by line, referencing each line number.`;
   }
+}
+
+// ─── Line highlight parser ─────────────────────────────────────────────────────
+function parseHighlightedLines(text: string): Set<number> {
+  const lines = new Set<number>();
+  const rangeRe = /[Ll]ines?\s+(\d+)\s*[–\-]\s*(\d+)/g;
+  const singleRe = /[Ll]ine\s+(\d+)/g;
+  const pipeRe = /^\|\s*(\d+)\s*\|/gm;
+  let m: RegExpExecArray | null;
+  while ((m = rangeRe.exec(text)) !== null) {
+    const a = parseInt(m[1]), b = parseInt(m[2]);
+    for (let i = a; i <= Math.min(b, a + 30); i++) lines.add(i);
+  }
+  while ((m = singleRe.exec(text)) !== null) lines.add(parseInt(m[1]));
+  while ((m = pipeRe.exec(text)) !== null) lines.add(parseInt(m[1]));
+  return lines;
+}
+
+// ─── Line-numbered code viewer with highlights ────────────────────────────────
+function CodeViewer({ code, highlightedLines }: { code: string; highlightedLines: Set<number> }) {
+  const codeLines = code.split("\n");
+  return (
+    <div className="rounded-lg overflow-hidden border border-slate-700 text-xs font-mono">
+      <div className="overflow-x-auto max-h-[420px] overflow-y-auto bg-slate-950">
+        {codeLines.map((line, i) => {
+          const n = i + 1;
+          const hi = highlightedLines.has(n);
+          return (
+            <div key={n} className={`flex min-w-0 ${hi ? "bg-amber-400/15 border-l-2 border-amber-400" : "border-l-2 border-transparent"}`}>
+              <span className={`select-none shrink-0 w-9 text-right pr-2 py-0.5 pl-1 ${hi ? "text-amber-400 font-bold" : "text-slate-600"}`}>{n}</span>
+              <span className={`py-0.5 px-2 whitespace-pre flex-1 min-w-0 ${hi ? "text-amber-100" : "text-slate-200"}`}>{line || " "}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ─── Execute code via server-proxied Piston API ───────────────────────────────
@@ -291,22 +347,25 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
     result: null, provider: null,
   });
 
-  const [loading,   setLoading]   = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
-  const [runResult, setRunResult] = useState<RunResult | null>(null);
-  const [showRun,   setShowRun]   = useState(false);
+  const [loading,    setLoading]    = useState(false);
+  const [isRunning,  setIsRunning]  = useState(false);
+  const [runResult,  setRunResult]  = useState<RunResult | null>(null);
+  const [showRun,    setShowRun]    = useState(false);
+  const [editMode,   setEditMode]   = useState(true);
 
   const selectedMode = MODES.find(m => m.id === s.mode)!;
+  const highlightedLines = s.result ? parseHighlightedLines(s.result) : new Set<number>();
+  const hasHighlights = highlightedLines.size > 0;
 
   async function analyze() {
     if (!s.code.trim()) return toast.error("Paste some code first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); set({ result: null });
-    setRunResult(null); setShowRun(false);
+    setRunResult(null); setShowRun(false); setEditMode(false);
 
     const prompt = buildAnalyzePrompt(s.code, s.language, s.mode, s.targetLang, s.question);
     const res = await askAI(prompt,
-      `You are Bishal's Code Tutor — an expert programming tutor with deep knowledge of all languages. You provide precise, accurate, production-quality analysis. Never give vague answers. Always reference specific lines. Use markdown with properly labelled code blocks. Be educational and thorough.`);
+      `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. You give deep, line-by-line explanations referencing exact line numbers from the numbered code provided. Every explanation starts from the very first line. You never skip lines. You explain every concept from scratch. Use markdown with code blocks. Be thorough and educational.`);
     set({ provider: res.provider, result: res.text });
     await bump();
     setLoading(false);
@@ -329,7 +388,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
 
   function reset() {
     set({ code: "", result: null, provider: null, question: "" });
-    setRunResult(null); setShowRun(false);
+    setRunResult(null); setShowRun(false); setEditMode(true);
   }
 
   return (
@@ -339,7 +398,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
         <div className="card-soft p-4 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Language</label>
-            <select value={s.language} onChange={e => set({ language: e.target.value })}
+            <select value={s.language} onChange={e => { set({ language: e.target.value }); setEditMode(true); }}
               className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
               {LANGUAGES.map(l => <option key={l}>{l}</option>)}
             </select>
@@ -370,12 +429,32 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           )}
         </div>
 
-        <div className="card-soft p-4 space-y-3">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Code</label>
-          <textarea value={s.code} onChange={e => set({ code: e.target.value })}
-            placeholder={`Paste your ${s.language} code here…`}
-            rows={13} spellCheck={false}
-            className="w-full rounded-lg border border-input bg-background p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
+        {/* Code input — textarea OR highlighted viewer */}
+        <div className="card-soft p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your Code</label>
+            {s.result && s.code && (
+              <div className="flex items-center gap-1 rounded-full border border-border bg-muted p-0.5">
+                <button onClick={() => setEditMode(true)}
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors ${editMode ? "bg-background shadow text-foreground" : "text-muted-foreground"}`}>
+                  Edit
+                </button>
+                <button onClick={() => setEditMode(false)}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium transition-colors ${!editMode ? "bg-background shadow text-foreground" : "text-muted-foreground"}`}>
+                  {hasHighlights && <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />}
+                  View {hasHighlights ? `(${highlightedLines.size} lines highlighted)` : ""}
+                </button>
+              </div>
+            )}
+          </div>
+          {editMode ? (
+            <textarea value={s.code} onChange={e => set({ code: e.target.value })}
+              placeholder={`Paste your ${s.language} code here…`}
+              rows={14} spellCheck={false}
+              className="w-full rounded-lg border border-input bg-background p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          ) : (
+            <CodeViewer code={s.code} highlightedLines={highlightedLines} />
+          )}
         </div>
 
         <div className="card-soft p-4 space-y-2">
@@ -394,7 +473,6 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
               ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</>
               : <><selectedMode.icon className="h-4 w-4" /> {selectedMode.label} Code</>}
           </button>
-          {/* Run button — only for executable languages */}
           {PISTON_LANG[s.language] && (
             <button onClick={runCode} disabled={isRunning || !s.code.trim()}
               title={`Run ${s.language} code`}
@@ -417,9 +495,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-slate-900">
               <div className="flex items-center gap-2">
                 <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-200">
-                  {s.language} Output
-                </span>
+                <span className="text-xs font-semibold text-slate-200">{s.language} Output</span>
                 {runResult && !("error" in runResult) && (
                   <span className={`text-[10px] rounded-full px-2 py-0.5 font-mono ${runResult.exitCode === 0 ? "bg-emerald-900 text-emerald-300" : "bg-red-900 text-red-300"}`}>
                     exit {runResult.exitCode}
@@ -430,7 +506,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
                 <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-200" />
               </button>
             </div>
-            <div className="bg-slate-950 p-4 min-h-[80px] max-h-[220px] overflow-y-auto">
+            <div className="bg-slate-950 p-4 min-h-[80px] max-h-[260px] overflow-y-auto">
               {isRunning && (
                 <div className="flex items-center gap-2 text-slate-400 text-xs">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Executing…
@@ -460,18 +536,28 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
       {/* Right: analysis result */}
       <div className="card-soft p-4 space-y-3 min-h-[400px] overflow-x-hidden">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            {s.result ? `${selectedMode.label} Result` : "Output"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              {s.result ? `${selectedMode.label} Result` : "Output"}
+            </span>
+            {hasHighlights && s.result && (
+              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
+                {highlightedLines.size} lines highlighted in code
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <ProviderBadge provider={s.provider} />
             {s.result && <CopyBtn text={s.result} />}
           </div>
         </div>
+
         {loading && (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Bishal's Code Tutor is analyzing…</p>
+            <p className="text-xs text-muted-foreground">Doing a deep line-by-line analysis…</p>
           </div>
         )}
         {!loading && !s.result && (
@@ -480,7 +566,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
               <Code2 className="h-8 w-8 opacity-40" />
             </div>
             <p className="text-sm font-medium">Paste code and choose a mode</p>
-            <p className="text-xs">Or hit <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono">Run</kbd> to execute your code instantly</p>
+            <p className="text-xs">The AI will explain every line with exact line references</p>
           </div>
         )}
         {!loading && s.result && (
