@@ -84,8 +84,8 @@ function makeComponents() {
 
     blockquote({ children }: { children?: React.ReactNode }) {
       return (
-        <div className="my-3 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-5 py-4 shadow-sm">
-          <div className="text-center text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed">
+        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
+          <div className="min-w-max text-center text-base sm:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed mx-auto">
             {children}
           </div>
         </div>
@@ -95,16 +95,18 @@ function makeComponents() {
     code({ inline, children }: { inline?: boolean; children?: React.ReactNode }) {
       if (inline) {
         return (
-          <code className="rounded-lg bg-violet-100 px-2 py-0.5 text-sm font-bold font-mono text-violet-700">
+          <code className="rounded-lg bg-violet-100 px-1.5 py-0.5 text-xs sm:text-sm font-bold font-mono text-violet-700 break-words">
             {children}
           </code>
         );
       }
       return (
-        <div className="my-3 rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-5 py-4 shadow-sm text-center">
-          <span className="text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre">
-            {children}
-          </span>
+        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
+          <div className="flex justify-center">
+            <span className="text-base sm:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre inline-block">
+              {children}
+            </span>
+          </div>
         </div>
       );
     },
@@ -211,18 +213,19 @@ function FormulaSheetPage() {
 1. Write the formula in a code block using proper Unicode math symbols
 2. Use a bullet list to define every variable with its unit in simple words
 3. Give a step-by-step worked example a beginner can follow
-4. Add a 💡 Tip or ⚠️ Common Mistake line`
+4. Where a derivation or proof is mathematically possible/standard, include a short "Derivation" section showing the key steps from first principles to the final formula
+5. Add a 💡 Tip or ⚠️ Common Mistake line`
       : s.format === "compact"
       ? `For EACH formula:
 1. Write the formula in a code block using proper Unicode math symbols
 2. Define each variable in simple one-line bullets`
-      : `List the 10–15 most exam-important formulas.
+      : `List the most exam-important formulas for this topic (do not artificially cap the count — include every formula a student could be tested on).
 For each:
 1. Formula in a code block with Unicode math symbols
 2. Quick variable meanings
 3. One 💡 Tip or ⚠️ Common Mistake`;
 
-    const prompt = `Generate a beautiful, easy-to-understand formula sheet for:
+    const prompt = `Generate a COMPLETE, exhaustive, beautiful, easy-to-understand formula sheet for:
 
 Subject: ${subjectLabel}
 Topic: ${s.topic.trim()}
@@ -231,18 +234,21 @@ Format: ${FORMAT_OPTIONS.find(x => x.id === s.format)?.label}
 CRITICAL RULES — follow these exactly:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. FORMULA DISPLAY — Always put each formula in a fenced code block:
+1. COMPLETENESS — This is the #1 priority. Before writing, mentally list EVERY formula, law, theorem, identity, and equation that belongs to "${s.topic.trim()}" at a standard school/college syllabus level — including special cases, alternate forms, and related sub-formulas (e.g. for Trigonometry: not just sin/cos/tan but also reciprocal ratios, Pythagorean identities, sum/difference formulas, double angle, half angle, product-to-sum, law of sines/cosines if relevant). Do NOT stop early or truncate the list. Nothing important should be missing. If the topic naturally has more than 15-20 formulas, include all of them, grouped logically — do not artificially limit the count.
+
+2. FORMULA DISPLAY — Always put each formula in a fenced code block:
 \`\`\`
 v = u + at
 \`\`\`
    Use REAL Unicode symbols, never abbreviations or words:
    • Superscripts: ² ³ ⁴ ⁻¹ ⁻² (never write "^2" or "^3")
    • Fractions: write as  numerator / denominator  with spaces
-   • Square root: use √ symbol (e.g. √(a² + b²))
+   • Square root: use √ symbol (e.g. √(a² + b²)), cube root ∛
    • Greek letters: α β γ δ θ λ μ π σ τ ω Δ Σ Ω ρ φ ε η
-   • Arrows/operators: → ≈ ≠ ≤ ≥ × ÷ ∝ ∞ ∴ ∵
+   • Arrows/operators: → ≈ ≠ ≤ ≥ × ÷ ∝ ∞ ∴ ∵ ∈ ∀ ∃
    • Subscripts: write as v₀ v₁ v₂ or V_initial (clear labelling)
-   • Integrals: ∫ f(x) dx   Summations: Σᵢ xᵢ
+   • Integrals: ∫ f(x) dx   Summations: Σᵢ xᵢ   Products: Πᵢ xᵢ
+   • Keep each formula SHORT on one line where possible — split very long formulas across two code blocks rather than one extremely wide line, since this must render well on narrow mobile screens
    EXAMPLES of good formula writing:
    v² = u² + 2as
    F = (G × m₁ × m₂) / r²
@@ -251,7 +257,7 @@ v = u + at
    x = (-b ± √(b² - 4ac)) / 2a
    Q = mcΔT
 
-2. STRUCTURE — Use this exact format for each formula group:
+3. STRUCTURE — Use this exact format for each formula group:
 
 ## [emoji] [Group Name]
 
@@ -263,22 +269,29 @@ v = u + at
 - **symbol** — plain-English meaning (unit)
 - **symbol** — plain-English meaning (unit)
 
+[Only for Full Sheet, when a derivation is standard/possible] **Derivation:**
+1. [starting principle/definition]
+2. [algebraic/logical step]
+3. [algebraic/logical step]
+4. [final formula reached] — proof complete ∎
+
 [Only for Full Sheet] **Example:** [step-by-step solution a 10-year-old could follow]
 
 💡 Tip: [one clear, useful tip] OR ⚠️ Common Mistake: [one mistake to avoid]
 
-3. LANGUAGE — Explain everything in PLAIN SIMPLE English. Write variable definitions as if explaining to a student who has never seen this topic. Use everyday analogies where helpful.
+4. LANGUAGE — Explain everything in PLAIN SIMPLE English. Write variable definitions as if explaining to a student who has never seen this topic. Use everyday analogies where helpful.
 
-4. At the very end, add:
+5. At the very end, add:
 ## 📋 Quick Reference Table
 with columns: Formula | What It Finds | Key Variables
+— this table must list EVERY formula covered above, not a subset.
 
-5. Cover ALL major formulas for the topic. Be thorough and complete.
+6. Cover ALL formulas for the topic exhaustively — completeness matters more than brevity. Never say "and more" or "etc." — always spell out every remaining item explicitly.
 
 ${formatInstr}`;
 
     const res = await askAI(prompt,
-      "You are an expert teacher who makes complex formulas easy to understand. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.");
+      "You are an expert teacher and mathematician who produces exhaustive, complete formula references — you never skip or truncate formulas for the sake of brevity. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Include short derivations/proofs from first principles whenever mathematically standard. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.");
     set({ sheet: res.text, provider: res.provider });
     await bump();
     setLoading(false);

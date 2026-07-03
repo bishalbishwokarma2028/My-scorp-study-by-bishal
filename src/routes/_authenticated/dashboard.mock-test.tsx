@@ -31,6 +31,9 @@ const SUBJECTS = [
   "Physics", "Mathematics", "Chemistry", "Biology",
   "History", "Geography", "Economics", "Computer Science",
   "English", "Nepali", "Accounting", "Political Science",
+  "Environmental Science", "Sociology", "Psychology", "Business Studies",
+  "Civics", "Health Education", "English Literature", "Data Structures & Algorithms",
+  "General Knowledge", "Statistics", "Agriculture Science", "Law",
 ];
 
 const DIFFICULTIES = [
@@ -39,16 +42,12 @@ const DIFFICULTIES = [
   { id: "hard",   label: "Hard",   color: "text-red-600 bg-red-50 border-red-200" },
 ];
 
-const Q_COUNTS  = [5, 10, 15, 20, 25, 30];
-const TIME_OPTS = [
-  { label: "No limit", secs: 0 },
-  { label: "10 min",   secs: 600 },
-  { label: "15 min",   secs: 900 },
-  { label: "20 min",   secs: 1200 },
-  { label: "30 min",   secs: 1800 },
-  { label: "45 min",   secs: 2700 },
-  { label: "60 min",   secs: 3600 },
-];
+const Q_COUNTS  = [10, 20, 30, 40, 50];
+const MIN_PER_QUESTION = 1.11;
+
+function computeTimeSecs(qCount: number) {
+  return Math.round(qCount * MIN_PER_QUESTION * 60);
+}
 
 function fmt(secs: number) {
   const m = Math.floor(secs / 60).toString().padStart(2, "0");
@@ -75,7 +74,9 @@ function MockTestPage() {
   const [topic,      setTopic]      = useState("");
   const [qCount,     setQCount]     = useState(10);
   const [difficulty, setDifficulty] = useState("medium");
-  const [timeSecs,   setTimeSecs]   = useState(1200);
+  const [timeSecs,   setTimeSecs]   = useState(computeTimeSecs(10));
+
+  useEffect(() => { setTimeSecs(computeTimeSecs(qCount)); }, [qCount]);
 
   const [questions, setQuestions]   = useState<Question[]>([]);
   const [current,   setCurrent]     = useState(0);
@@ -109,15 +110,22 @@ function MockTestPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setPhase("loading");
 
+    const difficultyInstr = difficulty === "easy"
+      ? "Require genuine conceptual understanding, not just simple one-line recall. Avoid trivially obvious questions — every question should make the student think."
+      : difficulty === "medium"
+      ? "Require applying concepts to new situations, multi-step reasoning, and connecting multiple ideas. Comparable to a challenging school/college exam."
+      : "Require deep analysis, multi-step problem-solving, tricky edge cases, and careful reasoning to eliminate close distractors. Comparable to competitive exam or olympiad-level difficulty. Options should include plausible near-miss distractors, not obviously wrong choices.";
+
     const prompt = `Generate a ${difficulty} difficulty mock test on "${topic || subject}" for subject "${subject}".
 
 Requirements:
 - Exactly ${qCount} questions
 - Mix of MCQ (4 options) and True/False questions (at least 70% MCQ, rest True/False)
-- Questions should cover different sub-topics within "${topic || subject}"
-- Difficulty: ${difficulty} — ${difficulty === "easy" ? "basic recall and definitions" : difficulty === "medium" ? "application and understanding" : "analysis, evaluation, and complex problem-solving"}
+- Questions should cover different sub-topics within "${topic || subject}" — spread across the full breadth of the topic
+- Difficulty: ${difficulty} — ${difficultyInstr}
+- IMPORTANT: Every question must be non-trivial and genuinely test understanding — this is a serious exam simulation, not a casual quiz
 - Each question must have a clear, unambiguous correct answer
-- Explanations must be 1-2 sentences explaining WHY the answer is correct
+- Explanations must be 2-3 sentences explaining WHY the answer is correct and why other options are wrong
 
 Return ONLY valid JSON in this exact format (no markdown, no extra text):
 {
@@ -450,12 +458,9 @@ The "ans" field is the 0-based index of the correct option.`;
 
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Time Limit</label>
-            <select value={timeSecs} onChange={e => setTimeSecs(Number(e.target.value))}
-              className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary">
-              {TIME_OPTS.map(t => (
-                <option key={t.secs} value={t.secs}>{t.label}</option>
-              ))}
-            </select>
+            <div className="mt-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-bold text-primary">
+              {fmt(timeSecs)} <span className="font-normal text-muted-foreground">({MIN_PER_QUESTION} min/question)</span>
+            </div>
           </div>
         </div>
 
@@ -470,7 +475,7 @@ The "ans" field is the 0-based index of the correct option.`;
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-blue-500" />
-            <span>{timeSecs ? `${timeSecs / 60} minutes` : "No time limit"}</span>
+            <span>{fmt(timeSecs)} minutes total</span>
           </div>
         </div>
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import React from "react";
-import { Loader2, Delete, ArrowLeftRight } from "lucide-react";
+import { Loader2, Delete, ArrowLeftRight, Copy, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { askAI } from "@/lib/aiProvider";
@@ -15,8 +15,9 @@ export const Route = createFileRoute("/_authenticated/dashboard/calculator")({
 });
 
 type Tab = "basic" | "scientific" | "formula" | "convert";
+type AngleMode = "DEG" | "RAD" | "GRAD";
 
-/* ─── helpers ─────────────────────────────────────────────────────────── */
+/* ─── math helpers ────────────────────────────────────────────────────── */
 function factorial(n: number): number {
   if (n < 0 || !Number.isInteger(n)) return NaN;
   if (n === 0 || n === 1) return 1;
@@ -34,42 +35,64 @@ function nCr(n: number, r: number): number {
   return factorial(n) / (factorial(r) * factorial(n - r));
 }
 
+/* ─── exact/fraction display for trig & common irrational results ──────── */
+function decimalToFraction(x: number, tolerance = 1e-9, maxDenom = 1000): string | null {
+  const sign = x < 0 ? "-" : "";
+  const ax = Math.abs(x);
+  if (Math.abs(ax - Math.round(ax)) < tolerance) return null;
+  let h1 = 1, h2 = 0, k1 = 0, k2 = 1, b = ax;
+  for (let i = 0; i < 25; i++) {
+    const a = Math.floor(b);
+    const th1 = a * h1 + h2; h2 = h1; h1 = th1;
+    const tk1 = a * k1 + k2; k2 = k1; k1 = tk1;
+    if (k1 > maxDenom) break;
+    if (Math.abs(ax - h1 / k1) < tolerance) break;
+    const frac = b - a;
+    if (frac < 1e-12) break;
+    b = 1 / frac;
+  }
+  if (k1 <= 1 || k1 > maxDenom || h1 > maxDenom) return null;
+  if (Math.abs(ax - h1 / k1) > 1e-6) return null;
+  return `${sign}${h1}/${k1}`;
+}
+
+const NICE_VALUES: [number, string][] = [
+  [0, "0"], [1, "1"], [-1, "-1"],
+  [0.5, "1/2"], [-0.5, "-1/2"],
+  [Math.sqrt(3) / 2, "√3/2"], [-Math.sqrt(3) / 2, "-√3/2"],
+  [Math.sqrt(2) / 2, "√2/2"], [-Math.sqrt(2) / 2, "-√2/2"],
+  [Math.sqrt(3), "√3"], [-Math.sqrt(3), "-√3"],
+  [1 / Math.sqrt(3), "√3/3"], [-1 / Math.sqrt(3), "-√3/3"],
+  [Math.sqrt(2), "√2"], [-Math.sqrt(2), "-√2"],
+  [Math.PI, "π"], [Math.PI / 2, "π/2"], [Math.PI / 3, "π/3"], [Math.PI / 4, "π/4"], [Math.PI / 6, "π/6"],
+  [2 * Math.PI, "2π"],
+];
+
+function toNiceForm(x: number): string | null {
+  if (!Number.isFinite(x)) return null;
+  for (const [v, label] of NICE_VALUES) {
+    if (Math.abs(x - v) < 1e-9) return label;
+  }
+  return decimalToFraction(x);
+}
+
 /* ─── Main page ───────────────────────────────────────────────────────── */
 function CalculatorPage() {
   const { user } = Route.useRouteContext();
   const [tab, setTab] = useState<Tab>("basic");
   const [expr, setExpr] = useState("");
   const [result, setResult] = useState("");
+  const [niceResult, setNiceResult] = useState<string | null>(null);
   const [history, setHistory] = useState<{ expr: string; result: string }[]>([]);
-  const [degrees, setDegrees] = useState(true);
-
-  const press = useCallback((k: string) => {
-    if (k === "=")   { compute(); return; }
-    if (k === "C")   { setExpr(""); setResult(""); return; }
-    if (k === "⌫")   { setExpr(e => e.slice(0, -1)); return; }
-    if (k === "x²")  { setExpr(e => `(${e || result})^2`); return; }
-    if (k === "x³")  { setExpr(e => `(${e || result})^3`); return; }
-    if (k === "1/x") { setExpr(e => `1/(${e || result})`); return; }
-    if (k === "n!")  { setExpr(e => `fact(${e || result})`); return; }
-    if (k === "%") {
-      setExpr(e => {
-        const match = e.match(/^(.*?)(-?\d+(?:\.\d+)?)$/);
-        if (match) {
-          const base = match[1], num = parseFloat(match[2]);
-          if (!isNaN(num)) return base + (num / 100);
-        }
-        return e + "/100";
-      });
-      return;
-    }
-    if (k === "+/-") { setExpr(e => e.startsWith("-") ? e.slice(1) : "-" + e); return; }
-    setExpr(e => e + k);
-  }, [result]);
+  const [angleMode, setAngleMode] = useState<AngleMode>("DEG");
+  const [inv, setInv] = useState(false);
+  const [memory, setMemory] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   function compute() {
     if (!expr.trim()) return;
     try {
-      const rad = degrees ? "Math.PI/180" : "1";
+      const rad = angleMode === "DEG" ? "Math.PI/180" : angleMode === "GRAD" ? "Math.PI/200" : "1";
       const prelude = `const _r=${rad};
         const sin=(x)=>Math.sin(x*_r), cos=(x)=>Math.cos(x*_r), tan=(x)=>Math.tan(x*_r),
               asin=(x)=>Math.asin(x)/_r, acos=(x)=>Math.acos(x)/_r, atan=(x)=>Math.atan(x)/_r,
@@ -87,15 +110,83 @@ function CalculatorPage() {
         .replace(/mod/g, "%").replace(/π/g, "pi");
       // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const raw = Function(`"use strict"; ${prelude} return (${sanitized})`)();
-      const r = typeof raw === "number"
-        ? (Number.isFinite(raw)
-          ? (Math.abs(raw) < 1e-10 && raw !== 0 ? raw.toExponential(6) : +raw.toPrecision(12) + "")
-          : (raw === Infinity ? "∞" : "Error"))
-        : String(raw);
+      let r: string;
+      let nice: string | null = null;
+      if (typeof raw === "number") {
+        if (!Number.isFinite(raw)) {
+          r = raw === Infinity ? "∞" : raw === -Infinity ? "-∞" : "Error";
+        } else {
+          nice = toNiceForm(raw);
+          r = Math.abs(raw) < 1e-10 && raw !== 0 ? raw.toExponential(6) : +raw.toPrecision(12) + "";
+        }
+      } else {
+        r = String(raw);
+      }
       setResult(r);
-      setHistory(h => [{ expr, result: r }, ...h].slice(0, 20));
-    } catch { setResult("Error"); }
+      setNiceResult(nice && nice !== r ? nice : null);
+      setHistory(h => [{ expr, result: nice && nice !== r ? `${r} = ${nice}` : r }, ...h].slice(0, 20));
+    } catch { setResult("Error"); setNiceResult(null); }
   }
+
+  function press(k: string) {
+    if (k === "=")   { compute(); return; }
+    if (k === "C")   { setExpr(""); setResult(""); setNiceResult(null); return; }
+    if (k === "⌫")   { setExpr(e => e.slice(0, -1)); return; }
+    if (k === "x²")  { setExpr(e => `(${e || result})^2`); return; }
+    if (k === "x³")  { setExpr(e => `(${e || result})^3`); return; }
+    if (k === "1/x") { setExpr(e => `1/(${e || result})`); return; }
+    if (k === "n!")  { setExpr(e => `fact(${e || result})`); return; }
+    if (k === "10^x") { setExpr(e => `tenX(${e || result})`); return; }
+    if (k === "e^x")  { setExpr(e => `exp(${e || result})`); return; }
+    if (k === "%") {
+      setExpr(e => {
+        const match = e.match(/^(.*?)(-?\d+(?:\.\d+)?)$/);
+        if (match) {
+          const base = match[1], num = parseFloat(match[2]);
+          if (!isNaN(num)) return base + (num / 100);
+        }
+        return e + "/100";
+      });
+      return;
+    }
+    if (k === "+/-") { setExpr(e => e.startsWith("-") ? e.slice(1) : "-" + e); return; }
+    setExpr(e => e + k);
+  }
+
+  function memClear()  { setMemory(0); toast.success("Memory cleared"); }
+  function memRecall() { if (memory !== 0) setExpr(e => e + memory); }
+  function memAdd()    { const v = parseFloat(result); if (!isNaN(v)) { setMemory(m => m + v); toast.success(`M+ ${v}`); } }
+  function memSub()    { const v = parseFloat(result); if (!isNaN(v)) { setMemory(m => m - v); toast.success(`M− ${v}`); } }
+
+  function copyResult() {
+    if (!result) return;
+    navigator.clipboard.writeText(result);
+    setCopied(true);
+    toast.success("Result copied!");
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  /* keyboard support */
+  useEffect(() => {
+    if (tab !== "basic" && tab !== "scientific") return;
+    function onKey(ev: KeyboardEvent) {
+      const target = ev.target as HTMLElement;
+      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      const k = ev.key;
+      if (/^[0-9.]$/.test(k)) { press(k); return; }
+      if (k === "+" || k === "-" ) { press(k); return; }
+      if (k === "*") { press("×"); return; }
+      if (k === "/") { ev.preventDefault(); press("÷"); return; }
+      if (k === "^") { press("^"); return; }
+      if (k === "(" || k === ")") { press(k); return; }
+      if (k === "%") { press("%"); return; }
+      if (k === "Enter" || k === "=") { ev.preventDefault(); compute(); return; }
+      if (k === "Backspace") { press("⌫"); return; }
+      if (k === "Escape") { press("C"); return; }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const BASIC_KEYS = [
     ["C", "+/-", "%", "÷"],
@@ -105,20 +196,26 @@ function CalculatorPage() {
     ["0", ".", "⌫", "="],
   ];
 
-  const SCI_ROWS = [
-    ["sin(",  "cos(",  "tan(",  "log(",  "ln(",   "abs("   ],
-    ["asin(", "acos(", "atan(", "sqrt(", "cbrt(", "n!"     ],
-    ["π",     "e",     "^",     "(",     ")",     "%"      ],
-    ["x²",    "x³",    "1/x",   "mod",  "10^x",  "e^x"    ],
-    ["nCr(",  "nPr(",  "sinh(", "cosh(", "floor(","ceil("  ],
-  ];
+  const SCI_ROWS: string[][] = inv
+    ? [
+        ["asin(", "acos(", "atan(", "10^x", "e^x", "abs("],
+        ["x²",    "x³",    "n!",    "π",    "e",   "%"   ],
+        ["(",     ")",     "^",     "mod",  "nCr(","nPr("],
+        ["sinh(", "cosh(", "tanh(", "floor(","ceil(","1/x"],
+      ]
+    : [
+        ["sin(",  "cos(",  "tan(",  "log(",  "ln(",  "abs("],
+        ["sqrt(", "cbrt(", "n!",    "π",     "e",    "%"   ],
+        ["(",     ")",     "^",     "mod",   "nCr(", "nPr("],
+        ["sinh(", "cosh(", "tanh(", "floor(","ceil(","1/x" ],
+      ];
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-white p-1.5 shadow-sm flex gap-1">
+      <div className="rounded-2xl border border-border bg-white p-1.5 shadow-sm flex gap-1 overflow-x-auto">
         {(["basic", "scientific", "formula", "convert"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold capitalize transition ${tab === t ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md" : "text-muted-foreground hover:bg-accent"}`}>
+            className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold capitalize transition whitespace-nowrap ${tab === t ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md" : "text-muted-foreground hover:bg-accent"}`}>
             {t === "convert" ? "Unit Converter" : t === "formula" ? "Formula Helper" : t === "scientific" ? "Scientific" : "Basic"}
           </button>
         ))}
@@ -127,18 +224,46 @@ function CalculatorPage() {
       {(tab === "basic" || tab === "scientific") && (
         <div className={`mx-auto ${tab === "scientific" ? "max-w-lg" : "max-w-sm"}`}>
           <div className="rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
-            <div className="bg-slate-900 px-5 py-4 text-right min-h-[96px]">
-              {tab === "scientific" && (
-                <div className="flex items-center justify-between mb-2">
-                  <button onClick={() => setDegrees(d => !d)}
-                    className={`rounded-full px-3 py-0.5 text-[11px] font-bold border transition ${degrees ? "border-amber-400 text-amber-300" : "border-blue-400 text-blue-300"}`}>
-                    {degrees ? "DEG" : "RAD"}
-                  </button>
+            <div className="bg-slate-900 px-5 py-4 text-right min-h-[104px]">
+              <div className="flex items-center justify-between mb-2">
+                {tab === "scientific" ? (
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => setAngleMode(m => m === "DEG" ? "RAD" : m === "RAD" ? "GRAD" : "DEG")}
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${angleMode === "DEG" ? "border-amber-400 text-amber-300" : angleMode === "RAD" ? "border-blue-400 text-blue-300" : "border-emerald-400 text-emerald-300"}`}>
+                      {angleMode}
+                    </button>
+                    <button onClick={() => setInv(v => !v)}
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${inv ? "border-fuchsia-400 text-fuchsia-300 bg-fuchsia-950" : "border-slate-600 text-slate-400"}`}>
+                      INV
+                    </button>
+                  </div>
+                ) : <div />}
+                <div className="flex items-center gap-2">
+                  {memory !== 0 && <span className="text-[10px] font-bold text-cyan-300">M={+memory.toPrecision(6)}</span>}
                   <button onClick={() => setHistory([])} className="text-[10px] text-slate-500 hover:text-slate-300">Clear history</button>
                 </div>
-              )}
+              </div>
               <div className="text-slate-400 text-sm font-mono min-h-[20px] truncate text-right">{expr || "0"}</div>
-              <div className="text-white text-3xl font-bold font-mono mt-1 truncate">{result || "0"}</div>
+              <div className="flex items-center justify-end gap-2 mt-1">
+                {result && (
+                  <button onClick={copyResult} className="text-slate-500 hover:text-slate-300 flex-shrink-0">
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+                <div className="text-white text-3xl font-bold font-mono truncate">{result || "0"}</div>
+              </div>
+              {niceResult && (
+                <div className="text-fuchsia-300 text-sm font-mono mt-0.5">= {niceResult}</div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-4 gap-px bg-slate-700 p-px">
+              {["MC", "MR", "M+", "M-"].map(m => (
+                <button key={m} onClick={() => m === "MC" ? memClear() : m === "MR" ? memRecall() : m === "M+" ? memAdd() : memSub()}
+                  className="bg-slate-800 hover:bg-slate-700 text-cyan-300 py-2 text-[11px] font-mono font-bold transition">
+                  {m}
+                </button>
+              ))}
             </div>
 
             {tab === "scientific" && (
@@ -146,11 +271,7 @@ function CalculatorPage() {
                 {SCI_ROWS.map((row, ri) => (
                   <div key={ri} className="grid grid-cols-6 gap-px mb-px">
                     {row.map((k) => (
-                      <button key={k} onClick={() => {
-                        if (k === "10^x") { setExpr(e => `tenX(${e || result})`); }
-                        else if (k === "e^x") { setExpr(e => `exp(${e || result})`); }
-                        else { press(k); }
-                      }}
+                      <button key={k} onClick={() => press(k)}
                         className="bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 text-[11px] font-mono font-semibold transition rounded-sm">
                         {k}
                       </button>
@@ -167,7 +288,6 @@ function CalculatorPage() {
                 const isDel = k === "C" || k === "⌫";
                 return (
                   <button key={`${k}-${idx}`} onClick={() => press(k)}
-                    onKeyDown={(ev) => { if (ev.key === "Enter") compute(); }}
                     className={`py-4 text-sm font-semibold transition select-none
                       ${isEq  ? "bg-violet-600 text-white hover:bg-violet-500" :
                         isOp  ? "bg-amber-400 text-white hover:bg-amber-300" :
@@ -180,6 +300,10 @@ function CalculatorPage() {
             </div>
           </div>
 
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            ⌨️ Keyboard supported — type numbers & operators, Enter to calculate
+          </p>
+
           {history.length > 0 && (
             <div className="mt-3 rounded-xl border border-border bg-white p-3">
               <div className="flex items-center justify-between mb-2">
@@ -188,7 +312,7 @@ function CalculatorPage() {
               </div>
               <ul className="space-y-1">
                 {history.map((h, i) => (
-                  <li key={i} onClick={() => { setExpr(h.expr); setResult(h.result); }}
+                  <li key={i} onClick={() => { setExpr(h.expr); setResult(h.result.split(" = ")[0]); }}
                     className="flex items-center justify-between cursor-pointer rounded-lg px-2 py-1.5 text-xs hover:bg-accent transition">
                     <span className="text-muted-foreground font-mono truncate">{h.expr}</span>
                     <span className="font-semibold font-mono ml-2 flex-shrink-0">= {h.result}</span>
