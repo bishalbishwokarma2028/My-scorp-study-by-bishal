@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Loader2, Eye, Download, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { askAIJSON } from "@/lib/aiProvider";
@@ -7,6 +7,7 @@ import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dashboard/visual-explainer")({
   component: VisualExplainerPage,
@@ -553,6 +554,16 @@ function VisualExplainerPage() {
   const svgRef = useRef<HTMLDivElement>(null);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "visual_explainer");
 
+  // Restore from History navigation
+  useEffect(() => {
+    const raw = sessionStorage.getItem("scorp_visual_restore");
+    if (raw) {
+      try { set(JSON.parse(raw)); } catch {}
+      sessionStorage.removeItem("scorp_visual_restore");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleTopicChange(val: string) {
     set({ topic: val });
     // Auto-suggest flowchart if topic looks like a process question
@@ -574,6 +585,12 @@ function VisualExplainerPage() {
       toast.error("Couldn't generate diagram — please try again or rephrase your topic");
     } else {
       set({ diagram: parsed });
+      // Save to mindmaps history (non-blocking)
+      supabase.from("mindmaps").insert({
+        user_id: user.id,
+        topic: s.topic.trim(),
+        map_data: parsed as never,
+      }).then(() => {});
     }
     setLoading(false);
   }

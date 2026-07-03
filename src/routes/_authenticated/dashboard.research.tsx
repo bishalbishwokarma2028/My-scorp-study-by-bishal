@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Search, ExternalLink, RefreshCw, Copy, Check, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
@@ -8,8 +8,10 @@ import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
+import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 
 export const Route = createFileRoute("/_authenticated/dashboard/research")({
   component: ResearchPage,
@@ -33,10 +35,86 @@ const EXAMPLE_TOPICS = [
   "The history of the internet",
 ];
 
+// Section header color map based on emoji prefix
+const SECTION_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+  "🔍": { bg: "from-blue-50 to-blue-50/30",   border: "border-blue-400",   text: "text-blue-700"   },
+  "📌": { bg: "from-violet-50 to-violet-50/30", border: "border-violet-400", text: "text-violet-700" },
+  "📖": { bg: "from-emerald-50 to-emerald-50/30", border: "border-emerald-400", text: "text-emerald-700" },
+  "📊": { bg: "from-amber-50 to-amber-50/30",  border: "border-amber-400",  text: "text-amber-700"  },
+  "🌍": { bg: "from-cyan-50 to-cyan-50/30",    border: "border-cyan-400",   text: "text-cyan-700"   },
+  "✅": { bg: "from-green-50 to-green-50/30",  border: "border-green-500",  text: "text-green-700"  },
+};
+
+function getSection(text: string) {
+  for (const [emoji, style] of Object.entries(SECTION_STYLES)) {
+    if (String(text).startsWith(emoji)) return style;
+  }
+  return { bg: "from-primary/5 to-primary/0", border: "border-primary", text: "text-primary" };
+}
+
+// Rich custom components for beautiful research report rendering
+const reportComponents: Components = {
+  h2: ({ children }) => {
+    const s = getSection(String(children));
+    return (
+      <div className={`flex items-center gap-2.5 mt-7 mb-3 px-4 py-3 rounded-xl bg-gradient-to-r ${s.bg} border-l-4 ${s.border} shadow-sm`}>
+        <span className={`text-sm font-bold leading-snug ${s.text}`}>{children}</span>
+      </div>
+    );
+  },
+  h3: ({ children }) => (
+    <h3 className="text-sm font-bold mt-5 mb-2 pl-3 border-l-2 border-primary/50 text-foreground">{children}</h3>
+  ),
+  strong: ({ children }) => (
+    <mark className="bg-yellow-200/80 text-yellow-900 px-0.5 rounded-sm font-semibold not-italic">{children}</mark>
+  ),
+  em: ({ children }) => (
+    <em className="text-primary font-medium not-italic">{children}</em>
+  ),
+  li: ({ children }) => (
+    <li className="flex items-start gap-2 my-1.5 leading-relaxed">
+      <span className="mt-[7px] h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+      <span className="flex-1 text-sm">{children}</span>
+    </li>
+  ),
+  ul: ({ children }) => (
+    <ul className="my-2 list-none pl-0 space-y-0">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-2 list-decimal pl-5 space-y-1 text-sm">{children}</ol>
+  ),
+  p: ({ children }) => (
+    <p className="text-sm leading-relaxed my-2 text-foreground/90">{children}</p>
+  ),
+  blockquote: ({ children }) => (
+    <div className="my-3 rounded-lg border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900 font-medium">
+      {children}
+    </div>
+  ),
+  table: ({ children }) => (
+    <div className="my-4 overflow-x-auto rounded-xl border border-border shadow-sm">
+      <table className="w-full text-sm">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="bg-muted/60">{children}</thead>,
+  th: ({ children }) => (
+    <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground border-b border-border">{children}</th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-2 text-xs border-b border-border/60">{children}</td>
+  ),
+  tr: ({ children }) => (
+    <tr className="even:bg-muted/20 hover:bg-accent/30 transition-colors">{children}</tr>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">{children}</code>
+  ),
+  hr: () => <hr className="my-4 border-border/50" />,
+};
+
 function ResearchPage() {
   const { user } = Route.useRouteContext();
 
-  // Persisted state across route changes
   const [s, set, clear] = usePageState("research", {
     query:        "",
     focusType:    "general",
@@ -46,10 +124,19 @@ function ResearchPage() {
     provider:     null as string | null,
   });
 
-  // Transient
   const [loading, setLoading] = useState(false);
   const [copied,  setCopied]  = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "research");
+
+  // Restore from History navigation
+  useEffect(() => {
+    const raw = sessionStorage.getItem("scorp_research_restore");
+    if (raw) {
+      try { set(JSON.parse(raw)); } catch {}
+      sessionStorage.removeItem("scorp_research_restore");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function research() {
     if (!s.query.trim()) return toast.error("Enter a topic to research");
@@ -63,44 +150,58 @@ function ResearchPage() {
 
       const focusLabel = FOCUS_TYPES.find(f => f.id === s.focusType)?.label || "General Overview";
 
-      const prompt = `You are a deep research assistant for students. Research this topic comprehensively.
+      const prompt = `You are a deep research assistant for students. Produce a rich, visually engaging, comprehensive research report.
 
 TOPIC: "${s.query.trim()}"
 FOCUS: ${focusLabel}
 
-LIVE WEB CONTEXT (use this as primary source):
+LIVE WEB CONTEXT (use as primary source):
 ${webCtx.context || "No live web data available — use training knowledge."}
 
-Write a comprehensive, well-structured research report in markdown. Use these exact sections:
+Write a comprehensive markdown research report using these EXACT section headers:
 
 ## 🔍 Executive Summary
-(2-3 paragraphs covering the most important points)
+Write 2–3 detailed paragraphs. **Bold every key term, name, concept, and critical fact.** Include the most essential information a student must know.
 
 ## 📌 Key Findings
-(6-8 bullet points of the most critical facts and insights)
+List 7–9 bullet points. **Bold the critical keyword or statistic at the start of each point.** Each point should be a complete, informative sentence.
 
 ## 📖 Detailed Analysis
-(3-4 subsections with ### headings, each covering a major aspect of the topic)
+Write 3–4 subsections using ### headings. Under each, write 2–3 paragraphs with **bolded key terms throughout**. Be thorough and educational.
 
 ## 📊 Statistics & Important Facts
-(A bullet list of specific numbers, dates, measurements, and verifiable facts)
+Use a markdown table with columns: | Fact | Detail | Source/Year |
+Include 6–8 rows of specific, verifiable statistics and figures.
 
 ## 🌍 Different Perspectives
-(2-3 different viewpoints or angles on the topic)
+Present 2–3 distinct viewpoints as separate paragraphs. Use > blockquotes to highlight the single most important insight from each perspective.
 
 ## ✅ Conclusion & Key Takeaways
-(Summary paragraph + 4-5 bullet points of the most important takeaways for a student)
+Write a strong summary paragraph, then list 5–6 bullet points where each starts with **bold takeaway label:** followed by the explanation.
 
-Rules:
-- Be thorough, accurate, and educational
-- Use specific facts, dates, and statistics from the web context where available
-- Format with proper markdown (bold, bullets, headers)
-- Write in a clear, engaging style for students`;
+FORMATTING RULES:
+- **Bold all key terms, important names, statistics, dates, and critical concepts** throughout the entire report
+- Use markdown tables for comparative or statistical information
+- Use > blockquotes for particularly important insights or quotes
+- Write at a high academic quality — detailed, factual, well-structured
+- Make it thorough enough that a student could write an essay from this report alone`;
 
       const res = await askAI(prompt,
-        "You are an expert research assistant. Write comprehensive, factual, well-structured research reports for students. Use markdown formatting.");
+        "You are an expert research assistant. Write comprehensive, beautifully formatted research reports with rich markdown — bold key terms, tables, and blockquotes throughout.");
       set({ provider: res.provider, report: res.text });
       await bump();
+
+      // Save to history (non-blocking)
+      supabase.from("research_history" as never).insert({
+        user_id: user.id,
+        query: s.query.trim(),
+        focus_type: s.focusType,
+        report: res.text,
+        sources: webCtx.sources as never,
+        search_source: webCtx.searchSource,
+        provider: res.provider,
+      } as never).then(() => {});
+
     } catch {
       toast.error("Research failed — please try again");
     }
@@ -189,8 +290,9 @@ Rules:
 
       {!loading && s.report && (
         <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
-          <div className="card-soft p-5 space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
+          {/* Report card */}
+          <div className="card-soft p-5 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-border">
               <div>
                 <p className="font-semibold text-sm">{s.query}</p>
                 {s.searchSource && (
@@ -204,16 +306,24 @@ Rules:
                 <ProviderBadge provider={s.provider} />
                 <button onClick={copyReport}
                   className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent">
-                  {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                  {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
             </div>
-            <div className="prose prose-sm max-w-none [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ul]:my-1 [&_li]:my-0.5 [&_p]:leading-relaxed [&_strong]:font-semibold">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.report}</ReactMarkdown>
+
+            {/* Rich formatted report */}
+            <div className="research-report">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={reportComponents}
+              >
+                {s.report}
+              </ReactMarkdown>
             </div>
           </div>
 
+          {/* Sources sidebar */}
           <div className="space-y-3">
             <div className="card-soft p-4 space-y-3">
               <p className="text-sm font-semibold flex items-center gap-1.5">
@@ -224,7 +334,7 @@ Rules:
                 <p className="text-xs text-muted-foreground">No live web sources — report based on AI training knowledge.</p>
               )}
               {s.sources.map((src, i) => (
-                <div key={i} className="rounded-lg border border-border bg-muted/30 p-3 space-y-1">
+                <div key={i} className="rounded-lg border border-border bg-muted/30 p-3 space-y-1 hover:bg-accent/30 transition-colors">
                   <p className="text-xs font-semibold leading-snug line-clamp-2">{src.title}</p>
                   <p className="text-[11px] text-muted-foreground line-clamp-3">{src.snippet}</p>
                   {src.url && (

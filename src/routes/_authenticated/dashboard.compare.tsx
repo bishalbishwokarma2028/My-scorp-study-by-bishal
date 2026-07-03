@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, GitCompare, RefreshCw, Lightbulb, BookOpen, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { askAIJSON } from "@/lib/aiProvider";
@@ -7,6 +7,7 @@ import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dashboard/compare")({
   component: ComparePage,
@@ -58,6 +59,16 @@ function ComparePage() {
   const [copied, setCopied] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "compare");
 
+  // Restore from History navigation
+  useEffect(() => {
+    const raw = sessionStorage.getItem("scorp_compare_restore");
+    if (raw) {
+      try { set(JSON.parse(raw)); } catch {}
+      sessionStorage.removeItem("scorp_compare_restore");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function loadExample(pair: string[]) {
     set({ conceptA: pair[0], conceptB: pair[1], result: null, provider: null });
   }
@@ -108,6 +119,15 @@ Return STRICT JSON only — no prose, no markdown fences:
       toast.error("Couldn't build the comparison — please try again");
     } else {
       set({ result: parsed });
+      // Save to history (non-blocking)
+      supabase.from("compare_history" as never).insert({
+        user_id: user.id,
+        concept_a: s.conceptA.trim(),
+        concept_b: s.conceptB.trim(),
+        category: s.category,
+        result: parsed as never,
+        provider: prov,
+      } as never).then(() => {});
     }
     setLoading(false);
   }

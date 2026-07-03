@@ -71,6 +71,39 @@ export type Database = {
         }
         Relationships: []
       }
+      compare_history: {
+        Row: {
+          id: string
+          user_id: string
+          concept_a: string
+          concept_b: string
+          category: string | null
+          result: Json | null
+          provider: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          concept_a: string
+          concept_b: string
+          category?: string | null
+          result?: Json | null
+          provider?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          concept_a?: string
+          concept_b?: string
+          category?: string | null
+          result?: Json | null
+          provider?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       flashcards: {
         Row: {
           cards: Json
@@ -233,6 +266,42 @@ export type Database = {
           topic?: string | null
           total?: number | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      research_history: {
+        Row: {
+          id: string
+          user_id: string
+          query: string
+          focus_type: string | null
+          report: string | null
+          sources: Json
+          search_source: string | null
+          provider: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          query: string
+          focus_type?: string | null
+          report?: string | null
+          sources?: Json
+          search_source?: string | null
+          provider?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          query?: string
+          focus_type?: string | null
+          report?: string | null
+          sources?: Json
+          search_source?: string | null
+          provider?: string | null
+          created_at?: string
         }
         Relationships: []
       }
