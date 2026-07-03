@@ -46,7 +46,7 @@ async function tryGroq(
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages,
-        max_tokens: 3000,
+        max_tokens: 6000,
       }),
     });
     const body = await res.text();
@@ -83,7 +83,7 @@ async function tryOpenRouter(
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: 3000,
+        max_tokens: 6000,
       }),
     });
     const body = await res.text();
@@ -148,7 +148,7 @@ async function tryCerebras(
       body: JSON.stringify({
         model: "gpt-oss-120b",
         messages,
-        max_tokens: 3000,
+        max_tokens: 6000,
       }),
     });
     const body = await res.text();

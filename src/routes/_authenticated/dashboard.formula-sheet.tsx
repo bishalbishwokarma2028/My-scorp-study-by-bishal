@@ -84,8 +84,8 @@ function makeComponents() {
 
     blockquote({ children }: { children?: React.ReactNode }) {
       return (
-        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
-          <div className="min-w-max text-center text-base sm:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed mx-auto">
+        <div className="my-3 w-full max-w-full rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
+          <div className="w-full text-center text-sm sm:text-lg md:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
             {children}
           </div>
         </div>
@@ -95,17 +95,15 @@ function makeComponents() {
     code({ inline, children }: { inline?: boolean; children?: React.ReactNode }) {
       if (inline) {
         return (
-          <code className="rounded-lg bg-violet-100 px-1.5 py-0.5 text-xs sm:text-sm font-bold font-mono text-violet-700 break-words">
+          <code className="rounded-lg bg-violet-100 px-1.5 py-0.5 text-xs sm:text-sm font-bold font-mono text-violet-700 break-words [overflow-wrap:anywhere]">
             {children}
           </code>
         );
       }
       return (
-        <div className="my-3 max-w-full overflow-x-auto rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
-          <div className="flex justify-center">
-            <span className="text-base sm:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre inline-block">
-              {children}
-            </span>
+        <div className="my-3 w-full max-w-full rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
+          <div className="w-full text-center text-sm sm:text-lg md:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {children}
           </div>
         </div>
       );
@@ -234,7 +232,9 @@ Format: ${FORMAT_OPTIONS.find(x => x.id === s.format)?.label}
 CRITICAL RULES — follow these exactly:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. COMPLETENESS — This is the #1 priority. Before writing, mentally list EVERY formula, law, theorem, identity, and equation that belongs to "${s.topic.trim()}" at a standard school/college syllabus level — including special cases, alternate forms, and related sub-formulas (e.g. for Trigonometry: not just sin/cos/tan but also reciprocal ratios, Pythagorean identities, sum/difference formulas, double angle, half angle, product-to-sum, law of sines/cosines if relevant). Do NOT stop early or truncate the list. Nothing important should be missing. If the topic naturally has more than 15-20 formulas, include all of them, grouped logically — do not artificially limit the count.
+1. COMPLETENESS — This is the #1 priority, more important than length or brevity. "${s.topic.trim()}" almost certainly has MANY sub-areas — before writing, break the topic down into ALL of its natural sub-topics/sections, then go through EACH sub-topic one by one and list EVERY formula, law, theorem, identity, special case, and alternate form that belongs to it. Do not stop after the first few "famous" formulas — go all the way in.
+   Example of the depth expected: for "Trigonometry" you must include — basic ratios (sin, cos, tan, cosec, sec, cot) AND their reciprocal relationships, Pythagorean identities (all 3 forms), co-function identities, sum & difference formulas (sin(A±B), cos(A±B), tan(A±B)), double angle formulas, triple angle formulas, half angle formulas, product-to-sum and sum-to-product formulas, law of sines, law of cosines, law of tangents, area of triangle formulas, general solutions of trig equations, and inverse trig formulas — this is the level of exhaustiveness expected for EVERY topic, not just trigonometry.
+   A typical full topic should realistically produce 20–40+ distinct formulas across all its sub-sections (more if the topic is broad, fewer only if the topic is genuinely narrow). Never artificially cap the count. Never skip a sub-topic to save space. If you are unsure whether to include something, INCLUDE IT.
 
 2. FORMULA DISPLAY — Always put each formula in a fenced code block:
 \`\`\`

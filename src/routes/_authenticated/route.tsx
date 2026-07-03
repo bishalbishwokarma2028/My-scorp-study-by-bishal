@@ -117,7 +117,7 @@ function AuthedLayout() {
       </header>
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 flex-col border-r border-sidebar-border bg-sidebar transition-transform lg:static lg:flex lg:translate-x-0 ${mobileOpen ? "translate-x-0 flex" : "-translate-x-full hidden lg:flex"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 flex-col border-r border-sidebar-border bg-sidebar transition-transform lg:flex lg:translate-x-0 ${mobileOpen ? "translate-x-0 flex" : "-translate-x-full hidden lg:flex"}`}>
         <div className="flex items-center justify-between border-b border-sidebar-border px-5 py-4">
           <Link to="/dashboard" className="flex items-center gap-2 font-bold">
             <img src={logoUrl} alt="ScorpStudy" width={48} height={48} className="h-12 w-12 rounded-xl object-contain" />
@@ -152,7 +152,7 @@ function AuthedLayout() {
       {mobileOpen && <div onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-black/30 lg:hidden" />}
 
       {/* Main */}
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 lg:ml-64">
         <div className="hidden items-center justify-between border-b border-border bg-background/95 px-6 py-3 backdrop-blur lg:flex">
           <div>
             <div className="text-xs text-muted-foreground">
