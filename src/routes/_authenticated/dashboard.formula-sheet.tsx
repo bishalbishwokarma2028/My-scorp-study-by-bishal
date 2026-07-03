@@ -51,6 +51,25 @@ type PageState = {
   provider: string | null;
 };
 
+/* ─── Formula Cleanup Helpers ──────────────────────────────────────────── */
+// Splits lines like "csc θ = 1 / sin θ  ,  sin θ = 1 / csc θ" into two separate
+// lines so paired/related formulas never render comma-joined on one line.
+function splitCommaJoinedFormulas(text: string): string {
+  return text
+    .split("\n")
+    .flatMap((line) => {
+      const trimmed = line.trim();
+      if (!trimmed.includes(",")) return [line];
+      const parts = trimmed.split(",").map((p) => p.trim()).filter(Boolean);
+      const formulaParts = parts.filter((p) => p.includes("="));
+      if (parts.length >= 2 && formulaParts.length === parts.length) {
+        return formulaParts;
+      }
+      return [line];
+    })
+    .join("\n");
+}
+
 /* ─── Custom Markdown Components ──────────────────────────────────────── */
 function makeComponents() {
   const SECTION_COLORS: Record<number, { bg: string; border: string; text: string; dot: string }> = {
@@ -100,10 +119,12 @@ function makeComponents() {
           </code>
         );
       }
+      const raw = Array.isArray(children) ? children.join("") : String(children ?? "");
+      const fixed = splitCommaJoinedFormulas(raw);
       return (
         <div className="my-3 w-full max-w-full rounded-2xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-3 py-3 sm:px-5 sm:py-4 shadow-sm">
           <div className="w-full text-center text-sm sm:text-lg md:text-xl font-bold tracking-wide text-violet-800 font-mono leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-            {children}
+            {fixed}
           </div>
         </div>
       );
@@ -249,6 +270,12 @@ v = u + at
    • Subscripts: write as v₀ v₁ v₂ or V_initial (clear labelling)
    • Integrals: ∫ f(x) dx   Summations: Σᵢ xᵢ   Products: Πᵢ xᵢ
    • Keep each formula SHORT on one line where possible — split very long formulas across two code blocks rather than one extremely wide line, since this must render well on narrow mobile screens
+   • NEVER put two related/paired formulas on the same line separated by a comma (e.g. NEVER write "csc θ = 1 / sin θ , sin θ = 1 / csc θ" on one line — this looks broken and confusing on mobile). If there are two related forms of a formula (like a formula and its inverse/rearranged version), put EACH one on its OWN separate line inside the SAME code block, like:
+   \`\`\`
+   csc θ = 1 / sin θ
+   sin θ = 1 / csc θ
+   \`\`\`
+   This rule applies to every formula group, not just trig — always one formula per line, never comma-joined on a single line.
    EXAMPLES of good formula writing:
    v² = u² + 2as
    F = (G × m₁ × m₂) / r²
