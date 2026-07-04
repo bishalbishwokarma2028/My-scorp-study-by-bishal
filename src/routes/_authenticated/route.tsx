@@ -5,7 +5,8 @@ import {
   LayoutDashboard, MessageSquare, FileText, ListChecks, Layers,
   Image as ImageIcon, StickyNote, Languages, Calculator, BarChart3,
   LogOut, Menu, X, Bell, Code2, GitCompare, Search, Eye,
-  FlaskConical, Sheet,
+  FlaskConical, Sheet, Brain, FileQuestion, Youtube, BookText,
+  Sigma, Microscope,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,6 +25,12 @@ export const Route = createFileRoute("/_authenticated")({
 const navItems = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { to: "/dashboard/chat", label: "Bishal's Assistant", icon: MessageSquare },
+  { to: "/dashboard/solver", label: "Step-by-Step Solver", icon: Brain },
+  { to: "/dashboard/pdf-chat", label: "Chat with PDF", icon: FileQuestion },
+  { to: "/dashboard/youtube", label: "YouTube Summarizer", icon: Youtube },
+  { to: "/dashboard/grammar", label: "Grammar", icon: BookText },
+  { to: "/dashboard/math", label: "Mathematics", icon: Sigma },
+  { to: "/dashboard/science", label: "Science", icon: Microscope },
   { to: "/dashboard/summarizer", label: "Summarizer", icon: FileText },
   { to: "/dashboard/quiz", label: "Quiz Generator", icon: ListChecks },
   { to: "/dashboard/flashcards", label: "Flashcards", icon: Layers },

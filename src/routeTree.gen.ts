@@ -13,16 +13,22 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
+import { Route as AuthenticatedDashboardYoutubeRouteImport } from './routes/_authenticated/dashboard.youtube'
 import { Route as AuthenticatedDashboardVisualExplainerRouteImport } from './routes/_authenticated/dashboard.visual-explainer'
 import { Route as AuthenticatedDashboardTranslatorRouteImport } from './routes/_authenticated/dashboard.translator'
 import { Route as AuthenticatedDashboardSummarizerRouteImport } from './routes/_authenticated/dashboard.summarizer'
+import { Route as AuthenticatedDashboardSolverRouteImport } from './routes/_authenticated/dashboard.solver'
+import { Route as AuthenticatedDashboardScienceRouteImport } from './routes/_authenticated/dashboard.science'
 import { Route as AuthenticatedDashboardResearchRouteImport } from './routes/_authenticated/dashboard.research'
 import { Route as AuthenticatedDashboardQuizRouteImport } from './routes/_authenticated/dashboard.quiz'
+import { Route as AuthenticatedDashboardPdfChatRouteImport } from './routes/_authenticated/dashboard.pdf-chat'
 import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
 import { Route as AuthenticatedDashboardMockTestRouteImport } from './routes/_authenticated/dashboard.mock-test'
 import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
+import { Route as AuthenticatedDashboardMathRouteImport } from './routes/_authenticated/dashboard.math'
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
+import { Route as AuthenticatedDashboardGrammarRouteImport } from './routes/_authenticated/dashboard.grammar'
 import { Route as AuthenticatedDashboardFormulaSheetRouteImport } from './routes/_authenticated/dashboard.formula-sheet'
 import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
 import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
@@ -50,6 +56,12 @@ const AuthenticatedDashboardIndexRoute =
     path: '/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardYoutubeRoute =
+  AuthenticatedDashboardYoutubeRouteImport.update({
+    id: '/dashboard/youtube',
+    path: '/dashboard/youtube',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardVisualExplainerRoute =
   AuthenticatedDashboardVisualExplainerRouteImport.update({
     id: '/dashboard/visual-explainer',
@@ -68,6 +80,18 @@ const AuthenticatedDashboardSummarizerRoute =
     path: '/dashboard/summarizer',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardSolverRoute =
+  AuthenticatedDashboardSolverRouteImport.update({
+    id: '/dashboard/solver',
+    path: '/dashboard/solver',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardScienceRoute =
+  AuthenticatedDashboardScienceRouteImport.update({
+    id: '/dashboard/science',
+    path: '/dashboard/science',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardResearchRoute =
   AuthenticatedDashboardResearchRouteImport.update({
     id: '/dashboard/research',
@@ -78,6 +102,12 @@ const AuthenticatedDashboardQuizRoute =
   AuthenticatedDashboardQuizRouteImport.update({
     id: '/dashboard/quiz',
     path: '/dashboard/quiz',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardPdfChatRoute =
+  AuthenticatedDashboardPdfChatRouteImport.update({
+    id: '/dashboard/pdf-chat',
+    path: '/dashboard/pdf-chat',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardNotesRoute =
@@ -98,6 +128,12 @@ const AuthenticatedDashboardMindmapRoute =
     path: '/dashboard/mindmap',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardMathRoute =
+  AuthenticatedDashboardMathRouteImport.update({
+    id: '/dashboard/math',
+    path: '/dashboard/math',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardImageGenRoute =
   AuthenticatedDashboardImageGenRouteImport.update({
     id: '/dashboard/image-gen',
@@ -108,6 +144,12 @@ const AuthenticatedDashboardHistoryRoute =
   AuthenticatedDashboardHistoryRouteImport.update({
     id: '/dashboard/history',
     path: '/dashboard/history',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardGrammarRoute =
+  AuthenticatedDashboardGrammarRouteImport.update({
+    id: '/dashboard/grammar',
+    path: '/dashboard/grammar',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardFormulaSheetRoute =
@@ -156,16 +198,22 @@ export interface FileRoutesByFullPath {
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
+  '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
+  '/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
+  '/dashboard/pdf-chat': typeof AuthenticatedDashboardPdfChatRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
   '/dashboard/research': typeof AuthenticatedDashboardResearchRoute
+  '/dashboard/science': typeof AuthenticatedDashboardScienceRoute
+  '/dashboard/solver': typeof AuthenticatedDashboardSolverRoute
   '/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
+  '/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRoutesByTo {
@@ -177,16 +225,22 @@ export interface FileRoutesByTo {
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
+  '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
+  '/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
+  '/dashboard/pdf-chat': typeof AuthenticatedDashboardPdfChatRoute
   '/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
   '/dashboard/research': typeof AuthenticatedDashboardResearchRoute
+  '/dashboard/science': typeof AuthenticatedDashboardScienceRoute
+  '/dashboard/solver': typeof AuthenticatedDashboardSolverRoute
   '/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
+  '/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRoutesById {
@@ -200,16 +254,22 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
   '/_authenticated/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/_authenticated/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
+  '/_authenticated/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
+  '/_authenticated/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/_authenticated/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/_authenticated/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/_authenticated/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
+  '/_authenticated/dashboard/pdf-chat': typeof AuthenticatedDashboardPdfChatRoute
   '/_authenticated/dashboard/quiz': typeof AuthenticatedDashboardQuizRoute
   '/_authenticated/dashboard/research': typeof AuthenticatedDashboardResearchRoute
+  '/_authenticated/dashboard/science': typeof AuthenticatedDashboardScienceRoute
+  '/_authenticated/dashboard/solver': typeof AuthenticatedDashboardSolverRoute
   '/_authenticated/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/_authenticated/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/_authenticated/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
+  '/_authenticated/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRouteTypes {
@@ -223,16 +283,22 @@ export interface FileRouteTypes {
     | '/dashboard/compare'
     | '/dashboard/flashcards'
     | '/dashboard/formula-sheet'
+    | '/dashboard/grammar'
     | '/dashboard/history'
     | '/dashboard/image-gen'
+    | '/dashboard/math'
     | '/dashboard/mindmap'
     | '/dashboard/mock-test'
     | '/dashboard/notes'
+    | '/dashboard/pdf-chat'
     | '/dashboard/quiz'
     | '/dashboard/research'
+    | '/dashboard/science'
+    | '/dashboard/solver'
     | '/dashboard/summarizer'
     | '/dashboard/translator'
     | '/dashboard/visual-explainer'
+    | '/dashboard/youtube'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -244,16 +310,22 @@ export interface FileRouteTypes {
     | '/dashboard/compare'
     | '/dashboard/flashcards'
     | '/dashboard/formula-sheet'
+    | '/dashboard/grammar'
     | '/dashboard/history'
     | '/dashboard/image-gen'
+    | '/dashboard/math'
     | '/dashboard/mindmap'
     | '/dashboard/mock-test'
     | '/dashboard/notes'
+    | '/dashboard/pdf-chat'
     | '/dashboard/quiz'
     | '/dashboard/research'
+    | '/dashboard/science'
+    | '/dashboard/solver'
     | '/dashboard/summarizer'
     | '/dashboard/translator'
     | '/dashboard/visual-explainer'
+    | '/dashboard/youtube'
     | '/dashboard'
   id:
     | '__root__'
@@ -266,16 +338,22 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/compare'
     | '/_authenticated/dashboard/flashcards'
     | '/_authenticated/dashboard/formula-sheet'
+    | '/_authenticated/dashboard/grammar'
     | '/_authenticated/dashboard/history'
     | '/_authenticated/dashboard/image-gen'
+    | '/_authenticated/dashboard/math'
     | '/_authenticated/dashboard/mindmap'
     | '/_authenticated/dashboard/mock-test'
     | '/_authenticated/dashboard/notes'
+    | '/_authenticated/dashboard/pdf-chat'
     | '/_authenticated/dashboard/quiz'
     | '/_authenticated/dashboard/research'
+    | '/_authenticated/dashboard/science'
+    | '/_authenticated/dashboard/solver'
     | '/_authenticated/dashboard/summarizer'
     | '/_authenticated/dashboard/translator'
     | '/_authenticated/dashboard/visual-explainer'
+    | '/_authenticated/dashboard/youtube'
     | '/_authenticated/dashboard/'
   fileRoutesById: FileRoutesById
 }
@@ -315,6 +393,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/youtube': {
+      id: '/_authenticated/dashboard/youtube'
+      path: '/dashboard/youtube'
+      fullPath: '/dashboard/youtube'
+      preLoaderRoute: typeof AuthenticatedDashboardYoutubeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/visual-explainer': {
       id: '/_authenticated/dashboard/visual-explainer'
       path: '/dashboard/visual-explainer'
@@ -336,6 +421,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardSummarizerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/solver': {
+      id: '/_authenticated/dashboard/solver'
+      path: '/dashboard/solver'
+      fullPath: '/dashboard/solver'
+      preLoaderRoute: typeof AuthenticatedDashboardSolverRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/science': {
+      id: '/_authenticated/dashboard/science'
+      path: '/dashboard/science'
+      fullPath: '/dashboard/science'
+      preLoaderRoute: typeof AuthenticatedDashboardScienceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/research': {
       id: '/_authenticated/dashboard/research'
       path: '/dashboard/research'
@@ -348,6 +447,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/quiz'
       fullPath: '/dashboard/quiz'
       preLoaderRoute: typeof AuthenticatedDashboardQuizRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/pdf-chat': {
+      id: '/_authenticated/dashboard/pdf-chat'
+      path: '/dashboard/pdf-chat'
+      fullPath: '/dashboard/pdf-chat'
+      preLoaderRoute: typeof AuthenticatedDashboardPdfChatRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard/notes': {
@@ -371,6 +477,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardMindmapRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/math': {
+      id: '/_authenticated/dashboard/math'
+      path: '/dashboard/math'
+      fullPath: '/dashboard/math'
+      preLoaderRoute: typeof AuthenticatedDashboardMathRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/image-gen': {
       id: '/_authenticated/dashboard/image-gen'
       path: '/dashboard/image-gen'
@@ -383,6 +496,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/history'
       fullPath: '/dashboard/history'
       preLoaderRoute: typeof AuthenticatedDashboardHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/grammar': {
+      id: '/_authenticated/dashboard/grammar'
+      path: '/dashboard/grammar'
+      fullPath: '/dashboard/grammar'
+      preLoaderRoute: typeof AuthenticatedDashboardGrammarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard/formula-sheet': {
@@ -437,16 +557,22 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardCompareRoute: typeof AuthenticatedDashboardCompareRoute
   AuthenticatedDashboardFlashcardsRoute: typeof AuthenticatedDashboardFlashcardsRoute
   AuthenticatedDashboardFormulaSheetRoute: typeof AuthenticatedDashboardFormulaSheetRoute
+  AuthenticatedDashboardGrammarRoute: typeof AuthenticatedDashboardGrammarRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
+  AuthenticatedDashboardMathRoute: typeof AuthenticatedDashboardMathRoute
   AuthenticatedDashboardMindmapRoute: typeof AuthenticatedDashboardMindmapRoute
   AuthenticatedDashboardMockTestRoute: typeof AuthenticatedDashboardMockTestRoute
   AuthenticatedDashboardNotesRoute: typeof AuthenticatedDashboardNotesRoute
+  AuthenticatedDashboardPdfChatRoute: typeof AuthenticatedDashboardPdfChatRoute
   AuthenticatedDashboardQuizRoute: typeof AuthenticatedDashboardQuizRoute
   AuthenticatedDashboardResearchRoute: typeof AuthenticatedDashboardResearchRoute
+  AuthenticatedDashboardScienceRoute: typeof AuthenticatedDashboardScienceRoute
+  AuthenticatedDashboardSolverRoute: typeof AuthenticatedDashboardSolverRoute
   AuthenticatedDashboardSummarizerRoute: typeof AuthenticatedDashboardSummarizerRoute
   AuthenticatedDashboardTranslatorRoute: typeof AuthenticatedDashboardTranslatorRoute
   AuthenticatedDashboardVisualExplainerRoute: typeof AuthenticatedDashboardVisualExplainerRoute
+  AuthenticatedDashboardYoutubeRoute: typeof AuthenticatedDashboardYoutubeRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
 }
 
@@ -458,17 +584,23 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardFlashcardsRoute: AuthenticatedDashboardFlashcardsRoute,
   AuthenticatedDashboardFormulaSheetRoute:
     AuthenticatedDashboardFormulaSheetRoute,
+  AuthenticatedDashboardGrammarRoute: AuthenticatedDashboardGrammarRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
   AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
+  AuthenticatedDashboardMathRoute: AuthenticatedDashboardMathRoute,
   AuthenticatedDashboardMindmapRoute: AuthenticatedDashboardMindmapRoute,
   AuthenticatedDashboardMockTestRoute: AuthenticatedDashboardMockTestRoute,
   AuthenticatedDashboardNotesRoute: AuthenticatedDashboardNotesRoute,
+  AuthenticatedDashboardPdfChatRoute: AuthenticatedDashboardPdfChatRoute,
   AuthenticatedDashboardQuizRoute: AuthenticatedDashboardQuizRoute,
   AuthenticatedDashboardResearchRoute: AuthenticatedDashboardResearchRoute,
+  AuthenticatedDashboardScienceRoute: AuthenticatedDashboardScienceRoute,
+  AuthenticatedDashboardSolverRoute: AuthenticatedDashboardSolverRoute,
   AuthenticatedDashboardSummarizerRoute: AuthenticatedDashboardSummarizerRoute,
   AuthenticatedDashboardTranslatorRoute: AuthenticatedDashboardTranslatorRoute,
   AuthenticatedDashboardVisualExplainerRoute:
     AuthenticatedDashboardVisualExplainerRoute,
+  AuthenticatedDashboardYoutubeRoute: AuthenticatedDashboardYoutubeRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
 }
 
