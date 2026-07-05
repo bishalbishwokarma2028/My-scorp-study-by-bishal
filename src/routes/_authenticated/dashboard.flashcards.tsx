@@ -122,7 +122,7 @@ function FlashcardsPage() {
 
   if (!cards) {
     return (
-      <div className="card-soft mx-auto max-w-xl space-y-5 p-4 sm:p-6">
+      <div className="card-soft mx-auto max-w-xl space-y-5 p-4 sm:p-6 lg:max-w-3xl">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-lg font-semibold">Make flashcards</h2>
           <QuotaBadge quota={quota} loading={quotaLoading} />
@@ -185,7 +185,7 @@ function FlashcardsPage() {
       </div>
 
       {mode === "flip" && (
-        <div className="mx-auto max-w-xl">
+        <div className="mx-auto max-w-xl lg:max-w-2xl">
           <div onClick={() => setFlipped(!flipped)} className="flip-card cursor-pointer">
             <div className={`flip-inner relative w-full rounded-2xl ${isLongAnswer ? "min-h-[200px]" : "h-64"} ${flipped ? "[transform:rotateY(180deg)]" : ""}`}>
               <div className="flip-face absolute inset-0 grid place-items-center rounded-2xl bg-primary p-6 text-center text-primary-foreground card-soft">
@@ -211,7 +211,7 @@ function FlashcardsPage() {
       )}
 
       {mode === "type" && (
-        <div className="card-soft mx-auto max-w-xl p-6 text-center">
+        <div className="card-soft mx-auto max-w-xl p-6 text-center lg:max-w-2xl">
           <p className="text-sm text-muted-foreground">{idx + 1} / {cards.length}</p>
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mt-1">{info.frontLabel}</p>
           <p className="my-4 text-xl font-semibold">{cards[idx].front}</p>
@@ -243,7 +243,7 @@ function MatchMode({ cards, matches, setMatches, selQ, setSelQ }: {
     if (matches.length + 1 === subset.length) toast.success("All matched!");
   }
   return (
-    <div className="card-soft mx-auto grid max-w-3xl gap-4 p-6 sm:grid-cols-2">
+    <div className="card-soft mx-auto grid max-w-3xl gap-4 p-6 sm:grid-cols-2 lg:max-w-5xl">
       <div className="space-y-2">
         <p className="text-xs font-semibold text-muted-foreground">Questions</p>
         {subset.map((c, i) => (

@@ -1170,7 +1170,7 @@ Return STRICT JSON only (no prose, no markdown fences):
   ];
 
   return (
-    <div className="fixed inset-x-0 top-14 bottom-0 flex flex-col overflow-hidden bg-white sm:relative sm:inset-auto sm:mx-auto sm:mt-0 sm:h-[calc(100vh-10rem)] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-border sm:shadow-sm">
+    <div className="fixed inset-x-0 top-14 bottom-0 flex flex-col overflow-hidden bg-white sm:relative sm:inset-auto sm:mx-auto sm:mt-0 sm:h-[calc(100vh-10rem)] sm:max-w-4xl sm:rounded-3xl sm:border sm:border-border sm:shadow-sm lg:max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5 sm:px-5 sm:py-3.5">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">

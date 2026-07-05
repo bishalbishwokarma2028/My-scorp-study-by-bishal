@@ -238,7 +238,7 @@ function QuizPage() {
     const q = questions[current];
     const open = isOpenEnded(type);
     return (
-      <div className="card-soft mx-auto max-w-2xl space-y-5 p-4 sm:p-6">
+      <div className="card-soft mx-auto max-w-2xl space-y-5 p-4 sm:p-6 lg:max-w-4xl">
         <div>
           <div className="mb-2 flex justify-between text-xs text-muted-foreground"><span>Question {current + 1} of {questions.length}</span><ProviderBadge provider={provider} /></div>
           <div className="h-1.5 overflow-hidden rounded bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${((current + 1) / questions.length) * 100}%` }} /></div>
@@ -277,7 +277,7 @@ function QuizPage() {
   ];
 
   return (
-    <div className="card-soft mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
+    <div className="card-soft mx-auto max-w-2xl space-y-4 p-4 sm:p-6 lg:max-w-4xl">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Generate a quiz</h2>
         <QuotaBadge quota={quota} loading={quotaLoading} />

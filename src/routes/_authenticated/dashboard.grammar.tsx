@@ -340,7 +340,7 @@ function GrammarPage() {
   const cat = GRAMMAR_TOPICS.find(g => g.topics.some(t => t === selectedTopic));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-5xl lg:max-w-6xl">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-lg font-bold">English Grammar</h2>

@@ -239,7 +239,7 @@ STRICT RULES:
   // ── Upload screen ──────────────────────────────────────────────────────────
   if (!pdfText && !extracting) {
     return (
-      <div className="mx-auto max-w-2xl space-y-5 px-1">
+      <div className="mx-auto max-w-2xl space-y-5 px-1 lg:max-w-4xl">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold">Chat with Your PDF</h2>
@@ -311,7 +311,7 @@ STRICT RULES:
 
   // ── Chat screen ────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100dvh - 7rem)" }}>
+    <div className="mx-auto flex max-w-2xl flex-col lg:max-w-4xl" style={{ height: "calc(100dvh - 7rem)" }}>
       {/* Doc info bar */}
       <div className="mb-2 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 flex-shrink-0">
         <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg bg-violet-200">

@@ -13,6 +13,7 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { richMarkdownComponents } from "@/components/rich-markdown";
 
 export const Route = createFileRoute("/_authenticated/dashboard/youtube")({
   component: YoutubePage,
@@ -55,21 +56,20 @@ VIDEO TITLE: "${title}"
 SOURCE MATERIAL:
 ${content.slice(0, 13000)}
 
-Write a richly formatted Markdown study summary using ONLY the information in the source material above. Do NOT add information from your general knowledge.
+Write a richly formatted Markdown study summary using ONLY the information in the source material above. Do NOT add information from your general knowledge. Match the same polished, highlighted formatting style used in the ScorpStudy Deep Research reports.
 
 ## Formatting Requirements:
-- Start with a compelling **Overview** paragraph (2-3 sentences of what this content covers)
-- Use ## for major section headings
-- Use **bold** for ALL key terms, concepts, formulas, names, and important facts
-- Highlight statistics, dates, specific numbers in **bold**
-- Use ==highlighted text== style by wrapping in **bold** for the single most critical insight per section
+- Start section headings with one of these emoji so they render as styled section cards: 🔍 (overview), 📌 (key points), 📖 (detailed breakdown), 📊 (facts/stats), 📝 (notes), ✅ (conclusion), 🎯 (takeaways) — e.g. "## 📖 How It Works"
+- Start with a "## 🔍 Overview" section — a compelling 2-3 sentence summary of what this content covers
+- Use ## for every major section heading (at least 4 major sections)
+- Use **bold** for ALL key terms, concepts, formulas, names, dates, statistics, and important facts — bold liberally, every section should have several bolded terms
 - Use > blockquotes for the most critical takeaways: > 💡 **Key insight:** ...
 - Use > ⚠️ **Important:** for warnings or common mistakes
 - Use > 📌 **Definition:** for key definitions
 - Use numbered lists for steps or sequential content
 - Use bullet lists with specific facts, not vague statements
-- End with ## 🎯 Key Takeaways listing 4-6 specific, actionable bullets
-- Include at least 4 major sections
+- If the source material contains data suited to a table (comparisons, stats, timelines), include a Markdown table
+- End with "## 🎯 Key Takeaways" listing 4-6 specific, actionable bullets with the most important words in **bold**
 - Be comprehensive but only based on the source material provided`;
 }
 
@@ -332,7 +332,7 @@ function YoutubePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4 lg:max-w-5xl">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -478,18 +478,10 @@ function YoutubePage() {
                 </p>
               </div>
             ) : activeTab === "summary" && tabContent.summary ? (
-              <div className="prose prose-sm max-w-none overflow-x-hidden
-                prose-headings:font-bold prose-headings:text-foreground
-                prose-h2:text-sm prose-h2:mt-5 prose-h2:mb-2.5 prose-h2:border-b prose-h2:pb-1.5 prose-h2:border-border
-                prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1.5
-                prose-p:leading-relaxed prose-p:text-foreground/85 prose-p:my-1.5
-                prose-strong:text-foreground prose-strong:font-bold prose-strong:bg-yellow-100 prose-strong:px-0.5 prose-strong:rounded
-                prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:rounded-r-xl prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:not-italic prose-blockquote:text-foreground/90
-                prose-ul:space-y-1 prose-li:text-foreground/85 prose-li:leading-relaxed
-                prose-ol:space-y-1
-                prose-code:bg-muted prose-code:px-1.5 prose-code:rounded prose-code:text-xs
-                prose-a:text-primary">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{tabContent.summary}</ReactMarkdown>
+              <div className="overflow-x-hidden">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={richMarkdownComponents}>
+                  {tabContent.summary}
+                </ReactMarkdown>
               </div>
             ) : activeTab === "keypoints" && Array.isArray(tabContent.keypoints) ? (
               <div className="space-y-2.5">

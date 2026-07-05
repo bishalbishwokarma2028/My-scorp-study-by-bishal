@@ -284,7 +284,7 @@ function SolverPage() {
   const allRevealed = revealed.length > 0 && revealed.every(Boolean);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="mx-auto max-w-2xl space-y-5 lg:max-w-4xl">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
