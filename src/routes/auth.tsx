@@ -134,7 +134,7 @@ function AuthPage() {
           <div className="mt-12 grid grid-cols-2 gap-3">
             {[
               { n: "24/7", l: "Always Available" },
-              { n: "9+", l: "Study Tools" },
+              { n: "21+", l: "Study Tools" },
               { n: "60+", l: "Languages" },
               { n: "Free", l: "Forever" },
             ].map((s) => (

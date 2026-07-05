@@ -4,6 +4,7 @@ import {
   MessageSquare, ListChecks, StickyNote, Image as ImageIcon, Sparkles, Flame,
   FileText, Layers, BookOpen, TrendingUp, Star, ArrowRight, Brain,
   Code2, GitCompare, Search, Eye, Languages, Calculator, FlaskConical, Sheet,
+  FileQuestion, Youtube, BookText, Sigma, Microscope,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDailyTip } from "@/hooks/useDailyTip";
@@ -14,6 +15,12 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
 
 const quickStart = [
   { to: "/dashboard/chat",             label: "Bishal's Assistant", sub: "Ask anything, get explained",  icon: MessageSquare, grad: "from-blue-500 to-cyan-500" },
+  { to: "/dashboard/solver",           label: "Step-by-Step Solver", sub: "Full worked solutions",       icon: Brain,         grad: "from-blue-500 to-indigo-600" },
+  { to: "/dashboard/pdf-chat",         label: "Chat with PDF",     sub: "Ask questions about any PDF",   icon: FileQuestion,  grad: "from-violet-500 to-fuchsia-600" },
+  { to: "/dashboard/youtube",          label: "YouTube Summarizer", sub: "Summarize any video",          icon: Youtube,       grad: "from-red-500 to-rose-600" },
+  { to: "/dashboard/grammar",          label: "Grammar",           sub: "Rules, examples & practice",    icon: BookText,      grad: "from-cyan-500 to-blue-600" },
+  { to: "/dashboard/math",             label: "Mathematics",       sub: "Formulas & worked examples",    icon: Sigma,         grad: "from-indigo-500 to-purple-600" },
+  { to: "/dashboard/science",          label: "Science",           sub: "Physics, Chem & Biology",       icon: Microscope,    grad: "from-emerald-500 to-green-600" },
   { to: "/dashboard/summarizer",       label: "Summarizer",        sub: "Condense any content fast",     icon: FileText,      grad: "from-violet-500 to-purple-500" },
   { to: "/dashboard/quiz",             label: "Quiz Yourself",     sub: "Custom practice tests",         icon: ListChecks,    grad: "from-fuchsia-500 to-purple-500" },
   { to: "/dashboard/flashcards",       label: "Flashcards",        sub: "Spaced repetition study",       icon: Layers,        grad: "from-pink-500 to-rose-500" },

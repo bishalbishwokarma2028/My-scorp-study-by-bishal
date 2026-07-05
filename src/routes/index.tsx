@@ -4,7 +4,7 @@ import {
   Sparkles, Globe, Clock, Star, Shield, ArrowRight, Calculator as CalcIcon, FlaskConical,
   Atom, History as HistoryIcon, Code2, Languages as LangIcon, BarChart3, Music, Palette,
   CheckCircle2, XCircle, Zap, TrendingUp, Brain, Map, ExternalLink, GraduationCap, Trophy,
-  GitCompare, Search, Eye,
+  GitCompare, Search, Eye, FileQuestion, Youtube, BookText, Sigma, Microscope,
 } from "lucide-react";
 import logoUrl from "@/assets/scorpstudy-logo.png";
 
@@ -42,6 +42,12 @@ const features = [
   { icon: Search, title: "Deep Research", desc: "Enter any topic and get a structured, web-powered research report — with sources, key findings, and analysis you can actually use for assignments.", color: "from-teal-500 to-cyan-600" },
   { icon: Eye, title: "Visual Explainer", desc: "Turn any topic into an interactive Mind Map, Flowchart, or Concept Web. Click any node to get a full explanation of that specific idea.", color: "from-emerald-500 to-teal-600" },
   { icon: GitCompare, title: "Compare Concepts", desc: "Pick two topics and get a structured side-by-side comparison — definitions, key differences, similarities, and exam tips all in one place.", color: "from-indigo-500 to-blue-600" },
+  { icon: Brain, title: "Step-by-Step Solver", desc: "Paste any math, physics, or chemistry problem and get a full step-by-step solution — every step of reasoning explained, not just the final answer.", color: "from-blue-500 to-indigo-600" },
+  { icon: FileQuestion, title: "Chat with PDF", desc: "Upload any textbook, paper, or notes as a PDF and ask questions directly. Bishal's Assistant reads the whole document and answers straight from it.", color: "from-violet-500 to-fuchsia-600" },
+  { icon: Youtube, title: "YouTube Summarizer", desc: "Paste any YouTube video link and get a richly formatted summary, key points, auto-generated flashcards, and a quiz — straight from the video.", color: "from-red-500 to-rose-600", badge: "New" },
+  { icon: BookText, title: "Grammar", desc: "A complete English grammar reference with clear rules, examples, practice exercises, and an AI tutor to clear every doubt instantly.", color: "from-cyan-500 to-blue-600" },
+  { icon: Sigma, title: "Mathematics", desc: "Every math topic explained with formulas, worked examples, step-by-step practice questions, and an AI chat for follow-up questions.", color: "from-indigo-500 to-purple-600" },
+  { icon: Microscope, title: "Science", desc: "Physics, Chemistry, Biology, and Earth Science — explained with real experiments, diagrams, and an AI tutor for every single topic.", color: "from-emerald-500 to-green-600" },
 ];
 
 const subjects = [
@@ -125,7 +131,7 @@ function Landing() {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-200 px-4 py-1.5 text-xs font-semibold text-violet-700"><Brain className="h-3.5 w-3.5" /> AI-powered study tutor</span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-4 py-1.5 text-xs font-semibold text-emerald-700"><Shield className="h-3.5 w-3.5" /> 100% Free — no paywalls</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-4 py-1.5 text-xs font-semibold text-blue-700"><Zap className="h-3.5 w-3.5" /> 9 study tools in one app</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-4 py-1.5 text-xs font-semibold text-blue-700"><Zap className="h-3.5 w-3.5" /> 21 study tools in one app</span>
           </div>
         </div>
       </section>
@@ -136,7 +142,7 @@ function Landing() {
           {[
             { icon: Globe, n: "60+", l: "Languages" },
             { icon: Clock, n: "24/7", l: "Available" },
-            { icon: GraduationCap, n: "9+", l: "Tools" },
+            { icon: GraduationCap, n: "21+", l: "Tools" },
             { icon: Star, n: "Free", l: "Forever" },
           ].map((s) => (
             <div key={s.l} className="text-center">
@@ -160,7 +166,7 @@ function Landing() {
             {[
               { i: Zap, n: "01", t: "Sign Up Free", d: "Create your account in under 30 seconds. No credit card required. Set up your learning profile — level, goals, preferred language.", color: "bg-violet-100 text-violet-700" },
               { i: Brain, n: "02", t: "Meet Bishal's Assistant", d: "Tell ScorpStudy your study level, goals, and preferred language. Bishal's Assistant adapts every response to suit you perfectly.", color: "bg-blue-100 text-blue-700" },
-              { i: TrendingUp, n: "03", t: "Study Smarter", d: "Use all 9 tools together. Chat, quiz yourself, make notes, summarize content, build mind maps, and track your progress daily.", color: "bg-emerald-100 text-emerald-700" },
+              { i: TrendingUp, n: "03", t: "Study Smarter", d: "Use all 21 tools together. Chat, quiz yourself, make notes, summarize content, build mind maps, and track your progress daily.", color: "bg-emerald-100 text-emerald-700" },
             ].map((s, i, arr) => (
               <div key={s.n} className="relative rounded-2xl border border-border bg-white p-7 shadow-sm hover:shadow-md transition">
                 <div className="flex items-start justify-between">
@@ -181,7 +187,7 @@ function Landing() {
         <div className="text-center">
           <div className="text-xs font-bold tracking-widest text-violet-600 uppercase">Features</div>
           <h2 className="mt-2 text-3xl font-bold sm:text-4xl">Everything you need to ace your exams</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">Nine powerful tools powered by Bishal's Assistant — built specifically for students, from school to university, in any subject.</p>
+          <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">21 powerful tools powered by Bishal's Assistant — built specifically for students, from school to university, in any subject.</p>
         </div>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => (
