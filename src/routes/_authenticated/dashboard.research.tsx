@@ -159,6 +159,13 @@ FOCUS: ${focusLabel}
 LIVE WEB CONTEXT (use as primary source):
 ${webCtx.context || "No live web data available — use training knowledge."}
 
+ACCURACY RULES (critical):
+- Every claim must be factual, well-verified, and unbiased. Never speculate, guess, or invent statistics, names, or dates.
+- Prioritize information from the LIVE WEB CONTEXT above your own training knowledge — it is more current and reliable.
+- Prefer reputable, trustworthy sources (established institutions, official bodies, peer-reviewed or widely-cited publications) over unverified claims.
+- If the live web context does not clearly support a fact, do not state it as certain — qualify it or omit it.
+- Present multiple perspectives fairly when a topic is contested; do not favor one viewpoint without evidence.
+
 Write a comprehensive markdown research report using these EXACT section headers:
 
 ## 🔍 Executive Summary
@@ -188,7 +195,7 @@ FORMATTING RULES:
 - Make it thorough enough that a student could write an essay from this report alone`;
 
       const res = await askAI(prompt,
-        "You are an expert research assistant. Write comprehensive, beautifully formatted research reports with rich markdown — bold key terms, tables, and blockquotes throughout.");
+        "You are an expert research assistant. Write comprehensive, beautifully formatted research reports with rich markdown — bold key terms, tables, and blockquotes throughout. Every fact must be accurate, well-verified, and unbiased — prioritize reliable, trustworthy sources and never fabricate information.");
       set({ provider: res.provider, report: res.text });
       await bump();
 

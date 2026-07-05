@@ -9,6 +9,7 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/math")({
   component: MathPage,
@@ -270,8 +271,8 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
         <div className="max-h-80 overflow-y-auto space-y-3 p-4">
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-2 ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-              <div className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}>
-                {m.role === "user" ? "You" : "AI"}
+              <div className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold overflow-hidden ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-white border border-primary/20"}`}>
+                {m.role === "user" ? "You" : <img src={logo} alt="Assistant" className="h-full w-full object-contain p-0.5" />}
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
@@ -284,7 +285,9 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
           ))}
           {loading && (
             <div className="flex gap-2">
-              <div className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">AI</div>
+              <div className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-white border border-primary/20 overflow-hidden">
+                <img src={logo} alt="Assistant" className="h-full w-full object-contain p-0.5" />
+              </div>
               <div className="rounded-2xl rounded-tl-sm bg-muted/50 px-3 py-2.5">
                 <div className="flex gap-1">{[0,150,300].map(d => <span key={d} className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div>
               </div>
@@ -416,7 +419,7 @@ function MathPage() {
               {/* Tabs */}
               <div className="flex gap-2">
                 {(["learn", "practice"] as const).map(s => (
-                  <button key={s} onClick={() => setSection(s)}
+                  <button key={s} onClick={() => set({ section: s })}
                     className={`rounded-xl px-5 py-2 text-sm font-bold capitalize transition-all ${section === s ? "bg-primary text-primary-foreground" : "border border-border hover:bg-accent"}`}>
                     {s === "learn" ? "📚 Learn" : "✏️ Practice"}
                   </button>
@@ -463,7 +466,7 @@ function MathPage() {
                     <div className="space-y-3">
                       {mathData.worked_examples.map((ex, i) => (
                         <div key={i} className="rounded-xl border border-border overflow-hidden">
-                          <button onClick={() => setExpandedExample(expandedExample === i ? null : i)}
+                          <button onClick={() => set({ expandedExample: expandedExample === i ? null : i })}
                             className="flex w-full items-center gap-3 px-4 py-3 text-left bg-muted/20 hover:bg-muted/40">
                             <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full ${activeSubject.color} text-xs font-bold text-white`}>{i + 1}</span>
                             <div className="min-w-0 flex-1">

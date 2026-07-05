@@ -37,6 +37,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    // If this crash is caused by a stale JS chunk (e.g. right after a new
+    // deploy), auto-recover with a hard reload instead of showing the
+    // "This page didn't load" screen.
+    if (/failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i.test(error.message || "")) {
+      const last = Number(sessionStorage.getItem("scorpstudy_chunk_reload_at") || 0);
+      const now = Date.now();
+      if (now - last >= 10_000) {
+        sessionStorage.setItem("scorpstudy_chunk_reload_at", String(now));
+        window.location.reload();
+      }
+    }
   }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -204,6 +215,19 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+const CHUNK_ERROR_RE = /failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|failed to fetch/i;
+const RELOAD_GUARD_KEY = "scorpstudy_chunk_reload_at";
+
+function forceReloadOnStaleChunk() {
+  if (typeof window === "undefined") return;
+  // Avoid infinite reload loops — only auto-reload once per 10s window.
+  const last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
+  const now = Date.now();
+  if (now - last < 10_000) return;
+  sessionStorage.setItem(RELOAD_GUARD_KEY, String(now));
+  window.location.reload();
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
@@ -216,6 +240,32 @@ function RootComponent() {
     });
     return () => sub.subscription.unsubscribe();
   }, [queryClient, router]);
+
+  // Recover from stale JS chunk references after a new deploy (common on
+  // mobile browsers that keep old tabs open across releases). Vite fires
+  // "vite:preloadError" for this; we also catch the generic error/rejection
+  // path as a fallback for browsers/routers that surface it differently.
+  useEffect(() => {
+    function onPreloadError(event: Event) {
+      event.preventDefault?.();
+      forceReloadOnStaleChunk();
+    }
+    function onError(event: ErrorEvent) {
+      if (CHUNK_ERROR_RE.test(event.message || "")) forceReloadOnStaleChunk();
+    }
+    function onRejection(event: PromiseRejectionEvent) {
+      const msg = event.reason?.message || String(event.reason || "");
+      if (CHUNK_ERROR_RE.test(msg)) forceReloadOnStaleChunk();
+    }
+    window.addEventListener("vite:preloadError", onPreloadError);
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("vite:preloadError", onPreloadError);
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

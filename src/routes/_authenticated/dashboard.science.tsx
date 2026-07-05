@@ -9,6 +9,7 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/science")({
   component: SciencePage,
@@ -411,8 +412,8 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
         <div className="max-h-80 overflow-y-auto space-y-3 p-4">
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-2 ${m.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-              <div className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"}`}>
-                {m.role === "user" ? "You" : "AI"}
+              <div className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold overflow-hidden ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-white border border-primary/20"}`}>
+                {m.role === "user" ? "You" : <img src={logo} alt="Assistant" className="h-full w-full object-contain p-0.5" />}
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
@@ -425,7 +426,9 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
           ))}
           {loading && (
             <div className="flex gap-2">
-              <div className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">AI</div>
+              <div className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-full bg-white border border-primary/20 overflow-hidden">
+                <img src={logo} alt="Assistant" className="h-full w-full object-contain p-0.5" />
+              </div>
               <div className="rounded-2xl rounded-tl-sm bg-muted/50 px-3 py-2.5">
                 <div className="flex gap-1">{[0,150,300].map(d => <span key={d} className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}</div>
               </div>
@@ -510,7 +513,7 @@ function SciencePage() {
             <nav className="max-h-[55vh] overflow-y-auto lg:max-h-[calc(100vh-16rem)]">
               {activeSubject.chapters.map(({ name, topics }) => (
                 <div key={name}>
-                  <button onClick={() => setOpenChapter(openChapter === name ? null : name)}
+                  <button onClick={() => set({ openChapter: openChapter === name ? null : name })}
                     className="flex w-full items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-xs font-bold hover:bg-accent">
                     <span className={`grid h-5 w-5 flex-shrink-0 place-items-center rounded ${activeSubject.color} text-[9px] text-white`}>
                       {openChapter === name ? "−" : "+"}
@@ -546,7 +549,7 @@ function SciencePage() {
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {activeSubject.chapters[0].topics.slice(0, 4).map(t => (
-                  <button key={t} onClick={() => { setOpenChapter(activeSubject.chapters[0].name); selectTopic(t); }}
+                  <button key={t} onClick={() => { set({ openChapter: activeSubject.chapters[0].name }); selectTopic(t); }}
                     className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">{t}</button>
                 ))}
               </div>

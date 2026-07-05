@@ -245,13 +245,16 @@ function QuizItem({ q, index }: { q: QuizQ; index: number }) {
 
 function YoutubePage() {
   const { user } = Route.useRouteContext();
-  const [url, setUrl] = useState("");
+  const [s, set] = usePageState("youtube", {
+    url: "",
+    videoInfo: null as { id: string; title: string; content: string; source: string } | null,
+    activeTab: "summary" as TabKey,
+    tabContent: {} as TabContent,
+    provider: null as string | null,
+  });
+  const { url, videoInfo, activeTab, tabContent, provider } = s;
   const [fetching, setFetching] = useState(false);
-  const [videoInfo, setVideoInfo] = useState<{ id: string; title: string; content: string; source: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("summary");
-  const [tabContent, setTabContent] = useState<TabContent>({});
   const [tabLoading, setTabLoading] = useState<TabKey | null>(null);
-  const [provider, setProvider] = useState<string | null>(null);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "youtube");
 
   async function fetchVideo() {
@@ -259,9 +262,7 @@ function YoutubePage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
 
     setFetching(true);
-    setVideoInfo(null);
-    setTabContent({});
-    setActiveTab("summary");
+    set({ videoInfo: null, tabContent: {}, activeTab: "summary" });
 
     try {
       const result = await fetchYouTubeServer({ data: { url: url.trim() } });
@@ -271,7 +272,8 @@ function YoutubePage() {
         return;
       }
       const content = result.transcript || result.researchContext || "";
-      setVideoInfo({ id: result.videoId, title: result.title, content, source: result.source });
+      const newVideoInfo = { id: result.videoId, title: result.title, content, source: result.source };
+      set({ videoInfo: newVideoInfo });
       await generateTab("summary", content, result.title, result.source);
     } catch {
       toast.error("Failed to fetch video — try another URL");
@@ -287,36 +289,35 @@ function YoutubePage() {
     if (!c || !t) return;
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
 
-    setActiveTab(tab);
+    set({ activeTab: tab, provider: null });
     setTabLoading(tab);
-    setProvider(null);
 
     const isResearch = src !== "transcript";
 
     try {
       if (tab === "summary") {
-        const res = await askAI(buildSummaryPrompt(c, t, isResearch), "You are a study assistant. Write a rich markdown summary using ONLY the provided source material — no outside knowledge.");
-        setProvider(res.provider);
+        const res = await askAI(buildSummaryPrompt(c, t, isResearch), "You are a study assistant. Write a rich markdown summary using ONLY the provided source material — no outside knowledge, no information from other videos, and no assumptions. Be concise, accurate, and faithful to the source.");
+        set({ provider: res.provider });
         await bump();
-        setTabContent((prev) => ({ ...prev, summary: res.text }));
+        set({ tabContent: { ...tabContent, summary: res.text } });
       } else if (tab === "keypoints") {
-        const res = await askAI(buildKeyPointsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material.");
-        setProvider(res.provider);
+        const res = await askAI(buildKeyPointsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material — never introduce facts from outside sources.");
+        set({ provider: res.provider });
         await bump();
         const parsed = extractJSON<{ points: { emoji: string; point: string; detail: string }[] }>(res.text);
-        if (parsed?.points) setTabContent((prev) => ({ ...prev, keypoints: parsed.points as unknown as string[] }));
+        if (parsed?.points) set({ tabContent: { ...tabContent, keypoints: parsed.points as unknown as string[] } });
       } else if (tab === "flashcards") {
-        const res = await askAI(buildFlashcardsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material.");
-        setProvider(res.provider);
+        const res = await askAI(buildFlashcardsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material — never introduce facts from outside sources.");
+        set({ provider: res.provider });
         await bump();
         const parsed = extractJSON<{ cards: Flashcard[] }>(res.text);
-        if (parsed?.cards) setTabContent((prev) => ({ ...prev, flashcards: parsed.cards }));
+        if (parsed?.cards) set({ tabContent: { ...tabContent, flashcards: parsed.cards } });
       } else if (tab === "quiz") {
-        const res = await askAI(buildQuizPrompt(c, t, isResearch), "Return ONLY valid JSON. Base every question strictly on the provided source material.");
-        setProvider(res.provider);
+        const res = await askAI(buildQuizPrompt(c, t, isResearch), "Return ONLY valid JSON. Base every question strictly on the provided source material — never introduce facts from outside sources.");
+        set({ provider: res.provider });
         await bump();
         const parsed = extractJSON<{ questions: QuizQ[] }>(res.text);
-        if (parsed?.questions) setTabContent((prev) => ({ ...prev, quiz: parsed.questions }));
+        if (parsed?.questions) set({ tabContent: { ...tabContent, quiz: parsed.questions } });
       }
     } catch {
       toast.error("Failed to generate content — try again");
@@ -348,7 +349,7 @@ function YoutubePage() {
             <Youtube className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-red-500 flex-shrink-0" />
             <input
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => set({ url: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && fetchVideo()}
               placeholder="https://www.youtube.com/watch?v=..."
               className="w-full rounded-xl border border-input bg-background py-2.5 pl-10 pr-3 text-sm focus:border-red-400 focus:outline-none"
@@ -368,7 +369,7 @@ function YoutubePage() {
         <div className="flex flex-wrap gap-1.5">
           <span className="text-[10px] font-semibold text-muted-foreground self-center">Try:</span>
           {EXAMPLES.map((ex) => (
-            <button key={ex} onClick={() => setUrl(ex)}
+            <button key={ex} onClick={() => set({ url: ex })}
               className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground truncate max-w-[200px]">
               {ex.slice(0, 38)}…
             </button>
@@ -446,7 +447,7 @@ function YoutubePage() {
               return (
                 <button
                   key={key}
-                  onClick={() => hasTab(key) ? setActiveTab(key) : generateTab(key)}
+                  onClick={() => hasTab(key) ? set({ activeTab: key }) : generateTab(key)}
                   disabled={!!tabLoading}
                   className={`relative rounded-2xl border px-2 py-2.5 text-sm font-bold transition-all disabled:cursor-wait ${active ? `${color} text-white shadow-md border-transparent` : `${light} border`}`}
                 >

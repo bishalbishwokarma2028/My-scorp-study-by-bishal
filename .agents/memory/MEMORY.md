@@ -3,3 +3,4 @@
 - [Server-side quota system](server-side-quota.md) — per-user daily limits stored in Supabase `daily_usage` table; atomic increment via Postgres RPC `increment_daily_usage`
 - [Feature state persistence](feature-state.md) — module-level cache in `src/lib/pageState.ts`; usePageState hook applied to compare, research, visual-explainer, code-tutor; survives route changes, resets on refresh
 - [MindMap SVG layout](mindmap-svg-fix.md) — viewBox must be 1500×1300 (CX=750,CY=650), BRANCH_R=270, SUB_R=480; R=545 causes top/bottom nodes to clip outside viewBox
+- [usePageState migration pitfall](usepagestate-migration.md) — after converting useState to usePageState, grep whole file for old setter names; stale calls only surface as runtime ReferenceErrors, not always caught by a quick read

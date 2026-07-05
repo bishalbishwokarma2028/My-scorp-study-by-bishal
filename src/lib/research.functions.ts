@@ -103,7 +103,36 @@ type RawVideoItem = {
   date?: string;
   imageUrl?: string;
   thumbnailUrl?: string;
+  views?: string | number;
+  duration?: string;
 };
+
+// Well-known, high-subscriber Indian education/knowledge YouTube channels.
+// Used to boost trusted, high-quality Indian results above generic ones.
+const TRUSTED_INDIAN_CHANNELS = [
+  "physics wallah", "unacademy", "byju", "khan academy india", "vedantu",
+  "study iq", "studyiq", "dr. vivek bindra", "exam warrior", "gate smashers",
+  "neso academy", "5 minutes engineering", "apni kaksha", "magnet brains",
+  "let's crack it", "know india", "wifistudy", "testbook", "toppr",
+  "amit sengupta", "conceptual physics", "chemistry made easy", "the fact neza",
+  "success cds", "drishti ias", "study channel", "cec", "nptel",
+];
+
+function isLikelyLowQuality(title: string, channel: string): boolean {
+  const t = `${title} ${channel}`.toLowerCase();
+  return /clickbait|prank|reaction only|full movie|leaked/.test(t);
+}
+
+function parseViewCount(views: string | number | undefined): number {
+  if (typeof views === "number") return views;
+  if (!views) return 0;
+  const s = views.toLowerCase().replace(/views?/, "").trim();
+  const num = parseFloat(s);
+  if (Number.isNaN(num)) return 0;
+  if (s.includes("m")) return num * 1_000_000;
+  if (s.includes("k")) return num * 1_000;
+  return num;
+}
 
 async function fetchVideoResults(q: string, key: string, num: number): Promise<YouTubeVideo[]> {
   try {
@@ -122,8 +151,10 @@ async function fetchVideoResults(q: string, key: string, num: number): Promise<Y
         channel: v.channel || "",
         date: v.date || "",
         imageUrl: v.imageUrl || v.thumbnailUrl || "",
+        _views: parseViewCount(v.views),
       }))
       .filter((v) => {
+        if (isLikelyLowQuality(v.title, v.channel)) return false;
         try {
           const host = new URL(v.url).hostname;
           return host.includes("youtube.com") || host.includes("youtu.be");
@@ -134,28 +165,36 @@ async function fetchVideoResults(q: string, key: string, num: number): Promise<Y
   }
 }
 
+function isTrustedIndianChannel(channel: string): boolean {
+  const c = channel.toLowerCase();
+  return TRUSTED_INDIAN_CHANNELS.some((name) => c.includes(name));
+}
+
 async function searchYouTubeVideos(query: string, key: string): Promise<YouTubeVideo[]> {
   // Run two searches in parallel: global best results + India-focused results
   const [global, india] = await Promise.all([
     fetchVideoResults(query, key, 8),
-    fetchVideoResults(`${query} India`, key, 6),
+    fetchVideoResults(`${query} India`, key, 8),
   ]);
 
-  // Interleave: global[0], india[0], global[1], india[1], … then dedup by URL, take top 5
   const seen = new Set<string>();
-  const merged: YouTubeVideo[] = [];
-  const maxLen = Math.max(global.length, india.length);
-  for (let i = 0; i < maxLen && merged.length < 7; i++) {
-    if (i < global.length && !seen.has(global[i].url)) {
-      seen.add(global[i].url);
-      merged.push(global[i]);
-    }
-    if (i < india.length && !seen.has(india[i].url)) {
-      seen.add(india[i].url);
-      merged.push(india[i]);
-    }
-  }
-  return merged.slice(0, 5);
+  const all = [...global, ...india].filter((v) => {
+    if (seen.has(v.url)) return false;
+    seen.add(v.url);
+    return true;
+  }) as (YouTubeVideo & { _views?: number })[];
+
+  // Rank: trusted Indian education channels first, then by view count,
+  // so we surface high-quality, well-watched, relevant videos only —
+  // never random or unrelated clips.
+  all.sort((a, b) => {
+    const aTrusted = isTrustedIndianChannel(a.channel) ? 1 : 0;
+    const bTrusted = isTrustedIndianChannel(b.channel) ? 1 : 0;
+    if (aTrusted !== bTrusted) return bTrusted - aTrusted;
+    return (b._views ?? 0) - (a._views ?? 0);
+  });
+
+  return all.slice(0, 5).map(({ title, url, channel, date, imageUrl }) => ({ title, url, channel, date, imageUrl }));
 }
 
 export const deepResearchServer = createServerFn({ method: "POST" })
