@@ -96,28 +96,26 @@ async function trySerper(query: string, key: string): Promise<ResearchContext | 
   }
 }
 
-async function searchYouTubeVideos(query: string, key: string): Promise<YouTubeVideo[]> {
+type RawVideoItem = {
+  title?: string;
+  link?: string;
+  channel?: string;
+  date?: string;
+  imageUrl?: string;
+  thumbnailUrl?: string;
+};
+
+async function fetchVideoResults(q: string, key: string, num: number): Promise<YouTubeVideo[]> {
   try {
     const res = await fetch("https://google.serper.dev/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-API-KEY": key },
-      body: JSON.stringify({ q: query, num: 6 }),
+      body: JSON.stringify({ q, num }),
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];
-    const data = await res.json() as {
-      videos?: {
-        title?: string;
-        link?: string;
-        channel?: string;
-        date?: string;
-        imageUrl?: string;
-        thumbnailUrl?: string;
-      }[];
-    };
-    if (!data.videos?.length) return [];
-    // Filter for YouTube URLs FIRST, then slice — so we don't drop YouTube results beyond index 5
-    return data.videos
+    const data = await res.json() as { videos?: RawVideoItem[] };
+    return (data.videos ?? [])
       .map((v) => ({
         title: v.title || "Untitled",
         url: v.link || "",
@@ -129,14 +127,35 @@ async function searchYouTubeVideos(query: string, key: string): Promise<YouTubeV
         try {
           const host = new URL(v.url).hostname;
           return host.includes("youtube.com") || host.includes("youtu.be");
-        } catch {
-          return false;
-        }
-      })
-      .slice(0, 5);
+        } catch { return false; }
+      });
   } catch {
     return [];
   }
+}
+
+async function searchYouTubeVideos(query: string, key: string): Promise<YouTubeVideo[]> {
+  // Run two searches in parallel: global best results + India-focused results
+  const [global, india] = await Promise.all([
+    fetchVideoResults(query, key, 8),
+    fetchVideoResults(`${query} India`, key, 6),
+  ]);
+
+  // Interleave: global[0], india[0], global[1], india[1], … then dedup by URL, take top 5
+  const seen = new Set<string>();
+  const merged: YouTubeVideo[] = [];
+  const maxLen = Math.max(global.length, india.length);
+  for (let i = 0; i < maxLen && merged.length < 7; i++) {
+    if (i < global.length && !seen.has(global[i].url)) {
+      seen.add(global[i].url);
+      merged.push(global[i]);
+    }
+    if (i < india.length && !seen.has(india[i].url)) {
+      seen.add(india[i].url);
+      merged.push(india[i]);
+    }
+  }
+  return merged.slice(0, 5);
 }
 
 export const deepResearchServer = createServerFn({ method: "POST" })

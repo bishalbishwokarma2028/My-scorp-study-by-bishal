@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
+import { usePageState } from "@/lib/pageState";
 import { Loader2, ChevronDown, ChevronRight, CheckCircle2, XCircle, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
@@ -205,8 +206,11 @@ function ExerciseItem({ q, index }: { q: GrammarData["exercise"]["questions"][0]
 
 function AskPanel({ topic, category }: { topic: string; category: string }) {
   const { user } = Route.useRouteContext();
-  const [messages, setMessages] = useState<AskMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [as, setAs] = usePageState(`grammar-ask-${topic}`, {
+    messages: [] as AskMessage[],
+    input: "",
+  });
+  const { messages, input } = as;
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { quota, bump } = useUsageLimit(user.id, "grammar-ask");
@@ -224,14 +228,14 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
     const text = (override ?? input).trim();
     if (!text) return;
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setMessages(prev => [...prev, { role: "user", content: text }]);
-    setInput("");
+    const msgsWithUser: AskMessage[] = [...messages, { role: "user", content: text }];
+    setAs({ messages: msgsWithUser, input: "" });
     setLoading(true);
     const system = `You are an expert English grammar teacher. The student is studying "${topic}" (${category}). Answer their grammar question clearly and helpfully. Use **bold** for key terms. Give examples. Be educational but conversational.`;
-    const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content }));
     const res = await askAI(text, system, history);
     await bump();
-    setMessages(prev => [...prev, { role: "assistant", content: res.text }]);
+    setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
     setLoading(false);
   }
 
@@ -246,9 +250,9 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
         <div className="p-4 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5"><Sparkles className="h-3 w-3" /> Suggested questions</p>
           <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map(s => (
-              <button key={s} onClick={() => send(s)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent hover:text-foreground text-muted-foreground transition-colors">
-                {s}
+            {SUGGESTIONS.map(sg => (
+              <button key={sg} onClick={() => send(sg)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent hover:text-foreground text-muted-foreground transition-colors">
+                {sg}
               </button>
             ))}
           </div>
@@ -288,7 +292,7 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
       <div className="border-t border-border p-3 flex gap-2">
         <input
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={e => setAs({ input: e.target.value })}
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder={`Ask about ${topic}…`}
           className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
@@ -303,32 +307,32 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
 
 function GrammarPage() {
   const { user } = Route.useRouteContext();
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set([GRAMMAR_TOPICS[0].category]));
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [grammarData, setGrammarData] = useState<GrammarData | null>(null);
+  const [ps, set] = usePageState("grammar", {
+    openCategories: [GRAMMAR_TOPICS[0].category] as string[],
+    selectedTopic:   null as string | null,
+    selectedCategory: "",
+    grammarData:     null as GrammarData | null,
+    activeSection:   "learn" as "learn" | "practice",
+    provider:        null as string | null,
+  });
+  const { openCategories, selectedTopic, selectedCategory, grammarData, activeSection, provider } = ps;
   const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<"learn" | "practice">("learn");
-  const [provider, setProvider] = useState<string | null>(null);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "grammar");
 
   function toggleCategory(cat: string) {
-    setOpenCategories(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n; });
+    set({ openCategories: openCategories.includes(cat) ? openCategories.filter(c => c !== cat) : [...openCategories, cat] });
   }
 
   async function selectTopic(topic: string, category: string) {
     if (topic === selectedTopic) return;
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setSelectedTopic(topic);
-    setSelectedCategory(category);
-    setGrammarData(null);
-    setActiveSection("learn");
+    set({ selectedTopic: topic, selectedCategory: category, grammarData: null, activeSection: "learn" });
     setLoading(true);
     const res = await askAI(buildGrammarPrompt(topic), "Return ONLY valid JSON — no markdown, no prose.");
-    setProvider(res.provider);
+    set({ provider: res.provider });
     await bump();
     const parsed = extractJSON<GrammarData>(res.text);
-    if (parsed) { setGrammarData(parsed); } else { toast.error("Could not load topic — please try again"); setSelectedTopic(null); }
+    if (parsed) { set({ grammarData: parsed }); } else { toast.error("Could not load topic — please try again"); set({ selectedTopic: null }); }
     setLoading(false);
   }
 
@@ -357,9 +361,9 @@ function GrammarPage() {
                   <button onClick={() => toggleCategory(category)} className="flex w-full items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-sm font-bold hover:bg-accent">
                     <span className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-md ${color} text-xs text-white`}>{icon}</span>
                     <span className="flex-1 truncate">{category}</span>
-                    {openCategories.has(category) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                    {openCategories.includes(category) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                   </button>
-                  {openCategories.has(category) && (
+                  {openCategories.includes(category) && (
                     <div className="border-b border-border/50 bg-muted/10">
                       {topics.map(topic => (
                         <button key={topic} onClick={() => selectTopic(topic, category)}

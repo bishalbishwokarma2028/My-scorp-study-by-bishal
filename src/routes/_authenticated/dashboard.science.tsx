@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
+import { usePageState } from "@/lib/pageState";
 import { Loader2, ChevronRight, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
@@ -357,8 +358,11 @@ function PracticeQuestion({ q, index }: { q: ScienceData["practice_questions"][0
 
 function AskPanel({ topic, subject }: { topic: string; subject: string }) {
   const { user } = Route.useRouteContext();
-  const [messages, setMessages] = useState<AskMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [as, setAs] = usePageState(`science-ask-${topic}`, {
+    messages: [] as AskMessage[],
+    input: "",
+  });
+  const { messages, input } = as;
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { quota, bump } = useUsageLimit(user.id, "science-ask");
@@ -376,14 +380,14 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
     const text = (override ?? input).trim();
     if (!text) return;
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setMessages(prev => [...prev, { role: "user", content: text }]);
-    setInput("");
+    const msgsWithUser: AskMessage[] = [...messages, { role: "user", content: text }];
+    setAs({ messages: msgsWithUser, input: "" });
     setLoading(true);
     const system = `You are an expert ${subject} teacher. The student is studying "${topic}". Provide clear, accurate scientific explanations. Use **bold** for key terms. Give examples. Show equations where relevant. Be educational.`;
-    const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content }));
     const res = await askAI(text, system, history);
     await bump();
-    setMessages(prev => [...prev, { role: "assistant", content: res.text }]);
+    setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
     setLoading(false);
   }
 
@@ -397,8 +401,8 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
         <div className="p-4 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5"><Sparkles className="h-3 w-3" /> Suggested questions</p>
           <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map(s => (
-              <button key={s} onClick={() => send(s)} className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">{s}</button>
+            {SUGGESTIONS.map(sg => (
+              <button key={sg} onClick={() => send(sg)} className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">{sg}</button>
             ))}
           </div>
         </div>
@@ -431,7 +435,7 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
         </div>
       )}
       <div className="border-t border-border p-3 flex gap-2">
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()}
+        <input value={input} onChange={e => setAs({ input: e.target.value })} onKeyDown={e => e.key === "Enter" && send()}
           placeholder={`Ask about ${topic}…`}
           className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
         <button onClick={() => send()} disabled={loading || !input.trim()} className="rounded-xl bg-primary px-3 py-2 text-white disabled:opacity-40">
@@ -444,36 +448,35 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
 
 function SciencePage() {
   const { user } = Route.useRouteContext();
-  const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
-  const [openChapter, setOpenChapter] = useState<string | null>(SCIENCE_SUBJECTS[0].chapters[0].name);
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
-  const [scienceData, setScienceData] = useState<ScienceData | null>(null);
+  const [ps, set] = usePageState("science", {
+    activeSubjectIdx: 0,
+    openChapter:      SCIENCE_SUBJECTS[0].chapters[0].name as string | null,
+    selectedTopic:    null as string | null,
+    scienceData:      null as ScienceData | null,
+    provider:         null as string | null,
+  });
+  const { activeSubjectIdx, openChapter, selectedTopic, scienceData, provider } = ps;
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState<string | null>(null);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "science");
 
   const activeSubject = SCIENCE_SUBJECTS[activeSubjectIdx];
 
   function switchSubject(i: number) {
-    setActiveSubjectIdx(i);
-    setOpenChapter(SCIENCE_SUBJECTS[i].chapters[0].name);
-    setSelectedTopic(null);
-    setScienceData(null);
+    set({ activeSubjectIdx: i, openChapter: SCIENCE_SUBJECTS[i].chapters[0].name, selectedTopic: null, scienceData: null });
   }
 
   async function selectTopic(topic: string) {
     if (topic === selectedTopic) return;
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setSelectedTopic(topic);
-    setScienceData(null);
+    set({ selectedTopic: topic, scienceData: null });
     setLoading(true);
     try {
       const res = await askAI(buildSciencePrompt(topic, activeSubject.subject), "You are a science teacher. Return ONLY valid JSON — no markdown, no prose.");
-      setProvider(res.provider);
+      set({ provider: res.provider });
       await bump();
       const parsed = extractJSON<ScienceData>(res.text);
-      if (parsed) { setScienceData(parsed); } else { toast.error("Could not load topic — try again"); setSelectedTopic(null); }
-    } catch { toast.error("Failed to load topic"); setSelectedTopic(null); }
+      if (parsed) { set({ scienceData: parsed }); } else { toast.error("Could not load topic — try again"); set({ selectedTopic: null }); }
+    } catch { toast.error("Failed to load topic"); set({ selectedTopic: null }); }
     setLoading(false);
   }
 

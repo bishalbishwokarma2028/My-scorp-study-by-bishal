@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { usePageState } from "@/lib/pageState";
 import {
   Loader2, ChevronRight, ChevronDown, Lightbulb,
   RotateCcw, CheckCircle2, AlertCircle, BookOpen,
@@ -229,31 +230,32 @@ function DifficultyBadge({ level }: { level: string }) {
 
 function SolverPage() {
   const { user } = Route.useRouteContext();
-  const [problem, setProblem] = useState("");
-  const [subject, setSubject] = useState<Subject>("Math");
+  const [s, set] = usePageState("solver", {
+    problem:  "",
+    subject:  "Math" as Subject,
+    solution: null as Solution | null,
+    provider: null as string | null,
+    revealed: [] as boolean[],
+  });
+  const { problem, subject, solution, provider, revealed } = s;
   const [loading, setLoading] = useState(false);
-  const [solution, setSolution] = useState<Solution | null>(null);
-  const [provider, setProvider] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<boolean[]>([]);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "solver");
 
   async function solve() {
     if (!problem.trim()) return toast.error("Enter a problem to solve");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
-    setSolution(null);
-    setRevealed([]);
+    set({ solution: null, revealed: [] });
     try {
       const res = await askAI(
         buildPrompt(problem, subject),
         "You are an expert tutor. Return ONLY valid JSON — absolutely no markdown fences or prose outside the JSON.",
       );
-      setProvider(res.provider);
+      set({ provider: res.provider });
       await bump();
       const parsed = extractJSON<Solution>(res.text);
       if (parsed?.steps?.length) {
-        setSolution(parsed);
-        setRevealed(Array(parsed.steps.length).fill(false));
+        set({ solution: parsed, revealed: Array(parsed.steps.length).fill(false) });
       } else {
         toast.error("Could not parse solution — try rephrasing your problem");
       }
@@ -265,18 +267,17 @@ function SolverPage() {
   }
 
   function revealStep(i: number) {
-    setRevealed((prev) => { const n = [...prev]; n[i] = true; return n; });
+    const n = [...revealed]; n[i] = true;
+    set({ revealed: n });
   }
 
   function revealAll() {
     if (!solution) return;
-    setRevealed(Array(solution.steps.length).fill(true));
+    set({ revealed: Array(solution.steps.length).fill(true) });
   }
 
   function reset() {
-    setSolution(null);
-    setRevealed([]);
-    setProblem("");
+    set({ solution: null, revealed: [], problem: "" });
   }
 
   const revealedCount = revealed.filter(Boolean).length;
@@ -307,7 +308,7 @@ function SolverPage() {
               {SUBJECTS.map(({ value, emoji, bg }) => (
                 <button
                   key={value}
-                  onClick={() => setSubject(value)}
+                  onClick={() => set({ subject: value })}
                   className={`rounded-full border px-4 py-1.5 text-xs font-bold transition-all ${
                     subject === value ? bg : "border-border bg-background text-muted-foreground hover:bg-accent"
                   }`}
@@ -325,7 +326,7 @@ function SolverPage() {
             </label>
             <textarea
               value={problem}
-              onChange={(e) => setProblem(e.target.value)}
+              onChange={(e) => set({ problem: e.target.value })}
               placeholder="Type or paste your problem here — include all given values and what you need to find…"
               rows={5}
               className="mt-2 w-full rounded-xl border border-input bg-background p-3.5 text-sm focus:border-primary focus:outline-none resize-none leading-relaxed"
@@ -339,10 +340,10 @@ function SolverPage() {
               {EXAMPLES.map((ex) => (
                 <button
                   key={ex.text}
-                  onClick={() => { setProblem(ex.text); setSubject(ex.subject); }}
+                  onClick={() => set({ problem: ex.text, subject: ex.subject })}
                   className="flex w-full items-start gap-3 rounded-xl border border-border px-4 py-3 text-left text-xs hover:border-primary/40 hover:bg-accent transition-colors"
                 >
-                  <span>{SUBJECTS.find(s => s.value === ex.subject)?.emoji}</span>
+                  <span>{SUBJECTS.find(sub => sub.value === ex.subject)?.emoji}</span>
                   <span className="text-muted-foreground hover:text-foreground">{ex.text}</span>
                 </button>
               ))}

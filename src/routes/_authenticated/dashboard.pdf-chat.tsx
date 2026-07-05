@@ -9,8 +9,10 @@ import { askAI } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
+import { usePageState } from "@/lib/pageState";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/pdf-chat")({
   component: PdfChatPage,
@@ -62,8 +64,10 @@ function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === "user";
   return (
     <div className={`flex gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      <div className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold shadow-sm ${isUser ? "bg-primary text-primary-foreground" : "bg-violet-100 text-violet-700 border border-violet-200"}`}>
-        {isUser ? "You" : "AI"}
+      <div className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full shadow-sm overflow-hidden ${isUser ? "bg-primary text-primary-foreground" : "bg-white border border-violet-200"}`}>
+        {isUser
+          ? <span className="text-[10px] font-bold">You</span>
+          : <img src={logo} alt="Assistant" className="h-full w-full object-contain p-0.5" />}
       </div>
       <div className={`max-w-[84%] flex flex-col ${isUser ? "items-end" : "items-start"} gap-1`}>
         <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${isUser ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm border border-border bg-background text-foreground"}`}>
@@ -84,7 +88,9 @@ function MessageBubble({ msg }: { msg: Message }) {
 function ThinkingBubble() {
   return (
     <div className="flex gap-2.5">
-      <div className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full border border-violet-200 bg-violet-100 text-[10px] font-bold text-violet-700">AI</div>
+      <div className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full border border-violet-200 bg-white overflow-hidden shadow-sm">
+        <img src={logo} alt="Assistant" className="h-full w-full object-contain p-0.5" />
+      </div>
       <div className="rounded-2xl rounded-tl-sm border border-border bg-background px-4 py-3 shadow-sm">
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -98,12 +104,15 @@ function ThinkingBubble() {
 
 function PdfChatPage() {
   const { user } = Route.useRouteContext();
-  const [pdfText, setPdfText] = useState<string | null>(null);
-  const [pdfName, setPdfName] = useState("");
-  const [pdfPages, setPdfPages] = useState(0);
-  const [chunks, setChunks] = useState<string[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [s, set] = usePageState("pdf-chat", {
+    pdfText:  null as string | null,
+    pdfName:  "",
+    pdfPages: 0,
+    chunks:   [] as string[],
+    messages: [] as Message[],
+    input:    "",
+  });
+  const { pdfText, pdfName, pdfPages, chunks, messages, input } = s;
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
@@ -123,9 +132,7 @@ function PdfChatPage() {
 
     setExtracting(true);
     setExtractProgress(0);
-    setPdfText(null);
-    setChunks([]);
-    setMessages([]);
+    set({ pdfText: null, chunks: [], messages: [] });
 
     try {
       const pdfjsLib = await import("pdfjs-dist");
@@ -159,16 +166,17 @@ function PdfChatPage() {
       }
 
       const allChunks = splitIntoChunks(cleaned);
-      setPdfText(cleaned);
-      setChunks(allChunks);
-      setPdfName(file.name);
-      setPdfPages(numPages);
-
-      setMessages([{
-        role: "assistant",
-        content: `📄 **${file.name}** is ready!\n\n**${numPages} pages** · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted\n\nI've read your entire document. Ask me anything about it — I'll search the relevant sections and give you a detailed answer.\n\n> ℹ️ I will only answer based on what's inside this document. If your question isn't covered in the PDF, I'll let you know.`,
-        provider: "Bishal's Assistant",
-      }]);
+      set({
+        pdfText:  cleaned,
+        chunks:   allChunks,
+        pdfName:  file.name,
+        pdfPages: numPages,
+        messages: [{
+          role: "assistant",
+          content: `📄 **${file.name}** is ready!\n\n**${numPages} pages** · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted\n\nI've read your entire document. Ask me anything about it — I'll search the relevant sections and give you a detailed answer.\n\n> ℹ️ I will only answer based on what's inside this document. If your question isn't covered in the PDF, I'll let you know.`,
+          provider: "Bishal's Assistant",
+        }],
+      });
     } catch (err) {
       console.error("PDF extraction error:", err);
       toast.error("Failed to read PDF. Try another file or check it isn't password-protected.");
@@ -188,8 +196,8 @@ function PdfChatPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
 
     const userMsg: Message = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
+    const msgsWithUser = [...messages, userMsg];
+    set({ messages: msgsWithUser, input: "" });
     setLoading(true);
 
     const context = getRelevantContext(chunks, text);
@@ -211,12 +219,12 @@ STRICT RULES:
 4. Be thorough and educational — explain concepts, don't just copy text.
 5. NEVER invent, assume, or add information not present in the document excerpts.`;
 
-    const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content }));
 
     try {
       const res = await askAI(text, systemPrompt, history);
       await bump();
-      setMessages((prev) => [...prev, { role: "assistant", content: res.text, provider: res.provider }]);
+      set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider }] });
     } catch {
       toast.error("Failed to get answer — please try again");
     } finally {
@@ -225,11 +233,7 @@ STRICT RULES:
   }
 
   function clearPdf() {
-    setPdfText(null);
-    setPdfName("");
-    setPdfPages(0);
-    setChunks([]);
-    setMessages([]);
+    set({ pdfText: null, pdfName: "", pdfPages: 0, chunks: [], messages: [] });
   }
 
   // ── Upload screen ──────────────────────────────────────────────────────────
@@ -362,7 +366,7 @@ STRICT RULES:
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => set({ input: e.target.value })}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
               }}

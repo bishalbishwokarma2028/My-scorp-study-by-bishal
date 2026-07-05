@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { usePageState } from "@/lib/pageState";
 import {
   Loader2, Youtube, AlertCircle, ExternalLink,
   ChevronUp, ChevronDown, CheckCircle2, XCircle,
