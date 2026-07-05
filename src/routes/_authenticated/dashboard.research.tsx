@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Loader2, Search, ExternalLink, RefreshCw, Copy, Check, Globe } from "lucide-react";
+import { Loader2, Search, ExternalLink, RefreshCw, Copy, Check, Globe, Youtube } from "lucide-react";
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
-import { deepResearchServer, type SearchResult } from "@/lib/research.functions";
+import { deepResearchServer, type SearchResult, type YouTubeVideo } from "@/lib/research.functions";
 import { ProviderBadge, QuotaBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -116,12 +116,13 @@ function ResearchPage() {
   const { user } = Route.useRouteContext();
 
   const [s, set, clear] = usePageState("research", {
-    query:        "",
-    focusType:    "general",
-    report:       null as string | null,
-    sources:      [] as SearchResult[],
-    searchSource: "",
-    provider:     null as string | null,
+    query:         "",
+    focusType:     "general",
+    report:        null as string | null,
+    sources:       [] as SearchResult[],
+    youtubeVideos: [] as YouTubeVideo[],
+    searchSource:  "",
+    provider:      null as string | null,
   });
 
   const [loading, setLoading] = useState(false);
@@ -146,7 +147,7 @@ function ResearchPage() {
 
     try {
       const webCtx = await deepResearchServer({ data: { query: s.query.trim() } });
-      set({ sources: webCtx.sources, searchSource: webCtx.searchSource });
+      set({ sources: webCtx.sources, searchSource: webCtx.searchSource, youtubeVideos: webCtx.youtubeVideos ?? [] });
 
       const focusLabel = FOCUS_TYPES.find(f => f.id === s.focusType)?.label || "General Overview";
 
@@ -325,9 +326,50 @@ FORMATTING RULES:
 
           {/* Sources sidebar */}
           <div className="space-y-3">
+            {/* YouTube Videos */}
+            {s.youtubeVideos && s.youtubeVideos.length > 0 && (
+              <div className="card-soft p-4 space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-1.5">
+                  <Youtube className="h-4 w-4 text-red-500" /> Top YouTube Videos
+                </p>
+                <p className="text-[10px] text-muted-foreground -mt-2">Most relevant videos on this topic</p>
+                {s.youtubeVideos.map((vid, i) => (
+                  <a
+                    key={i}
+                    href={vid.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex gap-2.5 rounded-lg border border-border bg-muted/20 p-2.5 hover:bg-accent/40 transition-colors group"
+                  >
+                    {vid.imageUrl ? (
+                      <img
+                        src={vid.imageUrl}
+                        alt={vid.title}
+                        className="h-14 w-24 flex-shrink-0 rounded-md object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="grid h-14 w-24 flex-shrink-0 place-items-center rounded-md bg-red-100">
+                        <Youtube className="h-6 w-6 text-red-400" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">{vid.title}</p>
+                      {vid.channel && <p className="mt-1 text-[10px] text-muted-foreground">{vid.channel}</p>}
+                      {vid.date && <p className="text-[9px] text-muted-foreground/70 mt-0.5">{vid.date}</p>}
+                      <p className="mt-1 flex items-center gap-0.5 text-[9px] text-red-600">
+                        <ExternalLink className="h-2.5 w-2.5" /> Watch on YouTube
+                      </p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Web sources */}
             <div className="card-soft p-4 space-y-3">
               <p className="text-sm font-semibold flex items-center gap-1.5">
-                <Globe className="h-4 w-4 text-primary" /> Sources
+                <Globe className="h-4 w-4 text-primary" /> Web Sources
                 {s.sources.length === 0 && <span className="text-xs font-normal text-muted-foreground">(AI knowledge)</span>}
               </p>
               {s.sources.length === 0 && (
@@ -341,7 +383,7 @@ FORMATTING RULES:
                     <a href={src.url} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
                       <ExternalLink className="h-2.5 w-2.5" />
-                      {new URL(src.url).hostname.replace("www.","")}
+                      {(() => { try { return new URL(src.url).hostname.replace("www.",""); } catch { return src.url.slice(0,30); } })()}
                     </a>
                   )}
                 </div>

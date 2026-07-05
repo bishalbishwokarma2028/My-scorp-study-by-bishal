@@ -12,10 +12,19 @@ export type SearchResult = {
   snippet: string;
 };
 
+export type YouTubeVideo = {
+  title: string;
+  url: string;
+  channel: string;
+  date: string;
+  imageUrl: string;
+};
+
 export type ResearchContext = {
   context: string;
   sources: SearchResult[];
   searchSource: string;
+  youtubeVideos: YouTubeVideo[];
 };
 
 async function tryTavily(query: string, key: string): Promise<ResearchContext | null> {
@@ -48,7 +57,7 @@ async function tryTavily(query: string, key: string): Promise<ResearchContext | 
     sources.forEach((s, i) => {
       parts.push(`[Source ${i + 1}] ${s.title}\n${s.snippet}\nURL: ${s.url}`);
     });
-    return { context: parts.join("\n\n"), sources, searchSource: "Tavily" };
+    return { context: parts.join("\n\n"), sources, searchSource: "Tavily", youtubeVideos: [] };
   } catch {
     return null;
   }
@@ -81,29 +90,80 @@ async function trySerper(query: string, key: string): Promise<ResearchContext | 
     sources.forEach((s, i) => {
       parts.push(`[Source ${i + 1}] ${s.title}\n${s.snippet}\nURL: ${s.url}`);
     });
-    return { context: parts.join("\n\n"), sources, searchSource: "Serper" };
+    return { context: parts.join("\n\n"), sources, searchSource: "Serper", youtubeVideos: [] };
   } catch {
     return null;
+  }
+}
+
+async function searchYouTubeVideos(query: string, key: string): Promise<YouTubeVideo[]> {
+  try {
+    const res = await fetch("https://google.serper.dev/videos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-KEY": key },
+      body: JSON.stringify({ q: query, num: 6 }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as {
+      videos?: {
+        title?: string;
+        link?: string;
+        channel?: string;
+        date?: string;
+        imageUrl?: string;
+        thumbnailUrl?: string;
+      }[];
+    };
+    if (!data.videos?.length) return [];
+    // Filter for YouTube URLs FIRST, then slice — so we don't drop YouTube results beyond index 5
+    return data.videos
+      .map((v) => ({
+        title: v.title || "Untitled",
+        url: v.link || "",
+        channel: v.channel || "",
+        date: v.date || "",
+        imageUrl: v.imageUrl || v.thumbnailUrl || "",
+      }))
+      .filter((v) => {
+        try {
+          const host = new URL(v.url).hostname;
+          return host.includes("youtube.com") || host.includes("youtu.be");
+        } catch {
+          return false;
+        }
+      })
+      .slice(0, 5);
+  } catch {
+    return [];
   }
 }
 
 export const deepResearchServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ResearchInput.parse(d))
   .handler(async ({ data }): Promise<ResearchContext> => {
-    let result: ResearchContext | null = null;
+    const serperKey = serverConfig.search.serperKey;
+    const tavilyKey = serverConfig.search.tavilyKey;
 
-    if (serverConfig.search.tavilyKey) {
-      result = await tryTavily(data.query, serverConfig.search.tavilyKey);
-    }
-    if (!result && serverConfig.search.serperKey) {
-      result = await trySerper(data.query, serverConfig.search.serperKey);
-    }
+    // Run web search and YouTube search in parallel
+    const [webResult, youtubeVideos] = await Promise.all([
+      (async () => {
+        let result: ResearchContext | null = null;
+        if (tavilyKey) result = await tryTavily(data.query, tavilyKey);
+        if (!result && serperKey) result = await trySerper(data.query, serperKey);
+        return result;
+      })(),
+      serperKey ? searchYouTubeVideos(data.query, serperKey) : Promise.resolve([] as YouTubeVideo[]),
+    ]);
 
-    if (result) return result;
+    if (webResult) {
+      return { ...webResult, youtubeVideos };
+    }
 
     return {
       context: `Research topic: "${data.query}". No live web results available — use training knowledge only.`,
       sources: [],
       searchSource: "AI Knowledge",
+      youtubeVideos,
     };
   });

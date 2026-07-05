@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   Loader2, Upload, FileText, Send, BookOpen, X,
-  ChevronDown, Sparkles, MessageCircle,
+  Sparkles, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
@@ -18,8 +18,8 @@ export const Route = createFileRoute("/_authenticated/dashboard/pdf-chat")({
 
 type Message = { role: "user" | "assistant"; content: string; provider?: string };
 
-const CHUNK_SIZE = 3000;
-const MAX_CHUNKS = 8;
+const CHUNK_SIZE = 2500;   // smaller chunks to leave room in system prompt
+const MAX_CHUNKS = 6;      // 6 × 2500 = 15 000 chars — safely under 44 000 limit
 
 function splitIntoChunks(text: string): string[] {
   const chunks: string[] = [];
@@ -50,33 +50,23 @@ function getRelevantContext(chunks: string[], query: string): string {
 }
 
 const QUICK_PROMPTS = [
-  "📋 Summarize this document",
-  "🔑 List the key points",
-  "❓ What are the main conclusions?",
-  "📖 Explain the most important concept",
-  "🧪 What methods or techniques are used?",
-  "📊 What evidence or data is presented?",
+  { icon: "📋", label: "Summarize this document",      text: "Summarize this document" },
+  { icon: "🔑", label: "List the key points",           text: "List the key points" },
+  { icon: "❓", label: "Main conclusions?",             text: "What are the main conclusions?" },
+  { icon: "📖", label: "Explain the main concept",     text: "Explain the most important concept" },
+  { icon: "🧪", label: "Methods & techniques used",    text: "What methods or techniques are used?" },
+  { icon: "📊", label: "Evidence or data presented",   text: "What evidence or data is presented?" },
 ];
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === "user";
   return (
     <div className={`flex gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      <div
-        className={`grid h-8 w-8 flex-shrink-0 place-items-center rounded-full text-xs font-bold shadow-sm ${
-          isUser ? "bg-primary text-primary-foreground" : "bg-violet-100 text-violet-700 border border-violet-200"
-        }`}
-      >
+      <div className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-[10px] font-bold shadow-sm ${isUser ? "bg-primary text-primary-foreground" : "bg-violet-100 text-violet-700 border border-violet-200"}`}>
         {isUser ? "You" : "AI"}
       </div>
-      <div className={`max-w-[82%] flex flex-col ${isUser ? "items-end" : "items-start"} gap-1`}>
-        <div
-          className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-            isUser
-              ? "rounded-tr-sm bg-primary text-primary-foreground"
-              : "rounded-tl-sm border border-border bg-background text-foreground"
-          }`}
-        >
+      <div className={`max-w-[84%] flex flex-col ${isUser ? "items-end" : "items-start"} gap-1`}>
+        <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-sm ${isUser ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm border border-border bg-background text-foreground"}`}>
           {isUser ? (
             <p className="whitespace-pre-wrap">{msg.content}</p>
           ) : (
@@ -94,9 +84,7 @@ function MessageBubble({ msg }: { msg: Message }) {
 function ThinkingBubble() {
   return (
     <div className="flex gap-2.5">
-      <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-violet-200 bg-violet-100 text-xs font-bold text-violet-700">
-        AI
-      </div>
+      <div className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full border border-violet-200 bg-violet-100 text-[10px] font-bold text-violet-700">AI</div>
       <div className="rounded-2xl rounded-tl-sm border border-border bg-background px-4 py-3 shadow-sm">
         <div className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -140,9 +128,7 @@ function PdfChatPage() {
     setMessages([]);
 
     try {
-      // Dynamically import pdfjs-dist and use the LOCAL worker (version-matched)
       const pdfjsLib = await import("pdfjs-dist");
-      // Use the exact installed version from unpkg so it matches
       pdfjsLib.GlobalWorkerOptions.workerSrc =
         "https://unpkg.com/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs";
 
@@ -167,9 +153,7 @@ function PdfChatPage() {
 
       const cleaned = fullText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
       if (cleaned.length < 100) {
-        toast.error(
-          "No readable text found. This PDF may be scanned/image-based. Try a text-based PDF.",
-        );
+        toast.error("No readable text found. This PDF may be scanned/image-based. Try a text-based PDF.");
         setExtracting(false);
         return;
       }
@@ -180,13 +164,11 @@ function PdfChatPage() {
       setPdfName(file.name);
       setPdfPages(numPages);
 
-      setMessages([
-        {
-          role: "assistant",
-          content: `📄 **${file.name}** is ready!\n\n**${numPages} pages** · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted\n\nI've read your entire document. Ask me anything — I'll search the relevant sections and give you a detailed answer. You can also use the quick prompts below.`,
-          provider: "Bishal's Assistant",
-        },
-      ]);
+      setMessages([{
+        role: "assistant",
+        content: `📄 **${file.name}** is ready!\n\n**${numPages} pages** · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted\n\nI've read your entire document. Ask me anything about it — I'll search the relevant sections and give you a detailed answer.\n\n> ℹ️ I will only answer based on what's inside this document. If your question isn't covered in the PDF, I'll let you know.`,
+        provider: "Bishal's Assistant",
+      }]);
     } catch (err) {
       console.error("PDF extraction error:", err);
       toast.error("Failed to read PDF. Try another file or check it isn't password-protected.");
@@ -211,34 +193,30 @@ function PdfChatPage() {
     setLoading(true);
 
     const context = getRelevantContext(chunks, text);
-    const systemPrompt = `You are an expert study assistant helping a student understand their uploaded document.
 
-The user asked: "${text}"
+    // Build a system prompt that fits within the 44 000 char Zod limit
+    const systemPrompt = `You are a strict document-based study assistant. You ONLY answer using the document excerpts provided below. You must NOT use any knowledge outside of these excerpts.
 
-Here are the most relevant excerpts from their document (with page numbers):
+DOCUMENT: "${pdfName}"
+
+MOST RELEVANT EXCERPTS FROM THE DOCUMENT:
 ---
 ${context}
 ---
 
-Instructions:
-- Answer using ONLY the document content above. Do not invent information.
-- If the answer isn't in the excerpts, say: "I couldn't find that in your document. Try asking differently or checking a different section."
-- Cite page numbers when referencing specific content (e.g. "On Page 3...")
-- Use **bold** for key terms and important facts
-- Use bullet points or numbered lists for multi-part answers
-- Use ## headers for long answers with multiple sections
-- Use > blockquotes for direct quotes from the document
-- Be thorough and educational — explain concepts, don't just copy text`;
+STRICT RULES:
+1. Answer ONLY using information present in the excerpts above.
+2. If the answer is NOT in the excerpts, respond with exactly: "Your question doesn't match with the PDF. The document doesn't seem to cover this topic. Try rephrasing, or ask about something else in the document."
+3. When the answer IS found: cite page numbers (e.g. "On Page 3..."), use **bold** for key terms, bullet points for multi-part answers, ## headers for long answers, and > blockquotes for direct quotes.
+4. Be thorough and educational — explain concepts, don't just copy text.
+5. NEVER invent, assume, or add information not present in the document excerpts.`;
 
-    const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+    const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
 
     try {
       const res = await askAI(text, systemPrompt, history);
       await bump();
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: res.text, provider: res.provider },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: res.text, provider: res.provider }]);
     } catch {
       toast.error("Failed to get answer — please try again");
     } finally {
@@ -257,13 +235,11 @@ Instructions:
   // ── Upload screen ──────────────────────────────────────────────────────────
   if (!pdfText && !extracting) {
     return (
-      <div className="mx-auto max-w-2xl space-y-5">
+      <div className="mx-auto max-w-2xl space-y-5 px-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold">Chat with Your PDF</h2>
-            <p className="text-sm text-muted-foreground">
-              Upload any textbook, paper, or notes — then ask questions
-            </p>
+            <p className="text-sm text-muted-foreground">Upload any textbook, paper, or notes — then ask questions</p>
           </div>
           <QuotaBadge quota={quota} loading={quotaLoading} />
         </div>
@@ -271,33 +247,19 @@ Instructions:
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            handleFile(e.dataTransfer.files[0]);
-          }}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
           onClick={() => fileRef.current?.click()}
-          className={`cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
-            dragging
-              ? "border-violet-500 bg-violet-50 scale-[1.01]"
-              : "border-border hover:border-violet-400 hover:bg-accent"
-          }`}
+          className={`cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition-all ${dragging ? "border-violet-500 bg-violet-50 scale-[1.01]" : "border-border hover:border-violet-400 hover:bg-accent"}`}
         >
-          <div className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-2xl bg-violet-100">
-            <Upload className="h-10 w-10 text-violet-600" />
+          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-violet-100">
+            <Upload className="h-8 w-8 text-violet-600" />
           </div>
-          <p className="text-lg font-bold text-foreground">Drop your PDF here</p>
-          <p className="mt-1 text-sm text-muted-foreground">or click to browse</p>
+          <p className="text-base font-bold text-foreground">Drop your PDF here</p>
+          <p className="mt-1 text-sm text-muted-foreground">or tap to browse</p>
           <p className="mt-3 inline-block rounded-full bg-violet-100 px-4 py-1 text-xs font-semibold text-violet-700">
             Supports text-based PDFs up to 25 MB
           </p>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf"
-            className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
+          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -322,22 +284,19 @@ Instructions:
     return (
       <div className="flex min-h-[55vh] flex-col items-center justify-center gap-5 text-center">
         <div className="relative">
-          <div className="grid h-20 w-20 place-items-center rounded-2xl bg-violet-100">
-            <FileText className="h-10 w-10 text-violet-400" />
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-violet-100">
+            <FileText className="h-8 w-8 text-violet-400" />
           </div>
-          <Loader2 className="absolute -right-2 -top-2 h-7 w-7 animate-spin text-violet-600" />
+          <Loader2 className="absolute -right-2 -top-2 h-6 w-6 animate-spin text-violet-600" />
         </div>
         <div>
-          <p className="font-bold text-base">Reading your PDF…</p>
+          <p className="font-bold">Reading your PDF…</p>
           <p className="mt-1 text-sm text-muted-foreground">Extracting and indexing all pages</p>
         </div>
         {extractProgress > 0 && (
           <div className="w-48 space-y-1.5">
             <div className="h-2 w-full overflow-hidden rounded-full bg-violet-100">
-              <div
-                className="h-full rounded-full bg-violet-500 transition-all duration-200"
-                style={{ width: `${extractProgress}%` }}
-              />
+              <div className="h-full rounded-full bg-violet-500 transition-all duration-200" style={{ width: `${extractProgress}%` }} />
             </div>
             <p className="text-xs text-muted-foreground">{extractProgress}% complete</p>
           </div>
@@ -348,53 +307,47 @@ Instructions:
 
   // ── Chat screen ────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 6rem)" }}>
+    <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100dvh - 7rem)" }}>
       {/* Doc info bar */}
-      <div className="mb-3 flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 flex-shrink-0">
-        <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg bg-violet-200">
+      <div className="mb-2 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 flex-shrink-0">
+        <div className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg bg-violet-200">
           <BookOpen className="h-4 w-4 text-violet-700" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-violet-900">{pdfName}</p>
-          <p className="text-xs text-violet-600">
+          <p className="truncate text-xs font-bold text-violet-900">{pdfName}</p>
+          <p className="text-[10px] text-violet-600">
             {pdfPages} pages · {chunks.length} sections · {Math.round((pdfText?.length ?? 0) / 1000)}k chars
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <QuotaBadge quota={quota} loading={quotaLoading} />
-          <button
-            onClick={clearPdf}
-            title="Remove PDF"
-            className="rounded-lg p-1.5 text-violet-500 hover:bg-violet-100"
-          >
+          <button onClick={clearPdf} title="Remove PDF" className="rounded-lg p-1.5 text-violet-500 hover:bg-violet-100">
             <X className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto space-y-4 rounded-xl border border-border bg-background/60 p-4 min-h-0">
-        {messages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} />
-        ))}
+      {/* Messages area — scrollable, fills available space */}
+      <div className="min-h-0 flex-1 overflow-y-auto space-y-3 rounded-xl border border-border bg-background/60 p-3">
+        {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
         {loading && <ThinkingBubble />}
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick prompts */}
+      {/* Quick prompts (only before first user message) */}
       {messages.length <= 1 && !loading && (
-        <div className="mt-3 flex-shrink-0">
-          <p className="mb-2 text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+        <div className="mt-2 flex-shrink-0">
+          <p className="mb-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
             <Sparkles className="h-3 w-3" /> Quick prompts
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {QUICK_PROMPTS.map((p) => (
               <button
-                key={p}
-                onClick={() => sendMessage(p.replace(/^[^\s]+\s/, ""))}
-                className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
+                key={p.text}
+                onClick={() => sendMessage(p.text)}
+                className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 transition-colors"
               >
-                {p}
+                {p.icon} {p.label}
               </button>
             ))}
           </div>
@@ -402,42 +355,39 @@ Instructions:
       )}
 
       {/* Input bar */}
-      <div className="mt-3 flex-shrink-0">
+      <div className="mt-2 flex-shrink-0 space-y-1.5">
         <div className="flex gap-2 items-end">
           <div className="relative flex-1">
-            <MessageCircle className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <MessageCircle className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
               }}
               placeholder="Ask anything about your document…"
               rows={2}
-              className="w-full rounded-xl border border-input bg-background py-2.5 pl-9 pr-4 text-sm resize-none focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-100"
+              className="w-full rounded-xl border border-input bg-background py-2 pl-9 pr-3 text-sm resize-none focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-100"
             />
           </div>
           <button
             onClick={() => sendMessage()}
             disabled={loading || !input.trim()}
-            className="flex-shrink-0 rounded-xl bg-violet-600 px-4 py-3 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+            className="flex-shrink-0 rounded-xl bg-violet-600 px-3 py-2.5 text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
           >
             <Send className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Suggested follow-ups after first answer */}
+        {/* Follow-up suggestions after first answer */}
         {messages.length > 2 && !loading && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {["Explain that in simpler terms", "Give me an example", "What does this mean for exams?"].map((s) => (
+          <div className="flex flex-wrap gap-1.5">
+            {["Explain in simpler terms", "Give me an example", "Exam relevance?"].map((s) => (
               <button
                 key={s}
                 onClick={() => sendMessage(s)}
-                className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 {s}
               </button>
@@ -445,9 +395,7 @@ Instructions:
           </div>
         )}
 
-        <p className="mt-1.5 text-center text-xs text-muted-foreground">
-          Enter to send · Shift+Enter for new line
-        </p>
+        <p className="text-center text-[10px] text-muted-foreground">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   );

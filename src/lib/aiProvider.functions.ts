@@ -8,7 +8,7 @@ const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.st
 
 const Input = z.object({
   prompt: z.string().min(1).max(50000),
-  systemPrompt: z.string().max(16000).optional(),
+  systemPrompt: z.string().max(44000).optional(),
   history: z.array(HistoryMsg).max(12).optional(),
 });
 
