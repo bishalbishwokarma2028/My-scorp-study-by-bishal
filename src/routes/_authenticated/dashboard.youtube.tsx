@@ -56,21 +56,22 @@ VIDEO TITLE: "${title}"
 SOURCE MATERIAL:
 ${content.slice(0, 13000)}
 
-Write a richly formatted Markdown study summary using ONLY the information in the source material above. Do NOT add information from your general knowledge. Match the same polished, highlighted formatting style used in the ScorpStudy Deep Research reports.
+Write a richly formatted, LONG, IN-DEPTH Markdown study summary using ONLY the information in the source material above. Do NOT add information from your general knowledge. Match the same polished, highlighted formatting style used in the ScorpStudy Deep Research reports.
 
 ## Formatting Requirements:
 - Start section headings with one of these emoji so they render as styled section cards: 🔍 (overview), 📌 (key points), 📖 (detailed breakdown), 📊 (facts/stats), 📝 (notes), ✅ (conclusion), 🎯 (takeaways) — e.g. "## 📖 How It Works"
-- Start with a "## 🔍 Overview" section — a compelling 2-3 sentence summary of what this content covers
-- Use ## for every major section heading (at least 4 major sections)
+- Start with a "## 🔍 Overview" section — a compelling 3-4 sentence summary of what this content covers
+- Use ## for every major section heading, and include AT LEAST 6-8 major sections that walk through the content in the order it was presented (not just 4) — break the detailed breakdown into multiple sub-sections (### ) covering distinct topics/segments of the video rather than one big block
+- Each section must be substantial — at least 4-6 sentences or 5-8 bullet points of real detail per section, not one-liners
 - Use **bold** for ALL key terms, concepts, formulas, names, dates, statistics, and important facts — bold liberally, every section should have several bolded terms
 - Use > blockquotes for the most critical takeaways: > 💡 **Key insight:** ...
 - Use > ⚠️ **Important:** for warnings or common mistakes
 - Use > 📌 **Definition:** for key definitions
 - Use numbered lists for steps or sequential content
-- Use bullet lists with specific facts, not vague statements
+- Use bullet lists with specific facts, not vague statements — include specific numbers, names, examples, and details actually mentioned in the source
 - If the source material contains data suited to a table (comparisons, stats, timelines), include a Markdown table
-- End with "## 🎯 Key Takeaways" listing 4-6 specific, actionable bullets with the most important words in **bold**
-- Be comprehensive but only based on the source material provided`;
+- End with "## 🎯 Key Takeaways" listing 6-8 specific, actionable bullets with the most important words in **bold**
+- Overall the summary should be thorough and comprehensive (aim for a long, detailed report, not a short digest) while staying strictly grounded in the source material provided — do not pad with filler or repetition, add real substance instead`;
 }
 
 function buildKeyPointsPrompt(content: string, title: string, isResearch: boolean): string {
