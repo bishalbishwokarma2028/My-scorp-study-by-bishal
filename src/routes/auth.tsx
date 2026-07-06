@@ -135,7 +135,7 @@ function AuthPage() {
             {[
               { n: "24/7", l: "Always Available" },
               { n: "21+", l: "Study Tools" },
-              { n: "60+", l: "Languages" },
+              { n: "0", l: "Ads Ever" },
               { n: "Free", l: "Forever" },
             ].map((s) => (
               <div key={s.l} className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 text-center">

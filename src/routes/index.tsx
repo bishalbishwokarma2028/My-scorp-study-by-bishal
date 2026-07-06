@@ -124,7 +124,7 @@ function Landing() {
           </div>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><Shield className="h-4 w-4 text-emerald-600" /> No credit card required</span>
-            <span className="inline-flex items-center gap-1.5"><Globe className="h-4 w-4 text-violet-600" /> 60+ languages supported</span>
+            <span className="inline-flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-violet-600" /> No ads, ever</span>
             <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-fuchsia-600" /> Setup in 30 seconds</span>
           </div>
 
@@ -140,7 +140,7 @@ function Landing() {
       <section className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-700 text-white">
         <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 px-4 py-14 sm:grid-cols-4 sm:px-6">
           {[
-            { icon: Globe, n: "60+", l: "Languages" },
+            { icon: Sparkles, n: "Unlimited", l: "Practice" },
             { icon: Clock, n: "24/7", l: "Available" },
             { icon: GraduationCap, n: "21+", l: "Tools" },
             { icon: Star, n: "Free", l: "Forever" },
@@ -235,7 +235,7 @@ function Landing() {
           {[
             { icon: Brain, color: "from-violet-500 to-fuchsia-500", title: "Instant Understanding", desc: "Ask any question and get structured, detailed explanations — like having a personal tutor available 24/7." },
             { icon: Zap, color: "from-amber-500 to-orange-500", title: "Exam-Ready Answers", desc: "Topper Mode formats answers with headings, points, formulas, and examples — exactly how toppers write." },
-            { icon: Globe, color: "from-blue-500 to-cyan-500", title: "Any Language", desc: "Study in Nepali, Hindi, English, or 60+ languages. Bishal's Assistant adapts to your preferred language instantly." },
+            { icon: Globe, color: "from-blue-500 to-cyan-500", title: "Any Language", desc: "Study in Nepali, Hindi, English, or any language you prefer. Bishal's Assistant adapts to your preferred language instantly." },
             { icon: Shield, color: "from-emerald-500 to-teal-500", title: "Always Free", desc: "No subscription fees, no credit card, no hidden paywalls. ScorpStudy is free for every student, forever." },
           ].map((item) => (
             <div key={item.title} className="rounded-2xl border border-border bg-white p-6 shadow-sm hover:shadow-md transition">
@@ -374,7 +374,7 @@ function Landing() {
           </div>
           <div className="mt-6 flex flex-col items-center gap-1 text-center text-xs text-muted-foreground sm:flex-row sm:justify-between">
             <p>© {new Date().getFullYear()} ScorpStudy by Bishal Bishwokarma. All rights reserved.</p>
-            <p>Powered by Bishal's Assistant · 60+ Languages · Free Forever</p>
+            <p>Powered by Bishal's Assistant · 21+ Study Tools · Free Forever</p>
           </div>
         </div>
       </footer>

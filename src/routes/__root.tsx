@@ -176,7 +176,7 @@ const JSON_LD = JSON.stringify([
       "Track Progress – Streaks & Badges",
       "Flashcard Maker – Spaced Repetition",
       "Mind Maps – Visual Learning",
-      "Universal Translator – 60+ Languages",
+      "Universal Translator – Any Language",
       "Image Question Solver",
       "Smart Calculator",
     ],
