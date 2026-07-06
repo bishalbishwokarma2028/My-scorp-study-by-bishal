@@ -250,7 +250,7 @@ FORMATTING RULES (strict):
 - NEVER use LaTeX syntax of any kind — no \\boxed{}, \\frac{}, \\times, \\subset, \\to, ^{}, _{}, $ signs, or backslash commands. Use plain Unicode math symbols instead: × for multiply, ÷ for divide, √ for square root, ² ³ for powers, π, ≤ ≥ ≠ ≈, → for "leads to", ⊂ for subset, ∈ for "is an element of".
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
 - Show calculations step-by-step using plain math notation, bolding the key formula or result of each step.`;
-    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content }));
+    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2500) }));
     const res = await askAI(text, system, history);
     await bump();
     setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });

@@ -393,7 +393,7 @@ FORMATTING RULES (strict):
 - NEVER use LaTeX syntax of any kind — no \\boxed{}, \\frac{}, \\times, \\subset, \\to, ^{}, _{}, $ signs, or backslash commands. Use plain Unicode symbols instead: × for multiply, ÷ for divide, √ for square root, ² ³ for powers/exponents, π, ≤ ≥ ≠ ≈, → for "leads to" or reactions, ° for degrees.
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
 - Show equations and formulas using plain notation, bolding the key result of each step.`;
-    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content }));
+    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2500) }));
     const res = await askAI(text, system, history);
     await bump();
     setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });

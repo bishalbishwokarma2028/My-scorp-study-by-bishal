@@ -51,18 +51,20 @@ const WEB_SEARCH_KEYWORDS = [
   // Time signals
   "today", "yesterday", "tomorrow", "tonight", "right now", "currently", "at the moment",
   "this week", "last week", "this month", "last month", "this year",
-  "recent", "latest", "current", "now", "2024", "2025", "2026",
+  "recent", "latest", "current", "now", "2024", "2025", "2026", "as of",
   // News signals
   "news", "breaking", "viral", "trending", "update", "announcement", "happened",
+  "just in", "headline", "report", "confirmed",
   // Sports
-  "match", "score", "winner", "result", "standings", "fixture", "lineup",
+  "match", "score", "winner", "result", "results", "standings", "fixture", "lineup",
   "cricket", "football", "soccer", "ipl", "world cup", "premier league",
-  "champions league", "nba", "nfl", "wimbledon", "olympics",
-  "tournament", "championship", "league", "series",
+  "champions league", "nba", "nfl", "wimbledon", "olympics", "t20", "odi", "test match",
+  "tournament", "championship", "league", "series", "final", "semifinal", "playoffs",
+  "who is winning", "live score", "toss",
   // Politics / world
-  "election", "politics", "government", "president", "prime minister",
-  "war", "conflict", "economy", "stock market", "earthquake", "disaster",
-  "who won", "weather", "live",
+  "election", "politics", "government", "president", "prime minister", "parliament",
+  "war", "conflict", "economy", "stock market", "share price", "earthquake", "disaster",
+  "who won", "weather", "live", "ceasefire", "protest", "policy",
 ];
 
 function needsWebSearch(text: string): boolean {
@@ -628,12 +630,14 @@ MANDATORY RULES
 ══════════════════════════════════════
 - ALWAYS cite the source at the bottom: "📰 Source: [site name]"
 - If multiple sources confirm a fact → say "✓ Confirmed by [n] sources"
-- If sources conflict → present both versions and say which is more reliable
-- If the search results don't contain the specific answer → say exactly what was found and state the information gap clearly
+- If sources conflict → present both versions, say which is more reliable, and explicitly flag the disagreement — never silently pick one
+- If the search results don't contain the specific answer → say exactly what was found and state the information gap clearly. NEVER fill the gap with a guess from training data.
+- If the search results look stale (older than the event you were asked about) → say so explicitly instead of presenting them as current
 - **Bold** every: score, date, name, country, team, figure, and key fact
 - End every response with: > 📌 **Summary:** [1–2 sentences on the key takeaway]
 - NEVER reveal AI provider names
-- NEVER make up facts not present in the search results`;
+- NEVER make up facts not present in the search results
+- NEVER claim 100% certainty on live/breaking events — sources can be delayed or wrong. State facts plainly as reported, and if only one source has a claim, say "per [source]" rather than presenting it as absolute truth`;
 
 
 const TOPPER_PROMPT = `\n\nTOPPER EXAM MODE — Format as an outstanding exam answer that scores full marks. Be exhaustive.

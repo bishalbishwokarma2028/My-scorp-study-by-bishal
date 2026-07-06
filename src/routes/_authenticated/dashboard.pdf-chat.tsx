@@ -239,7 +239,7 @@ STRICT RULES:
 2. If it IS covered: answer ONLY using information present in the excerpts. Cite page numbers (e.g. "On Page 3..."), use **bold** for key terms, bullet points for multi-part answers, ## headers for long answers, and > blockquotes for direct quotes. Be thorough and educational — explain concepts, don't just copy text. NEVER invent, assume, or add information not present in the document excerpts.
 3. If it is NOT covered in the excerpts (a general or off-topic question): do NOT refuse and do NOT say the document doesn't cover it. Instead, start your reply with the short note "📚 *This isn't in your document — here's a general answer:*" on its own line, then answer the question fully, accurately, and helpfully using your own general knowledge as Bishal's Assistant, with the same rich markdown formatting (bold, bullets, headers where useful).`;
 
-    const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 2500) }));
 
     try {
       const res = await askWithResilience(text, systemPrompt, history);
