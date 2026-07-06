@@ -631,6 +631,35 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
   );
 }
 
+// Per-code-block copy button rendered inside the code block itself (top-right)
+// so it only ever copies that block's actual code, never the surrounding text.
+function CodeBlockWithCopy({ code, language }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    toast.success("Code copied");
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="relative my-2 rounded-lg border border-slate-800 bg-slate-900 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-800 px-3 py-1.5">
+        <span className="text-[10px] font-mono uppercase tracking-wide text-slate-400">{language || "code"}</span>
+        <button
+          onClick={copy}
+          className="flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-200 transition-colors hover:bg-slate-700"
+        >
+          {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+          {copied ? "Copied" : "Copy code"}
+        </button>
+      </div>
+      <pre className="overflow-x-auto p-3 text-xs text-slate-100"><code>{code}</code></pre>
+    </div>
+  );
+}
+
 // ─── Generate Tab ─────────────────────────────────────────────────────────────
 type ChatMsg = { role: "user" | "assistant"; content: string; provider?: string };
 
@@ -691,12 +720,19 @@ RULES YOU MUST FOLLOW:
     setLoading(false);
   }
 
-  function copyCode(text: string) {
-    const match = text.match(/```[\w]*\n([\s\S]*?)```/);
-    const code = match ? match[1] : text;
-    navigator.clipboard.writeText(code);
-    toast.success("Code copied");
-  }
+  const genComponents: Components = {
+    pre: ({ children }) => <>{children}</>,
+    code: ({ className, children }) => {
+      const raw = String(children);
+      const isBlock = Boolean(className) || raw.includes("\n");
+      if (!isBlock) {
+        return <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">{children}</code>;
+      }
+      const code = raw.replace(/\n$/, "");
+      const language = className?.replace("language-", "") || "";
+      return <CodeBlockWithCopy code={code} language={language} />;
+    },
+  };
 
   return (
     <div className="space-y-4">
@@ -756,14 +792,10 @@ RULES YOU MUST FOLLOW:
                   <div className="flex items-center gap-2">
                     <ProviderBadge provider={msg.provider || null} />
                   </div>
-                  <div className="prose prose-sm max-w-none [&_pre]:rounded-lg [&_pre]:bg-slate-900 [&_pre]:p-4 [&_pre]:text-slate-100 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code:not(pre_code)]:rounded [&_code:not(pre_code)]:bg-muted [&_code:not(pre_code)]:px-1 [&_h2]:text-sm [&_h3]:text-sm">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  <div className="prose prose-sm max-w-none [&_h2]:text-sm [&_h3]:text-sm">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={genComponents}>{msg.content}</ReactMarkdown>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => copyCode(msg.content)}
-                      className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent">
-                      <Copy className="h-3 w-3" /> Copy code
-                    </button>
                     <CopyBtn text={msg.content} label="Copy all" />
                   </div>
                 </div>

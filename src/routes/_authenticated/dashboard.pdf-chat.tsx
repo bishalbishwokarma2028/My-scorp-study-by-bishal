@@ -51,6 +51,28 @@ function getRelevantContext(chunks: string[], query: string): string {
     .join("\n\n");
 }
 
+// Retries the AI call a couple of times before falling back to a plain
+// general-knowledge answer (no document restriction) — the user should
+// never see a raw "AI is busy" error inside the PDF chat.
+async function askWithResilience(
+  text: string,
+  systemPrompt: string,
+  history: { role: "user" | "assistant"; content: string }[],
+): Promise<{ text: string; provider: string }> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await askAI(text, systemPrompt, history);
+    if (res.provider !== "none") return res;
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  // Last resort: drop the document context entirely and just answer normally.
+  const fallback = await askAI(
+    text,
+    "You are Bishal's Assistant, a friendly expert study AI. The document search is temporarily unavailable, so answer the student's question directly and helpfully using your own general knowledge. Use markdown formatting with **bold** for key terms.",
+    history,
+  );
+  return fallback;
+}
+
 const QUICK_PROMPTS = [
   { icon: "📋", label: "Summarize this document",      text: "Summarize this document" },
   { icon: "🔑", label: "List the key points",           text: "List the key points" },
@@ -213,16 +235,14 @@ ${context}
 ---
 
 STRICT RULES:
-1. Answer ONLY using information present in the excerpts above.
-2. If the answer is NOT in the excerpts, respond with exactly: "Your question doesn't match with the PDF. The document doesn't seem to cover this topic. Try rephrasing, or ask about something else in the document."
-3. When the answer IS found: cite page numbers (e.g. "On Page 3..."), use **bold** for key terms, bullet points for multi-part answers, ## headers for long answers, and > blockquotes for direct quotes.
-4. Be thorough and educational — explain concepts, don't just copy text.
-5. NEVER invent, assume, or add information not present in the document excerpts.`;
+1. First, check whether the question relates to content covered in the excerpts above.
+2. If it IS covered: answer ONLY using information present in the excerpts. Cite page numbers (e.g. "On Page 3..."), use **bold** for key terms, bullet points for multi-part answers, ## headers for long answers, and > blockquotes for direct quotes. Be thorough and educational — explain concepts, don't just copy text. NEVER invent, assume, or add information not present in the document excerpts.
+3. If it is NOT covered in the excerpts (a general or off-topic question): do NOT refuse and do NOT say the document doesn't cover it. Instead, start your reply with the short note "📚 *This isn't in your document — here's a general answer:*" on its own line, then answer the question fully, accurately, and helpfully using your own general knowledge as Bishal's Assistant, with the same rich markdown formatting (bold, bullets, headers where useful).`;
 
     const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content }));
 
     try {
-      const res = await askAI(text, systemPrompt, history);
+      const res = await askWithResilience(text, systemPrompt, history);
       await bump();
       set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider }] });
     } catch {

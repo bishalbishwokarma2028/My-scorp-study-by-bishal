@@ -8,6 +8,7 @@ import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { usePageState } from "@/lib/pageState";
 import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from "react-markdown";
 
 export const Route = createFileRoute("/_authenticated/dashboard/visual-explainer")({
   component: VisualExplainerPage,
@@ -30,6 +31,34 @@ type ConceptWebData    = { type: "conceptweb"; nodes: ConceptNode[]; connections
 
 type DiagramData = MindMapData | FlowchartData | ConceptWebData;
 type SelectedNode = { label: string; explanation: string };
+
+// Validates that the AI's JSON response has a usable shape for each
+// diagram type before we accept it — catches malformed/truncated
+// responses (especially for Concept Web) so we can retry instead of
+// showing a broken diagram or a generic error.
+function isValidDiagram(data: unknown): data is DiagramData {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Record<string, unknown>;
+  if (d.type === "mindmap") {
+    const branches = d.branches;
+    return Array.isArray(branches) && branches.length > 0 &&
+      branches.every((b) => b && typeof b === "object" && typeof (b as Record<string, unknown>).label === "string" && Array.isArray((b as Record<string, unknown>).items));
+  }
+  if (d.type === "flowchart") {
+    const nodes = d.nodes, edges = d.edges;
+    return Array.isArray(nodes) && nodes.length > 0 && Array.isArray(edges) &&
+      nodes.every((n) => n && typeof n === "object" && typeof (n as Record<string, unknown>).id === "string" && typeof (n as Record<string, unknown>).label === "string");
+  }
+  if (d.type === "conceptweb") {
+    const nodes = d.nodes, connections = d.connections;
+    if (!Array.isArray(nodes) || nodes.length === 0 || !Array.isArray(connections)) return false;
+    const ids = new Set(nodes.map((n) => (n && typeof n === "object" ? (n as Record<string, unknown>).id : undefined)));
+    const nodesOk = nodes.every((n) => n && typeof n === "object" && typeof (n as Record<string, unknown>).label === "string" && typeof (n as Record<string, unknown>).id === "string");
+    const connsOk = connections.every((c) => c && typeof c === "object" && ids.has((c as Record<string, unknown>).from) && ids.has((c as Record<string, unknown>).to));
+    return nodesOk && connsOk;
+  }
+  return false;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function wrap(text: string, maxPerLine: number): string[] {
@@ -425,14 +454,24 @@ function ExplanationPanel({ node, onClose }: { node: SelectedNode; onClose: () =
         <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">Explanation</p>
         <h3 className="text-base font-bold text-foreground">{node.label}</h3>
       </div>
-      <p className="text-sm leading-relaxed text-foreground/90">{node.explanation}</p>
+      <div className="text-sm leading-relaxed text-foreground/90 [&_p]:my-1.5">
+        <ReactMarkdown
+          components={{
+            strong: ({ children }) => (
+              <mark className="bg-yellow-200/80 text-yellow-900 px-0.5 rounded-sm font-semibold not-italic">{children}</mark>
+            ),
+          }}
+        >
+          {node.explanation}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }
 
 // ─── Prompt builders ──────────────────────────────────────────────────────────
 function buildPrompt(topic: string, type: DiagramType): string {
-  const rule = `Return STRICT JSON only — no markdown fences, no prose outside JSON. Labels must be SHORT (max 14 chars). Each explanation must be 5-6 full sentences that clearly teach the concept to a student.`;
+  const rule = `Return STRICT JSON only — no markdown fences, no prose outside JSON, and make sure the JSON is fully valid and complete (all brackets and quotes closed). Labels must be SHORT (max 14 chars). Each "explanation" field must be LONG and detailed — at least 100-140 words (9-11 full sentences) that thoroughly teach the concept to a student, including a concrete example or analogy. Inside each explanation string, wrap key terms, numbers, and important facts in **double asterisks** (markdown bold) so they stand out — use at least 3-4 bolded phrases per explanation.`;
 
   if (type === "mindmap") {
     return `Generate a comprehensive educational mind map for: "${topic}"
@@ -578,10 +617,25 @@ function VisualExplainerPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); set({ diagram: null }); setSelected(null);
     const prompt = buildPrompt(s.topic.trim(), s.diagramType);
-    const { data: parsed, provider: prov } = await askAIJSON<DiagramData>(prompt);
+
+    let parsed: DiagramData | null = null;
+    let prov = "";
+    // Up to 3 attempts total — extra resilience for the more complex
+    // Concept Web schema, which occasionally comes back malformed.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await askAIJSON<DiagramData>(
+        attempt === 0 ? prompt : `${prompt}\n\nIMPORTANT: Your previous attempt returned invalid or incomplete JSON. Double-check every bracket, comma, and quote before responding. Output ONLY the raw JSON object.`,
+      );
+      prov = result.provider || prov;
+      if (result.data && isValidDiagram(result.data)) {
+        parsed = result.data;
+        break;
+      }
+    }
+
     set({ provider: prov });
     await bump();
-    if (!parsed || !parsed.type) {
+    if (!parsed) {
       toast.error("Couldn't generate diagram — please try again or rephrase your topic");
     } else {
       set({ diagram: parsed });
