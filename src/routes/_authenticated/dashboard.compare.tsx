@@ -23,15 +23,19 @@ type Comparison = {
   conceptA: {
     name: string; overview: string; keyFeatures: string[];
     advantages: string[]; disadvantages: string[]; usedFor: string;
+    realWorldExample: string;
   };
   conceptB: {
     name: string; overview: string; keyFeatures: string[];
     advantages: string[]; disadvantages: string[]; usedFor: string;
+    realWorldExample: string;
   };
   similarities: string[];
   differences: { aspect: string; a: string; b: string }[];
   memoryTrick: string;
   examTip: string;
+  commonMistakes: string[];
+  whenToChoose: string;
 };
 
 const EXAMPLE_PAIRS = [
@@ -80,36 +84,42 @@ function ComparePage() {
     set({ result: null });
 
     const catNote = s.category !== "Auto-detect" ? ` (subject: ${s.category})` : "";
-    const prompt = `Compare "${s.conceptA.trim()}" vs "${s.conceptB.trim()}"${catNote} for a student.
+    const prompt = `Compare "${s.conceptA.trim()}" vs "${s.conceptB.trim()}"${catNote} for a student. Be thorough and detailed throughout — this should be a rich, in-depth comparison, not a short summary.
 
 Return STRICT JSON only — no prose, no markdown fences:
 {
   "conceptA": {
     "name": "${s.conceptA.trim()}",
-    "overview": "2-3 sentence clear definition",
-    "keyFeatures": ["feature 1","feature 2","feature 3","feature 4"],
-    "advantages": ["advantage 1","advantage 2","advantage 3"],
-    "disadvantages": ["disadvantage 1","disadvantage 2"],
-    "usedFor": "1 sentence on when/where this is used"
+    "overview": "4-6 full sentences giving a thorough, clear definition and explanation — cover what it is, how it works, and its significance",
+    "keyFeatures": ["feature 1 with a short explanation","feature 2 with a short explanation","feature 3 with a short explanation","feature 4 with a short explanation","feature 5 with a short explanation","feature 6 with a short explanation"],
+    "advantages": ["advantage 1 explained in a full sentence","advantage 2 explained in a full sentence","advantage 3 explained in a full sentence","advantage 4 explained in a full sentence"],
+    "disadvantages": ["disadvantage 1 explained in a full sentence","disadvantage 2 explained in a full sentence","disadvantage 3 explained in a full sentence"],
+    "usedFor": "2-3 sentences on when/where/why this is used, with a concrete scenario",
+    "realWorldExample": "A specific, concrete real-world example or case study illustrating this concept in action (2-3 sentences)"
   },
   "conceptB": {
     "name": "${s.conceptB.trim()}",
-    "overview": "2-3 sentence clear definition",
-    "keyFeatures": ["feature 1","feature 2","feature 3","feature 4"],
-    "advantages": ["advantage 1","advantage 2","advantage 3"],
-    "disadvantages": ["disadvantage 1","disadvantage 2"],
-    "usedFor": "1 sentence on when/where this is used"
+    "overview": "4-6 full sentences giving a thorough, clear definition and explanation — cover what it is, how it works, and its significance",
+    "keyFeatures": ["feature 1 with a short explanation","feature 2 with a short explanation","feature 3 with a short explanation","feature 4 with a short explanation","feature 5 with a short explanation","feature 6 with a short explanation"],
+    "advantages": ["advantage 1 explained in a full sentence","advantage 2 explained in a full sentence","advantage 3 explained in a full sentence","advantage 4 explained in a full sentence"],
+    "disadvantages": ["disadvantage 1 explained in a full sentence","disadvantage 2 explained in a full sentence","disadvantage 3 explained in a full sentence"],
+    "usedFor": "2-3 sentences on when/where/why this is used, with a concrete scenario",
+    "realWorldExample": "A specific, concrete real-world example or case study illustrating this concept in action (2-3 sentences)"
   },
-  "similarities": ["similarity 1","similarity 2","similarity 3","similarity 4"],
+  "similarities": ["similarity 1 explained in a full sentence","similarity 2 explained in a full sentence","similarity 3 explained in a full sentence","similarity 4 explained in a full sentence","similarity 5 explained in a full sentence"],
   "differences": [
-    {"aspect":"Purpose","a":"...","b":"..."},
-    {"aspect":"Process/Mechanism","a":"...","b":"..."},
-    {"aspect":"Outcome/Result","a":"...","b":"..."},
-    {"aspect":"Complexity","a":"...","b":"..."},
-    {"aspect":"Application","a":"...","b":"..."}
+    {"aspect":"Purpose","a":"a full sentence, not just a word or two","b":"a full sentence, not just a word or two"},
+    {"aspect":"Process/Mechanism","a":"a full sentence","b":"a full sentence"},
+    {"aspect":"Outcome/Result","a":"a full sentence","b":"a full sentence"},
+    {"aspect":"Complexity","a":"a full sentence","b":"a full sentence"},
+    {"aspect":"Application","a":"a full sentence","b":"a full sentence"},
+    {"aspect":"Timing/Speed","a":"a full sentence","b":"a full sentence"},
+    {"aspect":"Cost/Resources","a":"a full sentence","b":"a full sentence"}
   ],
-  "memoryTrick": "A fun, memorable mnemonic or trick to remember the key difference",
-  "examTip": "The single most important thing to remember in an exam about these two concepts"
+  "memoryTrick": "A fun, memorable mnemonic or trick to remember the key difference, explained in 2-3 sentences with a vivid example",
+  "examTip": "2-3 sentences on the single most important thing to remember in an exam about these two concepts, plus a common trap to avoid",
+  "commonMistakes": ["A specific mistake students commonly make confusing these two concepts, explained in a full sentence","another common mistake explained in a full sentence","a third common mistake explained in a full sentence"],
+  "whenToChoose": "3-4 sentences giving practical guidance on how to decide which concept/approach applies in a given situation, with concrete decision criteria"
 }`;
 
     const { data: parsed, provider: prov } = await askAIJSON<Comparison>(prompt);
@@ -137,10 +147,12 @@ Return STRICT JSON only — no prose, no markdown fences:
     const r = s.result;
     const text = [
       `# ${r.conceptA.name} vs ${r.conceptB.name}`,
-      `\n## ${r.conceptA.name}\n${r.conceptA.overview}`,
-      `\n## ${r.conceptB.name}\n${r.conceptB.overview}`,
+      `\n## ${r.conceptA.name}\n${r.conceptA.overview}\nReal-world example: ${r.conceptA.realWorldExample}`,
+      `\n## ${r.conceptB.name}\n${r.conceptB.overview}\nReal-world example: ${r.conceptB.realWorldExample}`,
       `\n## Similarities\n${r.similarities.map(x => `• ${x}`).join("\n")}`,
       `\n## Key Differences\n${r.differences.map(d => `**${d.aspect}**: ${d.a} vs ${d.b}`).join("\n")}`,
+      `\n## Common Mistakes\n${(r.commonMistakes || []).map(x => `• ${x}`).join("\n")}`,
+      `\n## How to Decide\n${r.whenToChoose || ""}`,
       `\n## Memory Trick\n${r.memoryTrick}`,
       `\n## Exam Tip\n${r.examTip}`,
     ].join("\n");
@@ -265,6 +277,10 @@ Return STRICT JSON only — no prose, no markdown fences:
                   <div className="rounded-lg bg-white/60 px-3 py-2 text-xs">
                     <span className="font-semibold">Used for: </span>{c.usedFor}
                   </div>
+                  <div className="rounded-lg bg-white/60 px-3 py-2 text-xs">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">🌍 Real-World Example</p>
+                    {c.realWorldExample}
+                  </div>
                 </div>
               );
             })}
@@ -313,15 +329,37 @@ Return STRICT JSON only — no prose, no markdown fences:
               <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-700">
                 <Lightbulb className="h-4 w-4" /> Memory Trick
               </p>
-              <p className="text-sm text-amber-900">{s.result.memoryTrick}</p>
+              <p className="text-sm text-amber-900 leading-relaxed">{s.result.memoryTrick}</p>
             </div>
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-1.5">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-blue-700">
                 <BookOpen className="h-4 w-4" /> Exam Tip
               </p>
-              <p className="text-sm text-blue-900">{s.result.examTip}</p>
+              <p className="text-sm text-blue-900 leading-relaxed">{s.result.examTip}</p>
             </div>
           </div>
+
+          {/* Common mistakes */}
+          {s.result.commonMistakes?.length > 0 && (
+            <div className="card-soft p-4 space-y-2">
+              <p className="text-sm font-semibold text-red-600">🚫 Common Mistakes Students Make</p>
+              <ul className="space-y-2">
+                {s.result.commonMistakes.map((m, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm leading-relaxed text-red-900">
+                    <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-400" /> {m}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* When to choose */}
+          {s.result.whenToChoose && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-1.5">
+              <p className="text-sm font-semibold text-emerald-700">🧭 How to Decide Which to Use</p>
+              <p className="text-sm leading-relaxed text-emerald-900">{s.result.whenToChoose}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
