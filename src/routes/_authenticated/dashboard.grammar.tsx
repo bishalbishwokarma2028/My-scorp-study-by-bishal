@@ -7,9 +7,7 @@ import { askAI, extractJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { askMdComponents } from "@/lib/askMdComponents";
+import { TypewriterText } from "@/components/TypewriterText";
 import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/grammar")({
@@ -28,7 +26,7 @@ type GrammarData = {
   exercise: { instruction: string; questions: { question: string; answer: string; hint?: string }[] };
 };
 
-type AskMessage = { role: "user" | "assistant"; content: string };
+type AskMessage = { role: "user" | "assistant"; content: string; revealed?: boolean };
 
 const GRAMMAR_TOPICS = [
   {
@@ -276,9 +274,16 @@ FORMATTING RULES (strict):
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
-                  <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={askMdComponents}>{m.content}</ReactMarkdown>
-                  </div>
+                  <TypewriterText
+                    content={m.content}
+                    animate={!m.revealed}
+                    onDone={!m.revealed ? () => {
+                      const next = [...messages];
+                      if (next[i]) next[i] = { ...next[i], revealed: true };
+                      setAs({ messages: next });
+                    } : undefined}
+                    className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1"
+                  />
                 )}
               </div>
             </div>
@@ -346,72 +351,25 @@ function GrammarPage() {
 
   const cat = GRAMMAR_TOPICS.find(g => g.topics.some(t => t === selectedTopic));
 
-  return (
-    <div className="mx-auto max-w-5xl lg:max-w-6xl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-bold">English Grammar</h2>
-          <p className="text-sm text-muted-foreground">Complete grammar reference with rules, examples, exercises & AI chat</p>
+  if (selectedTopic) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            onClick={() => set({ selectedTopic: null, grammarData: null })}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back to topics
+          </button>
+          <QuotaBadge quota={quota} loading={quotaLoading} />
         </div>
-        <QuotaBadge quota={quota} loading={quotaLoading} />
-      </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Sidebar */}
-        <aside className="lg:w-72 flex-shrink-0">
-          <div className="card-soft overflow-hidden">
-            <div className="border-b border-border bg-muted/30 px-4 py-2.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Grammar Topics</p>
-            </div>
-            <nav className="max-h-[58vh] overflow-y-auto lg:max-h-[calc(100vh-12rem)]">
-              {GRAMMAR_TOPICS.map(({ category, icon, color, topics }) => (
-                <div key={category}>
-                  <button onClick={() => toggleCategory(category)} className="flex w-full items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-sm font-bold hover:bg-accent">
-                    <span className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-md ${color} text-xs text-white`}>{icon}</span>
-                    <span className="flex-1 truncate">{category}</span>
-                    {openCategories.includes(category) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                  </button>
-                  {openCategories.includes(category) && (
-                    <div className="border-b border-border/50 bg-muted/10">
-                      {topics.map(topic => (
-                        <button key={topic} onClick={() => selectTopic(topic, category)}
-                          className={`flex w-full items-center gap-2 px-5 py-2 text-left text-xs transition-colors ${selectedTopic === topic ? `${color} text-white font-bold` : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                          {selectedTopic === topic && <span className="h-1.5 w-1.5 rounded-full bg-white flex-shrink-0" />}
-                          <span className="truncate">{topic}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </nav>
+        {loading ? (
+          <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading {selectedTopic.split(" — ")[0]}…</p>
           </div>
-        </aside>
-
-        {/* Main */}
-        <div className="min-w-0 flex-1">
-          {!selectedTopic ? (
-            <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="text-5xl">📖</div>
-              <div>
-                <p className="font-bold text-base">Select a grammar topic</p>
-                <p className="mt-1 text-sm text-muted-foreground">Rich explanations, examples, exercises & AI chat for every topic</p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {["Present Perfect — Experience & Recent Past", "Passive Voice — Present, Past & Perfect", "First Conditional — Real & Possible Situations", "Their / There / They're"].map(t => (
-                  <button key={t} onClick={() => selectTopic(t, GRAMMAR_TOPICS.find(g => g.topics.includes(t))?.category ?? "")}
-                    className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">
-                    {t.split(" — ")[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : loading ? (
-            <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading {selectedTopic.split(" — ")[0]}…</p>
-            </div>
-          ) : grammarData ? (
+        ) : grammarData ? (
             <div className="space-y-4">
               {/* Header */}
               <div className={`rounded-2xl ${cat?.color ?? "bg-primary"} p-5 text-white`}>
@@ -530,7 +488,70 @@ function GrammarPage() {
                 </div>
               )}
             </div>
-          ) : null}
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl lg:max-w-6xl">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold">English Grammar</h2>
+          <p className="text-sm text-muted-foreground">Complete grammar reference with rules, examples, exercises & AI chat</p>
+        </div>
+        <QuotaBadge quota={quota} loading={quotaLoading} />
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* Sidebar */}
+        <aside className="lg:w-72 flex-shrink-0">
+          <div className="card-soft overflow-hidden">
+            <div className="border-b border-border bg-muted/30 px-4 py-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Grammar Topics</p>
+            </div>
+            <nav className="max-h-[58vh] overflow-y-auto lg:max-h-[calc(100vh-12rem)]">
+              {GRAMMAR_TOPICS.map(({ category, icon, color, topics }) => (
+                <div key={category}>
+                  <button onClick={() => toggleCategory(category)} className="flex w-full items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-sm font-bold hover:bg-accent">
+                    <span className={`grid h-6 w-6 flex-shrink-0 place-items-center rounded-md ${color} text-xs text-white`}>{icon}</span>
+                    <span className="flex-1 truncate">{category}</span>
+                    {openCategories.includes(category) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
+                  {openCategories.includes(category) && (
+                    <div className="border-b border-border/50 bg-muted/10">
+                      {topics.map(topic => (
+                        <button key={topic} onClick={() => selectTopic(topic, category)}
+                          className={`flex w-full items-center gap-2 px-5 py-2 text-left text-xs transition-colors ${selectedTopic === topic ? `${color} text-white font-bold` : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                          {selectedTopic === topic && <span className="h-1.5 w-1.5 rounded-full bg-white flex-shrink-0" />}
+                          <span className="truncate">{topic}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Main */}
+        <div className="min-w-0 flex-1">
+          <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="text-5xl">📖</div>
+            <div>
+              <p className="font-bold text-base">Select a grammar topic</p>
+              <p className="mt-1 text-sm text-muted-foreground">Rich explanations, examples, exercises & AI chat for every topic</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["Present Perfect — Experience & Recent Past", "Passive Voice — Present, Past & Perfect", "First Conditional — Real & Possible Situations", "Their / There / They're"].map(t => (
+                <button key={t} onClick={() => selectTopic(t, GRAMMAR_TOPICS.find(g => g.topics.includes(t))?.category ?? "")}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">
+                  {t.split(" — ")[0]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

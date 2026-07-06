@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { usePageState } from "@/lib/pageState";
-import { Loader2, ChevronRight, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { askMdComponents } from "@/lib/askMdComponents";
+import { TypewriterText } from "@/components/TypewriterText";
 import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/science")({
@@ -31,7 +29,7 @@ type ScienceData = {
   fun_fact: string;
 };
 
-type AskMessage = { role: "user" | "assistant"; content: string };
+type AskMessage = { role: "user" | "assistant"; content: string; revealed?: boolean };
 
 const SCIENCE_SUBJECTS = [
   {
@@ -274,6 +272,10 @@ const SCIENCE_SUBJECTS = [
 function buildSciencePrompt(topic: string, subject: string): string {
   return `You are a world-class science teacher teaching "${topic}" from ${subject}. Provide a COMPREHENSIVE, DETAILED lesson.
 
+CRITICAL SYMBOL RULE — applies to every text field in the JSON below, especially "equation" and "explanation":
+NEVER use LaTeX syntax of any kind — no \\frac{}{}, \\sqrt{}, \\times, \\div, \\pm, \\leq, \\geq, \\neq, \\rightarrow, \\Delta, \\theta, \\pi, ^{}, _{}, $ signs, or any backslash commands. A student who has never seen LaTeX must be able to read every equation instantly.
+Use plain Unicode symbols instead: × for multiply, ÷ for divide, ± for plus-minus, √ for square root, ² ³ for powers/exponents, ≤ ≥ ≠ ≈, → for reactions/"leads to", Δ for change, π θ α β γ, ° for degrees, and write fractions as "(numerator) / (denominator)" on one line, e.g. "v = Δs / t" NOT "v = \\frac{\\Delta s}{t}", and "F = (G × m₁ × m₂) / r²" NOT "\\frac{Gm_1m_2}{r^2}".
+
 Return STRICT JSON only — no prose, no markdown fences:
 {
   "topic": "${topic}",
@@ -425,9 +427,16 @@ FORMATTING RULES (strict):
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
-                  <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={askMdComponents}>{m.content}</ReactMarkdown>
-                  </div>
+                  <TypewriterText
+                    content={m.content}
+                    animate={!m.revealed}
+                    onDone={!m.revealed ? () => {
+                      const next = [...messages];
+                      if (next[i]) next[i] = { ...next[i], revealed: true };
+                      setAs({ messages: next });
+                    } : undefined}
+                    className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1"
+                  />
                 )}
               </div>
             </div>
@@ -491,83 +500,25 @@ function SciencePage() {
     setLoading(false);
   }
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-4 lg:max-w-6xl">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-bold">Science</h2>
-          <p className="text-sm text-muted-foreground">Physics, Chemistry, Biology & Earth Science — with experiments & AI chat</p>
-        </div>
-        <QuotaBadge quota={quota} loading={quotaLoading} />
-      </div>
-
-      {/* Subject tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {SCIENCE_SUBJECTS.map(({ subject, icon, color }, i) => (
-          <button key={subject} onClick={() => switchSubject(i)}
-            className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeSubjectIdx === i ? `${color} text-white shadow-sm` : "border border-border bg-background hover:bg-accent"}`}>
-            {icon} {subject}
+  if (selectedTopic) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            onClick={() => set({ selectedTopic: null, scienceData: null })}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back to topics
           </button>
-        ))}
-      </div>
+          <QuotaBadge quota={quota} loading={quotaLoading} />
+        </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Sidebar */}
-        <aside className="lg:w-72 flex-shrink-0">
-          <div className="card-soft overflow-hidden">
-            <div className={`border-b border-border px-4 py-2.5 ${activeSubject.light}`}>
-              <p className={`text-xs font-bold uppercase tracking-wider ${activeSubject.text}`}>{activeSubject.icon} {activeSubject.subject}</p>
-            </div>
-            <nav className="max-h-[55vh] overflow-y-auto lg:max-h-[calc(100vh-16rem)]">
-              {activeSubject.chapters.map(({ name, topics }) => (
-                <div key={name}>
-                  <button onClick={() => set({ openChapter: openChapter === name ? null : name })}
-                    className="flex w-full items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-xs font-bold hover:bg-accent">
-                    <span className={`grid h-5 w-5 flex-shrink-0 place-items-center rounded ${activeSubject.color} text-[9px] text-white`}>
-                      {openChapter === name ? "−" : "+"}
-                    </span>
-                    <span className="flex-1 truncate">{name}</span>
-                    <span className="text-[10px] text-muted-foreground">{topics.length}</span>
-                  </button>
-                  {openChapter === name && (
-                    <div className={`border-b border-border/40`}>
-                      {topics.map(topic => (
-                        <button key={topic} onClick={() => selectTopic(topic)}
-                          className={`flex w-full items-center gap-2 px-5 py-2 text-left text-xs transition-colors ${selectedTopic === topic ? `${activeSubject.color} text-white font-bold` : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                          {selectedTopic === topic ? <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white" /> : <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-40" />}
-                          <span className="truncate">{topic}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </nav>
+        {loading ? (
+          <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading {selectedTopic}…</p>
           </div>
-        </aside>
-
-        {/* Main content */}
-        <div className="min-w-0 flex-1">
-          {!selectedTopic ? (
-            <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="text-5xl">{activeSubject.icon}</div>
-              <div>
-                <p className="font-bold">{activeSubject.subject}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Select a topic for a full lesson with concepts, experiments, practice questions & AI chat</p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {activeSubject.chapters[0].topics.slice(0, 4).map(t => (
-                  <button key={t} onClick={() => { set({ openChapter: activeSubject.chapters[0].name }); selectTopic(t); }}
-                    className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">{t}</button>
-                ))}
-              </div>
-            </div>
-          ) : loading ? (
-            <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading {selectedTopic}…</p>
-            </div>
-          ) : scienceData ? (
+        ) : scienceData ? (
             <div className="space-y-4">
               {/* Header */}
               <div className={`rounded-2xl ${activeSubject.color} p-5 text-white`}>
@@ -720,7 +671,81 @@ function SciencePage() {
               {/* Ask AI */}
               <AskPanel topic={selectedTopic} subject={activeSubject.subject} />
             </div>
-          ) : null}
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-4 lg:max-w-6xl">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold">Science</h2>
+          <p className="text-sm text-muted-foreground">Physics, Chemistry, Biology & Earth Science — with experiments & AI chat</p>
+        </div>
+        <QuotaBadge quota={quota} loading={quotaLoading} />
+      </div>
+
+      {/* Subject tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {SCIENCE_SUBJECTS.map(({ subject, icon, color }, i) => (
+          <button key={subject} onClick={() => switchSubject(i)}
+            className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeSubjectIdx === i ? `${color} text-white shadow-sm` : "border border-border bg-background hover:bg-accent"}`}>
+            {icon} {subject}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* Sidebar */}
+        <aside className="lg:w-72 flex-shrink-0">
+          <div className="card-soft overflow-hidden">
+            <div className={`border-b border-border px-4 py-2.5 ${activeSubject.light}`}>
+              <p className={`text-xs font-bold uppercase tracking-wider ${activeSubject.text}`}>{activeSubject.icon} {activeSubject.subject}</p>
+            </div>
+            <nav className="max-h-[55vh] overflow-y-auto lg:max-h-[calc(100vh-16rem)]">
+              {activeSubject.chapters.map(({ name, topics }) => (
+                <div key={name}>
+                  <button onClick={() => set({ openChapter: openChapter === name ? null : name })}
+                    className="flex w-full items-center gap-2 border-b border-border/50 px-4 py-2.5 text-left text-xs font-bold hover:bg-accent">
+                    <span className={`grid h-5 w-5 flex-shrink-0 place-items-center rounded ${activeSubject.color} text-[9px] text-white`}>
+                      {openChapter === name ? "−" : "+"}
+                    </span>
+                    <span className="flex-1 truncate">{name}</span>
+                    <span className="text-[10px] text-muted-foreground">{topics.length}</span>
+                  </button>
+                  {openChapter === name && (
+                    <div className={`border-b border-border/40`}>
+                      {topics.map(topic => (
+                        <button key={topic} onClick={() => selectTopic(topic)}
+                          className={`flex w-full items-center gap-2 px-5 py-2 text-left text-xs transition-colors ${selectedTopic === topic ? `${activeSubject.color} text-white font-bold` : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                          {selectedTopic === topic ? <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-white" /> : <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-40" />}
+                          <span className="truncate">{topic}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="min-w-0 flex-1">
+          <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="text-5xl">{activeSubject.icon}</div>
+            <div>
+              <p className="font-bold">{activeSubject.subject}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Select a topic for a full lesson with concepts, experiments, practice questions & AI chat</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {activeSubject.chapters[0].topics.slice(0, 4).map(t => (
+                <button key={t} onClick={() => { set({ openChapter: activeSubject.chapters[0].name }); selectTopic(t); }}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">{t}</button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

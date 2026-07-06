@@ -12,6 +12,7 @@ import { webSearchServer } from "@/lib/webSearch.functions";
 import { supabase } from "@/integrations/supabase/client";
 import logoUrl from "@/assets/scorpstudy-logo.png";
 import { getCachedAnswer, setCachedAnswer } from "@/lib/dailyLimits";
+import { TypewriterText } from "@/components/TypewriterText";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 
@@ -45,6 +46,7 @@ type Msg = {
   imageUrl?: string;
   webSearchUsed?: boolean;
   isIdentityAnswer?: boolean;
+  revealed?: boolean;
 };
 
 const WEB_SEARCH_KEYWORDS = [
@@ -770,7 +772,7 @@ function ChatPage() {
           mimeType: pendingImage.mimeType,
         },
       });
-      setMessages([...newMsgs, { role: "assistant", content: res.text, provider: "Bishal's Assistant" }]);
+      setMessages([...newMsgs, { role: "assistant", content: res.text, provider: "Bishal's Assistant", revealed: false }]);
       await bump();
       setPendingImage(null);
       setLoading(false);
@@ -787,7 +789,7 @@ function ChatPage() {
     if (!isRepeat && !topperMode) {
       const cached = getCachedAnswer(text);
       if (cached) {
-        setMessages([...newMsgs, { role: "assistant", content: cached, provider: "Bishal's Assistant" }]);
+        setMessages([...newMsgs, { role: "assistant", content: cached, provider: "Bishal's Assistant", revealed: false }]);
         setTimeout(() => inputRef.current?.focus(), 50);
         return;
       }
@@ -834,7 +836,7 @@ function ChatPage() {
     setLoading(true);
     const res = await askAI(promptToSend, sys, history);
     if (!isRepeat) setCachedAnswer(text, res.text);
-    const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed, isIdentityAnswer: res.isIdentityAnswer };
+    const assistantMsg: Msg = { role: "assistant", content: res.text, provider: "Bishal's Assistant", webSearchUsed, isIdentityAnswer: res.isIdentityAnswer, revealed: false };
     setMessages([...newMsgs, assistantMsg]);
     await bump();
 
@@ -1284,18 +1286,34 @@ Return STRICT JSON only (no prose, no markdown fences):
                           <span className="text-base leading-none">🦂</span>
                           <span className="text-[11px] font-bold tracking-widest uppercase text-amber-700">ScorpStudy Identity</span>
                         </div>
-                        <div className="prose max-w-none text-foreground ai-prose">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={createIdentityMdComponents()}>
-                            {m.content}
-                          </ReactMarkdown>
-                        </div>
+                        <TypewriterText
+                          content={m.content}
+                          animate={!m.revealed}
+                          onDone={!m.revealed ? () => {
+                            setMessages(prev => {
+                              const next = [...prev];
+                              if (next[i]) next[i] = { ...next[i], revealed: true };
+                              return next;
+                            });
+                          } : undefined}
+                          components={createIdentityMdComponents()}
+                          className="prose max-w-none text-foreground ai-prose"
+                        />
                       </div>
                     ) : (
-                    <div className="prose prose-sm max-w-none text-foreground ai-prose">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={createMdComponents()}>
-                        {m.content}
-                      </ReactMarkdown>
-                    </div>
+                    <TypewriterText
+                      content={m.content}
+                      animate={!m.revealed}
+                      onDone={!m.revealed ? () => {
+                        setMessages(prev => {
+                          const next = [...prev];
+                          if (next[i]) next[i] = { ...next[i], revealed: true };
+                          return next;
+                        });
+                      } : undefined}
+                      components={createMdComponents()}
+                      className="prose prose-sm max-w-none text-foreground ai-prose"
+                    />
                     )
                   ) : null}
                   {m.visualCard && (

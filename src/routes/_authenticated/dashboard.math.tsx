@@ -1,15 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { usePageState } from "@/lib/pageState";
-import { Loader2, ChevronRight, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { askMdComponents } from "@/lib/askMdComponents";
+import { TypewriterText } from "@/components/TypewriterText";
 import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/math")({
@@ -30,7 +28,7 @@ type MathData = {
   exam_tips: string[];
 };
 
-type AskMessage = { role: "user" | "assistant"; content: string };
+type AskMessage = { role: "user" | "assistant"; content: string; revealed?: boolean };
 
 const MATH_SUBJECTS = [
   {
@@ -116,6 +114,10 @@ const MATH_SUBJECTS = [
 
 function buildMathPrompt(topic: string, subject: string): string {
   return `You are a world-class mathematics teacher. Teach "${topic}" from ${subject} in MAXIMUM detail so students truly master the concept.
+
+CRITICAL SYMBOL RULE — applies to every "formula" string and every "solution" string in the JSON below:
+NEVER use LaTeX syntax of any kind — no \\frac{}{}, \\sqrt{}, \\times, \\div, \\pm, \\leq, \\geq, \\neq, \\infty, \\theta, \\pi, \\sum, \\int, \\lim, \\boxed{}, ^{}, _{}, $ signs, or any backslash commands. A student who has never seen LaTeX must be able to read every formula instantly.
+Use plain Unicode symbols instead: × for multiply, ÷ for divide, ± for plus-minus, √ for square root, ² ³ ⁿ for powers/exponents (or write x^2 as x²), ≤ ≥ ≠ ≈ ∞, π θ α β, → for "leads to", Σ for sum, ∫ for integral, and write fractions as "(numerator) / (denominator)" on one line, e.g. "x = (-b ± √(b² - 4ac)) / 2a" NOT "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}".
 
 Return STRICT JSON only — no prose, no markdown fences:
 {
@@ -284,9 +286,16 @@ FORMATTING RULES (strict):
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
-                  <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1 prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:text-xs">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={askMdComponents}>{m.content}</ReactMarkdown>
-                  </div>
+                  <TypewriterText
+                    content={m.content}
+                    animate={!m.revealed}
+                    onDone={!m.revealed ? () => {
+                      const next = [...messages];
+                      if (next[i]) next[i] = { ...next[i], revealed: true };
+                      setAs({ messages: next });
+                    } : undefined}
+                    className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1 prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:text-xs"
+                  />
                 )}
               </div>
             </div>
@@ -347,66 +356,25 @@ function MathPage() {
     setLoading(false);
   }
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-4 lg:max-w-6xl">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-bold">Mathematics</h2>
-          <p className="text-sm text-muted-foreground">Every topic with formulas, worked examples, practice & AI chat</p>
-        </div>
-        <QuotaBadge quota={quota} loading={quotaLoading} />
-      </div>
-
-      {/* Subject pills */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {MATH_SUBJECTS.map(({ subject, icon, color }, i) => (
-          <button key={subject} onClick={() => set({ activeSubjectIdx: i, selectedTopic: null, mathData: null })}
-            className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeSubjectIdx === i ? `${color} text-white shadow-sm` : "border border-border bg-background hover:bg-accent"}`}>
-            {icon} {subject}
+  if (selectedTopic) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            onClick={() => set({ selectedTopic: null, mathData: null })}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back to topics
           </button>
-        ))}
-      </div>
+          <QuotaBadge quota={quota} loading={quotaLoading} />
+        </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Topic list */}
-        <aside className="lg:w-64 flex-shrink-0">
-          <div className="card-soft overflow-hidden">
-            <div className={`border-b border-border px-4 py-2.5 ${activeSubject.light}`}>
-              <p className={`text-xs font-bold uppercase tracking-wider ${activeSubject.text}`}>{activeSubject.icon} {activeSubject.subject}</p>
-            </div>
-            <nav className="max-h-[50vh] overflow-y-auto lg:max-h-[calc(100vh-18rem)]">
-              {activeSubject.topics.map(topic => (
-                <button key={topic} onClick={() => selectTopic(topic)}
-                  className={`flex w-full items-center gap-2 border-b border-border/40 px-4 py-2.5 text-left text-xs transition-colors last:border-0 ${selectedTopic === topic ? `${activeSubject.color} text-white font-bold` : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                  {selectedTopic === topic ? <span className="h-1.5 w-1.5 rounded-full bg-white flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-40" />}
-                  <span className="truncate">{topic}</span>
-                </button>
-              ))}
-            </nav>
+        {loading ? (
+          <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading {selectedTopic}…</p>
           </div>
-        </aside>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          {!selectedTopic ? (
-            <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="text-5xl">{activeSubject.icon}</div>
-              <div>
-                <p className="font-bold">{activeSubject.subject}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Select a topic for formulas, worked examples, practice problems & AI Q&A</p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {activeSubject.topics.slice(0, 4).map(t => (
-                  <button key={t} onClick={() => selectTopic(t)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">{t}</button>
-                ))}
-              </div>
-            </div>
-          ) : loading ? (
-            <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading {selectedTopic}…</p>
-            </div>
-          ) : mathData ? (
+        ) : mathData ? (
             <div className="space-y-4">
               {/* Header */}
               <div className={`rounded-2xl ${activeSubject.color} p-5 text-white`}>
@@ -557,7 +525,64 @@ function MathPage() {
                 </div>
               )}
             </div>
-          ) : null}
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-4 lg:max-w-6xl">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold">Mathematics</h2>
+          <p className="text-sm text-muted-foreground">Every topic with formulas, worked examples, practice & AI chat</p>
+        </div>
+        <QuotaBadge quota={quota} loading={quotaLoading} />
+      </div>
+
+      {/* Subject pills */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {MATH_SUBJECTS.map(({ subject, icon, color }, i) => (
+          <button key={subject} onClick={() => set({ activeSubjectIdx: i, selectedTopic: null, mathData: null })}
+            className={`flex-shrink-0 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeSubjectIdx === i ? `${color} text-white shadow-sm` : "border border-border bg-background hover:bg-accent"}`}>
+            {icon} {subject}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* Topic list */}
+        <aside className="lg:w-64 flex-shrink-0">
+          <div className="card-soft overflow-hidden">
+            <div className={`border-b border-border px-4 py-2.5 ${activeSubject.light}`}>
+              <p className={`text-xs font-bold uppercase tracking-wider ${activeSubject.text}`}>{activeSubject.icon} {activeSubject.subject}</p>
+            </div>
+            <nav className="max-h-[50vh] overflow-y-auto lg:max-h-[calc(100vh-18rem)]">
+              {activeSubject.topics.map(topic => (
+                <button key={topic} onClick={() => selectTopic(topic)}
+                  className={`flex w-full items-center gap-2 border-b border-border/40 px-4 py-2.5 text-left text-xs transition-colors last:border-0 ${selectedTopic === topic ? `${activeSubject.color} text-white font-bold` : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                  {selectedTopic === topic ? <span className="h-1.5 w-1.5 rounded-full bg-white flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-40" />}
+                  <span className="truncate">{topic}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="text-5xl">{activeSubject.icon}</div>
+            <div>
+              <p className="font-bold">{activeSubject.subject}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Select a topic for formulas, worked examples, practice problems & AI Q&A</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {activeSubject.topics.slice(0, 4).map(t => (
+                <button key={t} onClick={() => selectTopic(t)} className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent">{t}</button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

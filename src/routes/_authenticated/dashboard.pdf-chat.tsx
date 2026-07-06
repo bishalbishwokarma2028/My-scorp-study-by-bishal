@@ -10,15 +10,14 @@ import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
 import { usePageState } from "@/lib/pageState";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import logo from "@/assets/scorpstudy-logo.png";
+import { TypewriterText } from "@/components/TypewriterText";
 
 export const Route = createFileRoute("/_authenticated/dashboard/pdf-chat")({
   component: PdfChatPage,
 });
 
-type Message = { role: "user" | "assistant"; content: string; provider?: string };
+type Message = { role: "user" | "assistant"; content: string; provider?: string; revealed?: boolean };
 
 const CHUNK_SIZE = 2500;   // smaller chunks to leave room in system prompt
 const MAX_CHUNKS = 6;      // 6 × 2500 = 15 000 chars — safely under 44 000 limit
@@ -114,7 +113,7 @@ const QUICK_PROMPTS = [
   { icon: "📊", label: "Evidence or data presented",   text: "What evidence or data is presented?" },
 ];
 
-function MessageBubble({ msg }: { msg: Message }) {
+function MessageBubble({ msg, onRevealed }: { msg: Message; onRevealed?: () => void }) {
   const isUser = msg.role === "user";
   return (
     <div className={`flex gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
@@ -128,9 +127,12 @@ function MessageBubble({ msg }: { msg: Message }) {
           {isUser ? (
             <p className="whitespace-pre-wrap">{msg.content}</p>
           ) : (
-            <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1.5 prose-headings:text-[13px] prose-headings:font-extrabold prose-headings:text-violet-900 prose-h2:border-b prose-h2:border-violet-100 prose-h2:pb-1 prose-p:my-2.5 prose-p:leading-relaxed prose-strong:rounded prose-strong:bg-violet-100/70 prose-strong:px-1 prose-strong:py-0.5 prose-strong:font-bold prose-strong:text-violet-900 prose-em:text-violet-700 prose-ul:my-2 prose-ul:space-y-1 prose-ol:my-2 prose-ol:space-y-1 prose-li:my-0.5 prose-li:leading-relaxed prose-code:rounded prose-code:bg-violet-50 prose-code:px-1 prose-code:text-violet-700 prose-code:text-xs prose-blockquote:my-2.5 prose-blockquote:border-l-4 prose-blockquote:border-l-violet-400 prose-blockquote:bg-violet-50 prose-blockquote:rounded-r-lg prose-blockquote:py-1.5 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-violet-900 prose-hr:my-3 prose-hr:border-violet-100">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-            </div>
+            <TypewriterText
+              content={msg.content}
+              animate={!msg.revealed}
+              onDone={onRevealed}
+              className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1.5 prose-headings:text-[13px] prose-headings:font-extrabold prose-headings:text-violet-900 prose-h2:border-b prose-h2:border-violet-100 prose-h2:pb-1 prose-p:my-2.5 prose-p:leading-relaxed prose-strong:rounded prose-strong:bg-violet-100/70 prose-strong:px-1 prose-strong:py-0.5 prose-strong:font-bold prose-strong:text-violet-900 prose-em:text-violet-700 prose-ul:my-2 prose-ul:space-y-1 prose-ol:my-2 prose-ol:space-y-1 prose-li:my-0.5 prose-li:leading-relaxed prose-code:rounded prose-code:bg-violet-50 prose-code:px-1 prose-code:text-violet-700 prose-code:text-xs prose-blockquote:my-2.5 prose-blockquote:border-l-4 prose-blockquote:border-l-violet-400 prose-blockquote:bg-violet-50 prose-blockquote:rounded-r-lg prose-blockquote:py-1.5 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-violet-900 prose-hr:my-3 prose-hr:border-violet-100"
+            />
           )}
         </div>
         {msg.provider && !isUser && <ProviderBadge provider={msg.provider} />}
@@ -259,9 +261,9 @@ function PdfChatPage() {
     try {
       const res = await askWithResilience(text, pdfName, chunks, history);
       await bump();
-      set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider }] });
+      set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider, revealed: false }] });
     } catch {
-      set({ messages: [...msgsWithUser, { role: "assistant", content: "I ran into a hiccup reaching the AI — please send your question again.", provider: "Bishal's Assistant" }] });
+      set({ messages: [...msgsWithUser, { role: "assistant", content: "I ran into a hiccup reaching the AI — please send your question again.", provider: "Bishal's Assistant", revealed: false }] });
     } finally {
       setLoading(false);
     }
@@ -368,7 +370,21 @@ function PdfChatPage() {
 
       {/* Messages area — scrollable, fills available space */}
       <div className="min-h-0 flex-1 overflow-y-auto space-y-3 rounded-xl border border-border bg-background/60 p-3">
-        {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+        {messages.map((msg, i) => (
+          <MessageBubble
+            key={i}
+            msg={msg}
+            onRevealed={
+              msg.role === "assistant" && !msg.revealed
+                ? () => {
+                    const next = [...s.messages];
+                    if (next[i]) next[i] = { ...next[i], revealed: true };
+                    set({ messages: next });
+                  }
+                : undefined
+            }
+          />
+        ))}
         {loading && <ThinkingBubble />}
         <div ref={bottomRef} />
       </div>
