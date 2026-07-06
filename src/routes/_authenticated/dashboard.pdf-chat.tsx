@@ -41,36 +41,68 @@ function scoreChunk(chunk: string, query: string): number {
   }, 0);
 }
 
-function getRelevantContext(chunks: string[], query: string): string {
+function getRelevantContext(chunks: string[], query: string, maxChunks: number = MAX_CHUNKS): string {
   const scored = chunks.map((chunk, i) => ({ chunk, score: scoreChunk(chunk, query), i }));
   scored.sort((a, b) => b.score - a.score || a.i - b.i);
   return scored
-    .slice(0, MAX_CHUNKS)
+    .slice(0, maxChunks)
     .sort((a, b) => a.i - b.i)
     .map((s) => s.chunk)
     .join("\n\n");
 }
 
-// Retries the AI call a couple of times before falling back to a plain
-// general-knowledge answer (no document restriction) — the user should
-// never see a raw "AI is busy" error inside the PDF chat.
+function buildDocSystemPrompt(pdfName: string, context: string): string {
+  return `You are Bishal's Assistant, a friendly expert study AI helping a student understand a document. You must ALWAYS give a confident, complete, well-formatted answer — never say you are unable to answer, never say to try again later, never mention being "busy" or having technical issues.
+
+DOCUMENT: "${pdfName}"
+
+MOST RELEVANT EXCERPTS FROM THE DOCUMENT:
+---
+${context}
+---
+
+STRICT RULES:
+1. First, silently check whether the question relates to content covered in the excerpts above.
+2. If it IS covered: answer using information present in the excerpts. Cite page numbers (e.g. "On Page 3..."), and be thorough and educational — explain concepts, don't just copy text.
+3. If it is NOT covered in the excerpts (a general or off-topic question, including greetings, follow-ups, or requests to simplify/expand on something you already said): do NOT refuse and do NOT say the document doesn't cover it. Instead, start your reply with the short note "📚 *This isn't in your document — here's a general answer:*" on its own line, then answer the question fully, accurately, and helpfully using your own general knowledge as Bishal's Assistant.
+4. If the question is a follow-up referring to the earlier conversation (e.g. "explain more", "simpler please", "give an example"), use the chat history to understand what is being asked and answer it directly — treat it as covered if the earlier topic came from the document.
+
+FORMATTING RULES (always follow, for both document and general answers):
+- Use **bold** generously on key terms, names, numbers, and important phrases.
+- Break the answer into short paragraphs, separated by blank lines — never one dense block of text.
+- Use bullet points or numbered lists for multi-part answers.
+- Use ## headers to organize longer answers into sections.
+- Use > blockquotes to highlight a key definition, direct quote, or takeaway.
+- NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown only.`;
+}
+
+const GENERAL_SYSTEM_PROMPT = "You are Bishal's Assistant, a friendly expert study AI. Answer the student's question directly, confidently, and helpfully using your own general knowledge — never say you are unable to answer or ask them to try again later. Use rich markdown formatting: **bold** for key terms, short paragraphs separated by blank lines, bullet/numbered lists for multi-part answers, ## headers for longer answers, and > blockquotes for key definitions or takeaways.";
+
+// Retries several times, shrinking the document context and finally dropping
+// it entirely, so the user should never see a raw "AI is busy" error inside
+// the PDF chat — there is always a substantive answer by the last attempt.
 async function askWithResilience(
   text: string,
-  systemPrompt: string,
+  pdfName: string,
+  chunks: string[],
   history: { role: "user" | "assistant"; content: string }[],
 ): Promise<{ text: string; provider: string }> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const attempts: { systemPrompt: string; delay: number }[] = [
+    { systemPrompt: buildDocSystemPrompt(pdfName, getRelevantContext(chunks, text, MAX_CHUNKS)), delay: 0 },
+    { systemPrompt: buildDocSystemPrompt(pdfName, getRelevantContext(chunks, text, MAX_CHUNKS)), delay: 600 },
+    { systemPrompt: buildDocSystemPrompt(pdfName, getRelevantContext(chunks, text, 2)), delay: 900 },
+    { systemPrompt: GENERAL_SYSTEM_PROMPT, delay: 1200 },
+    { systemPrompt: GENERAL_SYSTEM_PROMPT, delay: 1800 },
+  ];
+
+  let last: { text: string; provider: string } | null = null;
+  for (const { systemPrompt, delay } of attempts) {
+    if (delay) await new Promise((r) => setTimeout(r, delay));
     const res = await askAI(text, systemPrompt, history);
     if (res.provider !== "none") return res;
-    await new Promise((r) => setTimeout(r, 700));
+    last = res;
   }
-  // Last resort: drop the document context entirely and just answer normally.
-  const fallback = await askAI(
-    text,
-    "You are Bishal's Assistant, a friendly expert study AI. The document search is temporarily unavailable, so answer the student's question directly and helpfully using your own general knowledge. Use markdown formatting with **bold** for key terms.",
-    history,
-  );
-  return fallback;
+  return last ?? { text: "I'm sorry, I couldn't reach the AI service just now — please try again in a moment.", provider: "Bishal's Assistant" };
 }
 
 const QUICK_PROMPTS = [
@@ -96,7 +128,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           {isUser ? (
             <p className="whitespace-pre-wrap">{msg.content}</p>
           ) : (
-            <div className="prose prose-sm max-w-none prose-headings:text-sm prose-headings:font-bold prose-p:my-1.5 prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-ul:my-1 prose-li:my-0.5 prose-code:rounded prose-code:bg-violet-50 prose-code:px-1 prose-code:text-violet-700 prose-code:text-xs prose-blockquote:border-l-violet-400 prose-blockquote:bg-violet-50 prose-blockquote:rounded-r-lg prose-blockquote:py-1">
+            <div className="prose prose-sm max-w-none prose-headings:mt-3 prose-headings:mb-1.5 prose-headings:text-[13px] prose-headings:font-extrabold prose-headings:text-violet-900 prose-h2:border-b prose-h2:border-violet-100 prose-h2:pb-1 prose-p:my-2.5 prose-p:leading-relaxed prose-strong:rounded prose-strong:bg-violet-100/70 prose-strong:px-1 prose-strong:py-0.5 prose-strong:font-bold prose-strong:text-violet-900 prose-em:text-violet-700 prose-ul:my-2 prose-ul:space-y-1 prose-ol:my-2 prose-ol:space-y-1 prose-li:my-0.5 prose-li:leading-relaxed prose-code:rounded prose-code:bg-violet-50 prose-code:px-1 prose-code:text-violet-700 prose-code:text-xs prose-blockquote:my-2.5 prose-blockquote:border-l-4 prose-blockquote:border-l-violet-400 prose-blockquote:bg-violet-50 prose-blockquote:rounded-r-lg prose-blockquote:py-1.5 prose-blockquote:px-3 prose-blockquote:not-italic prose-blockquote:text-violet-900 prose-hr:my-3 prose-hr:border-violet-100">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
             </div>
           )}
@@ -222,31 +254,14 @@ function PdfChatPage() {
     set({ messages: msgsWithUser, input: "" });
     setLoading(true);
 
-    const context = getRelevantContext(chunks, text);
-
-    // Build a system prompt that fits within the 44 000 char Zod limit
-    const systemPrompt = `You are a strict document-based study assistant. You ONLY answer using the document excerpts provided below. You must NOT use any knowledge outside of these excerpts.
-
-DOCUMENT: "${pdfName}"
-
-MOST RELEVANT EXCERPTS FROM THE DOCUMENT:
----
-${context}
----
-
-STRICT RULES:
-1. First, check whether the question relates to content covered in the excerpts above.
-2. If it IS covered: answer ONLY using information present in the excerpts. Cite page numbers (e.g. "On Page 3..."), use **bold** for key terms, bullet points for multi-part answers, ## headers for long answers, and > blockquotes for direct quotes. Be thorough and educational — explain concepts, don't just copy text. NEVER invent, assume, or add information not present in the document excerpts.
-3. If it is NOT covered in the excerpts (a general or off-topic question): do NOT refuse and do NOT say the document doesn't cover it. Instead, start your reply with the short note "📚 *This isn't in your document — here's a general answer:*" on its own line, then answer the question fully, accurately, and helpfully using your own general knowledge as Bishal's Assistant, with the same rich markdown formatting (bold, bullets, headers where useful).`;
-
     const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 2500) }));
 
     try {
-      const res = await askWithResilience(text, systemPrompt, history);
+      const res = await askWithResilience(text, pdfName, chunks, history);
       await bump();
       set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider }] });
     } catch {
-      toast.error("Failed to get answer — please try again");
+      set({ messages: [...msgsWithUser, { role: "assistant", content: "I ran into a hiccup reaching the AI — please send your question again.", provider: "Bishal's Assistant" }] });
     } finally {
       setLoading(false);
     }
