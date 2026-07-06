@@ -9,6 +9,7 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { askMdComponents } from "@/lib/askMdComponents";
 import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/math")({
@@ -241,7 +242,14 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
     const msgsWithUser: AskMessage[] = [...messages, { role: "user", content: text }];
     setAs({ messages: msgsWithUser, input: "" });
     setLoading(true);
-    const system = `You are an expert ${subject} teacher. The student is studying "${topic}". Answer clearly with steps and examples. Use **bold** for key terms and formulas. Show calculations where needed.`;
+    const system = `You are an expert ${subject} teacher. The student is studying "${topic}". Answer clearly with steps and examples.
+
+FORMATTING RULES (strict):
+- Use **bold** generously to highlight key terms, formulas, important numbers, and final answers — every important word or phrase should be bolded so the answer is easy to scan.
+- Break your answer into short paragraphs or a numbered/bulleted list. Never write a big wall of unbroken text.
+- NEVER use LaTeX syntax of any kind — no \\boxed{}, \\frac{}, \\times, \\subset, \\to, ^{}, _{}, $ signs, or backslash commands. Use plain Unicode math symbols instead: × for multiply, ÷ for divide, √ for square root, ² ³ for powers, π, ≤ ≥ ≠ ≈, → for "leads to", ⊂ for subset, ∈ for "is an element of".
+- NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
+- Show calculations step-by-step using plain math notation, bolding the key formula or result of each step.`;
     const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content }));
     const res = await askAI(text, system, history);
     await bump();
@@ -276,8 +284,8 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
-                  <div className="prose prose-sm max-w-none prose-p:my-0.5 prose-strong:font-bold prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:text-xs">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                  <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1 prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:text-xs">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={askMdComponents}>{m.content}</ReactMarkdown>
                   </div>
                 )}
               </div>

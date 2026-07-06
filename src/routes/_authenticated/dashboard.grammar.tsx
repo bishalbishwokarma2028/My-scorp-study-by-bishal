@@ -9,6 +9,7 @@ import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { askMdComponents } from "@/lib/askMdComponents";
 import logo from "@/assets/scorpstudy-logo.png";
 
 export const Route = createFileRoute("/_authenticated/dashboard/grammar")({
@@ -232,7 +233,13 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
     const msgsWithUser: AskMessage[] = [...messages, { role: "user", content: text }];
     setAs({ messages: msgsWithUser, input: "" });
     setLoading(true);
-    const system = `You are an expert English grammar teacher. The student is studying "${topic}" (${category}). Answer their grammar question clearly and helpfully. Use **bold** for key terms. Give examples. Be educational but conversational.`;
+    const system = `You are an expert English grammar teacher. The student is studying "${topic}" (${category}). Answer their grammar question clearly and helpfully. Give examples. Be educational but conversational.
+
+FORMATTING RULES (strict):
+- Use **bold** generously to highlight key grammar terms, rules, and example words/phrases — every important word or phrase should be bolded so the answer is easy to scan.
+- Break your answer into short paragraphs or a numbered/bulleted list. Never write a big wall of unbroken text.
+- Use *italics* for example sentences or words being discussed, to set them apart from the explanation.
+- NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.`;
     const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content }));
     const res = await askAI(text, system, history);
     await bump();
@@ -269,8 +276,8 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
               </div>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm bg-muted/50"}`}>
                 {m.role === "user" ? <p>{m.content}</p> : (
-                  <div className="prose prose-sm max-w-none prose-p:my-0.5 prose-strong:font-bold">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                  <div className="prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-1">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={askMdComponents}>{m.content}</ReactMarkdown>
                   </div>
                 )}
               </div>
