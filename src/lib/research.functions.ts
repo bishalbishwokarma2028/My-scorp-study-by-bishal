@@ -201,13 +201,18 @@ export const deepResearchServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ResearchInput.parse(d))
   .handler(async ({ data }): Promise<ResearchContext> => {
     const serperKey = serverConfig.search.serperKey;
-    const tavilyKey = serverConfig.search.tavilyKey;
+    const tavilyKeys = serverConfig.search.tavilyKeys;
 
     // Run web search and YouTube search in parallel
     const [webResult, youtubeVideos] = await Promise.all([
       (async () => {
         let result: ResearchContext | null = null;
-        if (tavilyKey) result = await tryTavily(data.query, tavilyKey);
+        // Try every configured Tavily key in order before giving up on Tavily
+        for (const key of tavilyKeys) {
+          result = await tryTavily(data.query, key);
+          if (result) break;
+        }
+        // All Tavily keys failed/exhausted (or none configured) — fall back to Serper
         if (!result && serperKey) result = await trySerper(data.query, serperKey);
         return result;
       })(),

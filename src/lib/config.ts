@@ -56,7 +56,9 @@ export const serverConfig = {
   },
   get search() {
     return {
-      tavilyKey: getEnv("TAVILY_API_KEY"),
+      tavilyKeys: [1, 2, 3, 4]
+        .map((i) => (i === 1 ? getEnv("TAVILY_API_KEY", "TAVILY_API_KEY_1") : getEnv(`TAVILY_API_KEY_${i}`)))
+        .filter(Boolean),
       serperKey: getEnv("SERPER_API_KEY"),
     };
   },

@@ -96,10 +96,10 @@ async function fetchTranscriptFromPage(videoId: string): Promise<string | null> 
   }
 }
 
-async function researchVideo(title: string, tavilyKey?: string, serperKey?: string): Promise<string | null> {
+async function researchVideo(title: string, tavilyKeys: string[] = [], serperKey?: string): Promise<string | null> {
   const query = `${title} lecture summary key points transcript`;
 
-  if (tavilyKey) {
+  for (const tavilyKey of tavilyKeys) {
     try {
       const res = await fetch("https://api.tavily.com/search", {
         method: "POST",
@@ -124,7 +124,7 @@ async function researchVideo(title: string, tavilyKey?: string, serperKey?: stri
         const ctx = parts.join("\n\n");
         if (ctx.length > 200) return ctx;
       }
-    } catch { /* fallthrough */ }
+    } catch { /* fallthrough — try next Tavily key */ }
   }
 
   if (serperKey) {
@@ -172,7 +172,7 @@ export const fetchYouTubeServer = createServerFn({ method: "POST" })
     // Fallback: use Tavily/Serper to research the video topic
     const researchContext = await researchVideo(
       title,
-      serverConfig.search.tavilyKey || undefined,
+      serverConfig.search.tavilyKeys,
       serverConfig.search.serperKey || undefined,
     );
 
