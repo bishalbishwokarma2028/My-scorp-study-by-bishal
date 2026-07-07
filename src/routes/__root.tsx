@@ -68,8 +68,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 const SITE_URL = "https://scorpstudy.in.net";
 const SITE_NAME = "ScorpStudy by Bishal";
-const SITE_TITLE = "ScorpStudy by Bishal – AI Student Learning Platform 🚀";
-const SITE_DESCRIPTION = "ScorpStudy by Bishal is an AI-powered learning platform for students. Get study help, notes, quizzes, mock tests and personalized AI tutoring. Study Smart. Learn Faster. Achieve More.";
+const SITE_TITLE = "ScorpStudy by Bishal – Free AI Student Learning Platform";
+const SITE_DESCRIPTION = "ScorpStudy by Bishal is a free AI-powered learning platform for students. Get instant study help, auto-generate quizzes, create smart notes, solve PDFs, make flashcards, build mind maps, and ace every exam with personalized AI tutoring.";
+const OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -91,23 +92,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: SITE_TITLE },
       { property: "og:description", content: SITE_DESCRIPTION },
       { property: "og:url", content: SITE_URL },
-      { property: "og:image", content: `${SITE_URL}/favicon.png` },
-      { property: "og:image:width", content: "512" },
-      { property: "og:image:height", content: "512" },
-      { property: "og:image:alt", content: "ScorpStudy by Bishal – AI Student Learning Platform" },
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:alt", content: "ScorpStudy by Bishal – Free AI Student Learning Platform" },
       { property: "og:locale", content: "en_US" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: SITE_TITLE },
       { name: "twitter:description", content: SITE_DESCRIPTION },
-      { name: "twitter:image", content: `${SITE_URL}/favicon.png` },
-      { name: "twitter:image:alt", content: "ScorpStudy by Bishal – AI Student Learning Platform" },
+      { name: "twitter:image", content: OG_IMAGE },
+      { name: "twitter:image:alt", content: "ScorpStudy by Bishal – Free AI Student Learning Platform" },
       { name: "twitter:creator", content: "@BishalStudy" },
       { name: "twitter:site", content: "@BishalStudy" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/png", href: "/favicon.png" },
-      { rel: "apple-touch-icon", href: "/favicon.png" },
+      { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icon-192.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/site.webmanifest" },
       { rel: "canonical", href: SITE_URL },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -143,10 +148,11 @@ const JSON_LD = JSON.stringify([
     "url": SITE_URL,
     "logo": {
       "@type": "ImageObject",
-      "url": `${SITE_URL}/favicon.png`,
+      "url": `${SITE_URL}/icon-512.png`,
       "width": 512,
       "height": 512,
     },
+    "image": OG_IMAGE,
     "founder": {
       "@type": "Person",
       "name": "Bishal Bishwokarma",
