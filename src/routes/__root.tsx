@@ -125,82 +125,60 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-const JSON_LD = JSON.stringify([
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": SITE_NAME,
-    "alternateName": ["ScorpStudy", "Bishal's Assistant", "ScorpStudy AI"],
-    "url": SITE_URL,
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": {
-        "@type": "EntryPoint",
-        "urlTemplate": `${SITE_URL}/dashboard/chat?q={search_term_string}`,
+const JSON_LD = JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      "name": SITE_NAME,
+      "alternateName": ["ScorpStudy", "Bishal's Assistant", "ScorpStudy AI"],
+      "url": SITE_URL,
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": `${SITE_URL}/dashboard/chat?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
       },
-      "query-input": "required name=search_term_string",
     },
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": SITE_NAME,
-    "url": SITE_URL,
-    "logo": {
-      "@type": "ImageObject",
-      "url": `${SITE_URL}/icon-512.png`,
-      "width": 512,
-      "height": 512,
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      "name": SITE_NAME,
+      "url": SITE_URL,
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${SITE_URL}/icon-512.png`,
+        "width": 512,
+        "height": 512,
+      },
+      "image": OG_IMAGE,
+      "founder": {
+        "@type": "Person",
+        "name": "Bishal Bishwokarma",
+        "url": "https://www.bishalbishwokarma.in.net",
+      },
+      "description": SITE_DESCRIPTION,
+      "sameAs": ["https://www.bishalbishwokarma.in.net"],
     },
-    "image": OG_IMAGE,
-    "founder": {
-      "@type": "Person",
-      "name": "Bishal Bishwokarma",
-      "url": "https://www.bishalbishwokarma.in.net",
+    {
+      "@type": "WebApplication",
+      "@id": `${SITE_URL}/#webapp`,
+      "name": SITE_NAME,
+      "url": SITE_URL,
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "en",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": SITE_DESCRIPTION,
+      "image": OG_IMAGE,
+      "author": { "@type": "Person", "name": "Bishal Bishwokarma" },
     },
-    "description": SITE_DESCRIPTION,
-    "sameAs": ["https://www.bishalbishwokarma.in.net"],
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": SITE_NAME,
-    "url": SITE_URL,
-    "applicationCategory": "EducationalApplication",
-    "operatingSystem": "Web",
-    "inLanguage": "en",
-    "isAccessibleForFree": true,
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "description": SITE_DESCRIPTION,
-    "image": `${SITE_URL}/favicon.png`,
-    "author": { "@type": "Person", "name": "Bishal Bishwokarma" },
-    "featureList": [
-      "Bishal's Assistant – 24/7 AI Study Help",
-      "Study Notes – Chapter-wise Notes",
-      "Quizzes & Tests – Practice & Improve",
-      "PDF to Notes – Smart AI Tool",
-      "Track Progress – Streaks & Badges",
-      "Flashcard Maker – Spaced Repetition",
-      "Mind Maps – Visual Learning",
-      "Universal Translator – Any Language",
-      "Image Question Solver",
-      "Smart Calculator",
-    ],
-  },
-  {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    "name": "ScorpStudy Features",
-    "url": SITE_URL,
-    "itemListElement": [
-      { "@type": "SiteLinksAction", "name": "Bishal's Assistant", "url": `${SITE_URL}/dashboard/chat`, "position": 1 },
-      { "@type": "SiteLinksAction", "name": "Study Notes", "url": `${SITE_URL}/dashboard/notes`, "position": 2 },
-      { "@type": "SiteLinksAction", "name": "Quizzes & Tests", "url": `${SITE_URL}/dashboard/quiz`, "position": 3 },
-      { "@type": "SiteLinksAction", "name": "Flashcards", "url": `${SITE_URL}/dashboard/flashcards`, "position": 4 },
-      { "@type": "SiteLinksAction", "name": "Login", "url": `${SITE_URL}/auth`, "position": 5 },
-    ],
-  },
-]);
+  ],
+});
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
