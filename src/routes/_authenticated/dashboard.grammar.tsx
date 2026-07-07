@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { usePageState } from "@/lib/pageState";
-import { Loader2, ChevronDown, ChevronRight, CheckCircle2, XCircle, Send, MessageCircle, Sparkles } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, XCircle, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
