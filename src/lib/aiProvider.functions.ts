@@ -139,6 +139,37 @@ async function tryGemini(
   }
 }
 
+async function tryCompoundMini(
+  prompt: string,
+  system: string,
+  key: string,
+  history: Turn[],
+): Promise<Result | null> {
+  try {
+    const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "groq/compound-mini",
+        messages,
+        max_tokens: 6000,
+      }),
+    });
+    const body = await res.text();
+    if (!res.ok) {
+      if (isRateLimited(res.status, body)) return null;
+      return null;
+    }
+    const data = JSON.parse(body);
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function tryCerebras(
   prompt: string,
   system: string,
@@ -220,14 +251,23 @@ export const askAIServer = createServerFn({ method: "POST" })
     let result: Result | null = null;
 
     if (data.preferCerebras) {
-      // ── Cerebras-first path (long-answer features) ──────────────────────
-      // Try all Cerebras keys first, then fall back to OpenRouter → HuggingFace.
-      // Groq is intentionally skipped so these features always get long answers.
-      for (const key of serverConfig.ai.cerebrasKeys) {
-        result = await tryCerebras(data.prompt, system, key, history);
+      // ── compound-mini-first path (long-answer features) ─────────────────
+      // Compare, Research, YouTube, CodeTutor, MockTest, PDFChat, Visual,
+      // FormulaSheet, Calculator, Grammar, Math, Science, Notes, Solver
+      for (const key of serverConfig.ai.groqCompoundKeys) {
+        result = await tryCompoundMini(data.prompt, system, key, history);
         if (result) break;
       }
 
+      // Fallback 1 — Cerebras (global fallback for all features)
+      if (!result) {
+        for (const key of serverConfig.ai.cerebrasKeys) {
+          result = await tryCerebras(data.prompt, system, key, history);
+          if (result) break;
+        }
+      }
+
+      // Fallback 2 — OpenRouter
       if (!result && serverConfig.ai.openrouterKey) {
         result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
       }
@@ -235,11 +275,12 @@ export const askAIServer = createServerFn({ method: "POST" })
         result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
       }
 
+      // Fallback 3 — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }
     } else {
-      // ── Groq-first path (all other features) ────────────────────────────
+      // ── Groq llama-first path (quick/short answers) ──────────────────────
       const groqMax = data.maxTokens ?? 1024;
       for (const key of serverConfig.ai.groqPrimaryKeys) {
         result = await tryGroq(data.prompt, system, key, history, groqMax);
@@ -253,13 +294,7 @@ export const askAIServer = createServerFn({ method: "POST" })
         }
       }
 
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
-      }
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
-      }
-
+      // Fallback 1 — Cerebras (global fallback for all features)
       if (!result) {
         for (const key of serverConfig.ai.cerebrasKeys) {
           result = await tryCerebras(data.prompt, system, key, history);
@@ -267,6 +302,15 @@ export const askAIServer = createServerFn({ method: "POST" })
         }
       }
 
+      // Fallback 2 — OpenRouter
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
+      }
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
+      }
+
+      // Fallback 3 — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }

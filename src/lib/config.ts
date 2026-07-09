@@ -47,6 +47,9 @@ export const serverConfig = {
       groqSecondaryKeys: [6, 7]
         .map((i) => getEnv(`GROQ_API_KEY_${i}`))
         .filter(Boolean),
+      groqCompoundKeys: [1, 2, 3, 4, 5, 6, 7, 8]
+        .map((i) => getEnv(`GROQ_COMPOUND_KEY_${i}`))
+        .filter(Boolean),
       openrouterKey: getEnv("OPENROUTER_API_KEY"),
       cerebrasKeys: [1, 2, 3, 4, 5, 6]
         .map((i) => getEnv(`CEREBRAS_API_KEY_${i}`))
