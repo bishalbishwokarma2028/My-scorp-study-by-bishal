@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
-import { CEREBRAS_DAILY_LIMIT, GROQ_DAILY_LIMIT } from "@/lib/usageLimit.config";
 import { Brain, Zap, CheckCircle2, Info, Sparkles, FlaskConical } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/credits")({
@@ -184,11 +183,11 @@ function CreditsPage() {
           <div className="mt-5 flex flex-wrap gap-3">
             <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur-sm">
               <Brain className="h-4 w-4" />
-              <span>Deep Engine — {CEREBRAS_DAILY_LIMIT} credits</span>
+              <span>Deep Engine — {cQuota?.limit ?? "…"} credits</span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur-sm">
               <Zap className="h-4 w-4" />
-              <span>Rapid Engine — {GROQ_DAILY_LIMIT} credits</span>
+              <span>Rapid Engine — {gQuota?.limit ?? "…"} credits</span>
             </div>
           </div>
         </div>
@@ -200,7 +199,7 @@ function CreditsPage() {
           title="Deep Engine"
           subtitle="Powers deep-thinking, long-answer features"
           used={cQuota?.used ?? 0}
-          limit={CEREBRAS_DAILY_LIMIT}
+          limit={cQuota?.limit ?? 0}
           loading={cLoad}
           features={DEEP_ENGINE_FEATURES}
           gradient="bg-gradient-to-br from-violet-400 via-purple-400 to-pink-400"
@@ -214,7 +213,7 @@ function CreditsPage() {
           title="Rapid Engine"
           subtitle="Powers fast, conversational features"
           used={gQuota?.used ?? 0}
-          limit={GROQ_DAILY_LIMIT}
+          limit={gQuota?.limit ?? 0}
           loading={gLoad}
           features={RAPID_ENGINE_FEATURES}
           gradient="bg-gradient-to-br from-amber-400 via-orange-400 to-rose-400"
@@ -249,7 +248,7 @@ function CreditsPage() {
             {
               icon: <Sparkles className="h-5 w-5 text-amber-500" />,
               title: "Shared across features",
-              desc: "All Deep Engine features share the same 10-credit pool. All Rapid Engine features share the 20-credit pool.",
+              desc: `All Deep Engine features share the same ${cQuota?.limit ?? "…"}-credit pool. All Rapid Engine features share the ${gQuota?.limit ?? "…"}-credit pool.`,
             },
           ].map((item) => (
             <div key={item.title} className="rounded-xl bg-muted/50 p-4 space-y-2">
