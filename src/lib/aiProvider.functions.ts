@@ -156,6 +156,12 @@ async function tryCompoundMini(
         model: "groq/compound-mini",
         messages,
         max_tokens: 6000,
+        // Disable compound-mini's built-in agentic tool use (web search / code
+        // execution / visit-website) — those internally invoke extra worker
+        // models (llama-3.3-70b-versatile, gpt-oss-120b, etc.), which shows up
+        // as multiple calls per request. We already do our own web search, so
+        // we only want the compound-mini model itself to answer.
+        compound_custom: { tools: { enabled_tools: [] } },
       }),
     });
     const body = await res.text();
