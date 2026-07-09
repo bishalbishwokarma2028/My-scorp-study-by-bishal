@@ -482,7 +482,8 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
 
     const prompt = buildAnalyzePrompt(s.code, s.language, s.mode, s.targetLang, s.question);
     const res = await askAI(prompt,
-      `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. You give deep, line-by-line explanations referencing exact line numbers from the numbered code provided. Every explanation starts from the very first line. You never skip lines. You explain every concept from scratch. Use markdown with code blocks. Be thorough and educational.`);
+      `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. You give deep, line-by-line explanations referencing exact line numbers from the numbered code provided. Every explanation starts from the very first line. You never skip lines. You explain every concept from scratch. Use markdown with code blocks. Be thorough and educational.`,
+      undefined, true);
     set({ provider: res.provider, result: res.text });
     await bump();
     setLoading(false);
@@ -714,7 +715,7 @@ RULES YOU MUST FOLLOW:
 6. If asked to add tests, error handling, or async support — implement it properly`;
 
     const history: HistoryMsg[] = newMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
-    const res = await askAI(prompt, systemPrompt, history);
+    const res = await askAI(prompt, systemPrompt, history, true);
     set({ messages: [...newMessages, { role: "assistant", content: res.text, provider: res.provider }] });
     await bump();
     setLoading(false);

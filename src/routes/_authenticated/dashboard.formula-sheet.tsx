@@ -318,7 +318,8 @@ with columns: Formula | What It Finds | Key Variables
 ${formatInstr}`;
 
     const res = await askAI(prompt,
-      "You are an expert teacher and mathematician who produces exhaustive, complete formula references — you never skip or truncate formulas for the sake of brevity. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Include short derivations/proofs from first principles whenever mathematically standard. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.");
+      "You are an expert teacher and mathematician who produces exhaustive, complete formula references — you never skip or truncate formulas for the sake of brevity. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Include short derivations/proofs from first principles whenever mathematically standard. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.",
+      undefined, true);
     set({ sheet: res.text, provider: res.provider });
     await bump();
     setLoading(false);

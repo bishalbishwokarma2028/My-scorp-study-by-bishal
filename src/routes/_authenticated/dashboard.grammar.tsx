@@ -239,7 +239,7 @@ FORMATTING RULES (strict):
 - Use *italics* for example sentences or words being discussed, to set them apart from the explanation.
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.`;
     const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2500) }));
-    const res = await askAI(text, system, history);
+    const res = await askAI(text, system, history, true);
     await bump();
     setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
     setLoading(false);
@@ -341,7 +341,7 @@ function GrammarPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     set({ selectedTopic: topic, selectedCategory: category, grammarData: null, activeSection: "learn" });
     setLoading(true);
-    const res = await askAI(buildGrammarPrompt(topic), "Return ONLY valid JSON — no markdown, no prose.");
+    const res = await askAI(buildGrammarPrompt(topic), "Return ONLY valid JSON — no markdown, no prose.", undefined, true);
     set({ provider: res.provider });
     await bump();
     const parsed = extractJSON<GrammarData>(res.text);

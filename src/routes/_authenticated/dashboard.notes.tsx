@@ -272,6 +272,7 @@ function NotesPage() {
     setAiLoading("enhance");
     const res = await askAI(
       `Improve, structure and polish these study notes. Keep meaning, fix grammar, use clear Markdown headings/bullets. Bold the key terms with **.\n\nNotes:\n${content}`,
+      undefined, undefined, true,
     );
     setContent(res.text);
     setDirty(true);
@@ -283,7 +284,7 @@ function NotesPage() {
     if (!content.trim()) return toast.error("Write something first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setAiLoading("summarize");
-    const res = await askAI(`Summarize these notes as crisp bullet points with bolded key terms:\n${content}`);
+    const res = await askAI(`Summarize these notes as crisp bullet points with bolded key terms:\n${content}`, undefined, undefined, true);
     setContent(`${content}\n\n---\n\n## ✨ Summary\n${res.text}`);
     setDirty(true);
     await bump();

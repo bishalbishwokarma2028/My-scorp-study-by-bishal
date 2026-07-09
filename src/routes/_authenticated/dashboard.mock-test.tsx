@@ -150,7 +150,7 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
 The "ans" field is the 0-based index of the correct option.`;
 
     const { data } = await askAIJSON<{ questions: Question[] }>(prompt,
-      "You are an expert exam paper setter. Return ONLY valid JSON. No markdown fences.");
+      "You are an expert exam paper setter. Return ONLY valid JSON. No markdown fences.", undefined, true);
 
     if (!data?.questions?.length) {
       toast.error("Failed to generate questions — please try again");

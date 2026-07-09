@@ -97,7 +97,7 @@ async function askWithResilience(
   let last: { text: string; provider: string } | null = null;
   for (const { systemPrompt, delay } of attempts) {
     if (delay) await new Promise((r) => setTimeout(r, delay));
-    const res = await askAI(text, systemPrompt, history);
+    const res = await askAI(text, systemPrompt, history, true);
     if (res.provider !== "none") return res;
     last = res;
   }

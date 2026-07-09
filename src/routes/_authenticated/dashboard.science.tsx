@@ -396,7 +396,7 @@ FORMATTING RULES (strict):
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
 - Show equations and formulas using plain notation, bolding the key result of each step.`;
     const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2500) }));
-    const res = await askAI(text, system, history);
+    const res = await askAI(text, system, history, true);
     await bump();
     setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
     setLoading(false);
@@ -491,7 +491,7 @@ function SciencePage() {
     set({ selectedTopic: topic, scienceData: null });
     setLoading(true);
     try {
-      const res = await askAI(buildSciencePrompt(topic, activeSubject.subject), "You are a science teacher. Return ONLY valid JSON — no markdown, no prose.");
+      const res = await askAI(buildSciencePrompt(topic, activeSubject.subject), "You are a science teacher. Return ONLY valid JSON — no markdown, no prose.", undefined, true);
       set({ provider: res.provider });
       await bump();
       const parsed = extractJSON<ScienceData>(res.text);

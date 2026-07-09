@@ -122,7 +122,7 @@ Return STRICT JSON only — no prose, no markdown fences:
   "whenToChoose": "3-4 sentences giving practical guidance on how to decide which concept/approach applies in a given situation, with concrete decision criteria"
 }`;
 
-    const { data: parsed, provider: prov } = await askAIJSON<Comparison>(prompt);
+    const { data: parsed, provider: prov } = await askAIJSON<Comparison>(prompt, undefined, undefined, true);
     set({ provider: prov });
     await bump();
     if (!parsed || !parsed.conceptA || !parsed.conceptB) {

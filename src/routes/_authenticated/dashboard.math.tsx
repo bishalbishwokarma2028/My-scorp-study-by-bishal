@@ -253,7 +253,7 @@ FORMATTING RULES (strict):
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
 - Show calculations step-by-step using plain math notation, bolding the key formula or result of each step.`;
     const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2500) }));
-    const res = await askAI(text, system, history);
+    const res = await askAI(text, system, history, true);
     await bump();
     setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
     setLoading(false);
@@ -347,7 +347,7 @@ function MathPage() {
     set({ selectedTopic: topic, mathData: null, section: "learn", expandedExample: 0 });
     setLoading(true);
     try {
-      const res = await askAI(buildMathPrompt(topic, activeSubject.subject), "You are a math teacher. Return ONLY valid JSON — no markdown, no prose.");
+      const res = await askAI(buildMathPrompt(topic, activeSubject.subject), "You are a math teacher. Return ONLY valid JSON — no markdown, no prose.", undefined, true);
       set({ provider: res.provider });
       await bump();
       const parsed = extractJSON<MathData>(res.text);

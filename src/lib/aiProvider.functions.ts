@@ -10,6 +10,8 @@ const Input = z.object({
   prompt: z.string().min(1).max(50000),
   systemPrompt: z.string().max(44000).optional(),
   history: z.array(HistoryMsg).max(12).optional(),
+  /** When true: skip Groq entirely and route through Cerebras for long, detailed answers. */
+  preferCerebras: z.boolean().optional(),
 });
 
 type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
@@ -214,34 +216,56 @@ export const askAIServer = createServerFn({ method: "POST" })
 
     let result: Result | null = null;
 
-    for (const key of serverConfig.ai.groqPrimaryKeys) {
-      result = await tryGroq(data.prompt, system, key, history);
-      if (result) break;
-    }
-
-    if (!result) {
-      for (const key of serverConfig.ai.groqSecondaryKeys) {
-        result = await tryGroq(data.prompt, system, key, history);
-        if (result) break;
-      }
-    }
-
-    if (!result && serverConfig.ai.openrouterKey) {
-      result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
-    }
-    if (!result && serverConfig.ai.openrouterKey) {
-      result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
-    }
-
-    if (!result) {
+    if (data.preferCerebras) {
+      // ── Cerebras-first path (long-answer features) ──────────────────────
+      // Try all Cerebras keys first, then fall back to OpenRouter → HuggingFace.
+      // Groq is intentionally skipped so these features always get long answers.
       for (const key of serverConfig.ai.cerebrasKeys) {
         result = await tryCerebras(data.prompt, system, key, history);
         if (result) break;
       }
-    }
 
-    if (!result && serverConfig.ai.huggingfaceKey) {
-      result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
+      }
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
+      }
+
+      if (!result && serverConfig.ai.huggingfaceKey) {
+        result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
+      }
+    } else {
+      // ── Groq-first path (all other features) ────────────────────────────
+      for (const key of serverConfig.ai.groqPrimaryKeys) {
+        result = await tryGroq(data.prompt, system, key, history);
+        if (result) break;
+      }
+
+      if (!result) {
+        for (const key of serverConfig.ai.groqSecondaryKeys) {
+          result = await tryGroq(data.prompt, system, key, history);
+          if (result) break;
+        }
+      }
+
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
+      }
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
+      }
+
+      if (!result) {
+        for (const key of serverConfig.ai.cerebrasKeys) {
+          result = await tryCerebras(data.prompt, system, key, history);
+          if (result) break;
+        }
+      }
+
+      if (!result && serverConfig.ai.huggingfaceKey) {
+        result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
+      }
     }
 
     if (result) {

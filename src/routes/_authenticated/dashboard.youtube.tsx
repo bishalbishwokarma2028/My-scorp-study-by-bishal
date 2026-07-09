@@ -297,24 +297,24 @@ function YoutubePage() {
 
     try {
       if (tab === "summary") {
-        const res = await askAI(buildSummaryPrompt(c, t, isResearch), "You are a study assistant. Write a rich markdown summary using ONLY the provided source material — no outside knowledge, no information from other videos, and no assumptions. Be concise, accurate, and faithful to the source.");
+        const res = await askAI(buildSummaryPrompt(c, t, isResearch), "You are a study assistant. Write a rich markdown summary using ONLY the provided source material — no outside knowledge, no information from other videos, and no assumptions. Be concise, accurate, and faithful to the source.", undefined, true);
         set({ provider: res.provider });
         await bump();
         set({ tabContent: { ...tabContent, summary: res.text } });
       } else if (tab === "keypoints") {
-        const res = await askAI(buildKeyPointsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material — never introduce facts from outside sources.");
+        const res = await askAI(buildKeyPointsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material — never introduce facts from outside sources.", undefined, true);
         set({ provider: res.provider });
         await bump();
         const parsed = extractJSON<{ points: { emoji: string; point: string; detail: string }[] }>(res.text);
         if (parsed?.points) set({ tabContent: { ...tabContent, keypoints: parsed.points as unknown as string[] } });
       } else if (tab === "flashcards") {
-        const res = await askAI(buildFlashcardsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material — never introduce facts from outside sources.");
+        const res = await askAI(buildFlashcardsPrompt(c, t, isResearch), "Return ONLY valid JSON. Base everything strictly on the provided source material — never introduce facts from outside sources.", undefined, true);
         set({ provider: res.provider });
         await bump();
         const parsed = extractJSON<{ cards: Flashcard[] }>(res.text);
         if (parsed?.cards) set({ tabContent: { ...tabContent, flashcards: parsed.cards } });
       } else if (tab === "quiz") {
-        const res = await askAI(buildQuizPrompt(c, t, isResearch), "Return ONLY valid JSON. Base every question strictly on the provided source material — never introduce facts from outside sources.");
+        const res = await askAI(buildQuizPrompt(c, t, isResearch), "Return ONLY valid JSON. Base every question strictly on the provided source material — never introduce facts from outside sources.", undefined, true);
         set({ provider: res.provider });
         await bump();
         const parsed = extractJSON<{ questions: QuizQ[] }>(res.text);
