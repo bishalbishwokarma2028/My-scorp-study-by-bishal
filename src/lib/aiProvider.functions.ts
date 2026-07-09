@@ -46,7 +46,7 @@ async function tryGroq(
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages,
-        max_tokens: 6000,
+        max_tokens: 1024, // Groq free tier: 6 000 TPM *total* (input + output); keep output small
       }),
     });
     const body = await res.text();
