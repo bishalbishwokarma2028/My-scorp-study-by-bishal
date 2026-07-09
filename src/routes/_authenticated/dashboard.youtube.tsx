@@ -256,7 +256,7 @@ function YoutubePage() {
   const { url, videoInfo, activeTab, tabContent, provider } = s;
   const [fetching, setFetching] = useState(false);
   const [tabLoading, setTabLoading] = useState<TabKey | null>(null);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "youtube");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   async function fetchVideo() {
     if (!url.trim()) return toast.error("Enter a YouTube URL");

@@ -176,7 +176,7 @@ function PdfChatPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "pdf-chat");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

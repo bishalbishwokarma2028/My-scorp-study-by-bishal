@@ -32,7 +32,7 @@ function SummarizerPage() {
   const [output, setOutput] = useState<Output | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "summarizer");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   useEffect(() => {
     try {

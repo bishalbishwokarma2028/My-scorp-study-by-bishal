@@ -213,7 +213,7 @@ function AskPanel({ topic, category }: { topic: string; category: string }) {
   const { messages, input } = as;
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { quota, bump } = useUsageLimit(user.id, "grammar-ask");
+  const { quota, bump } = useUsageLimit(user.id, "cerebras");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
@@ -330,7 +330,7 @@ function GrammarPage() {
   });
   const { openCategories, selectedTopic, selectedCategory, grammarData, activeSection, provider } = ps;
   const [loading, setLoading] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "grammar");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   function toggleCategory(cat: string) {
     set({ openCategories: openCategories.includes(cat) ? openCategories.filter(c => c !== cat) : [...openCategories, cat] });

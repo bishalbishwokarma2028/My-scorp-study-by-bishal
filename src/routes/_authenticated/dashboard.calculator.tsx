@@ -335,7 +335,7 @@ function FormulaHelper({ userId }: { userId: string }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(userId, "formula");
+  const { quota, quotaLoading, bump } = useUsageLimit(userId, "cerebras");
 
   async function ask() {
     if (!q.trim()) return;

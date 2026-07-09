@@ -39,7 +39,7 @@ function TranslatorPage() {
   const [target, setTarget] = useState("Spanish");
   const [loading, setLoading] = useState(false);
   const [auto] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "translator");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   // Restore from history
   useEffect(() => {

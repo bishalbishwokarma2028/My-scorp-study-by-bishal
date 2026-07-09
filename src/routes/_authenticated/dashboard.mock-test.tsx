@@ -67,7 +67,7 @@ function gradeInfo(pct: number) {
 
 function MockTestPage() {
   const { user } = Route.useRouteContext();
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "mock_test");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const [phase,      setPhase]      = useState<Phase>("setup");
   const [subject,    setSubject]    = useState("Physics");

@@ -112,7 +112,7 @@ function QuizPage() {
   const [done, setDone] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
   const [showAnswers, setShowAnswers] = useState<boolean[]>([]);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "quiz");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   useEffect(() => {
     const seed = sessionStorage.getItem("scorp_quiz_topic");

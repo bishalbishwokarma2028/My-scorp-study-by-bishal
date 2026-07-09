@@ -215,7 +215,7 @@ function FormulaSheetPage() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied]   = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "formula_sheet");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const quickTopics = QUICK_TOPICS[s.subject] ?? [];
 

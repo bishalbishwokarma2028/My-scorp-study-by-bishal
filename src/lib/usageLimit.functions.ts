@@ -2,11 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { serverConfig } from "./config";
-import { DAILY_CREDIT_LIMIT, GLOBAL_POOL_KEY } from "./usageLimit.config";
+import { limitForPool, GROQ_POOL_KEY } from "./usageLimit.config";
 
 const Input = z.object({
   userId: z.string().uuid(),
-  feature: z.string().optional(), // accepted but ignored — all features share one pool
+  pool: z.enum(["cerebras", "groq"]).optional(), // defaults to "groq"
 });
 
 function getAdminClient() {
@@ -21,27 +21,31 @@ function todayUTC(): string {
 export const getUsageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
+    const pool = data.pool ?? GROQ_POOL_KEY;
+    const limit = limitForPool(pool);
     const today = todayUTC();
 
     const { data: row } = await getAdminClient()
       .from("feature_usage")
       .select("count")
       .eq("user_id", data.userId)
-      .eq("feature", GLOBAL_POOL_KEY)
+      .eq("feature", pool)
       .eq("usage_date", today)
       .maybeSingle();
 
     const used = (row as { count: number } | null)?.count ?? 0;
     return {
       used,
-      limit: DAILY_CREDIT_LIMIT,
-      remaining: Math.max(0, DAILY_CREDIT_LIMIT - used),
+      limit,
+      remaining: Math.max(0, limit - used),
     };
   });
 
 export const bumpUsageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
+    const pool = data.pool ?? GROQ_POOL_KEY;
+    const limit = limitForPool(pool);
     const today = todayUTC();
     const admin = getAdminClient();
 
@@ -49,19 +53,14 @@ export const bumpUsageServer = createServerFn({ method: "POST" })
       .from("feature_usage")
       .select("count")
       .eq("user_id", data.userId)
-      .eq("feature", GLOBAL_POOL_KEY)
+      .eq("feature", pool)
       .eq("usage_date", today)
       .maybeSingle();
 
     const currentCount = (row as { count: number } | null)?.count ?? 0;
 
-    if (currentCount >= DAILY_CREDIT_LIMIT) {
-      return {
-        allowed: false,
-        used: currentCount,
-        limit: DAILY_CREDIT_LIMIT,
-        remaining: 0,
-      };
+    if (currentCount >= limit) {
+      return { allowed: false, used: currentCount, limit, remaining: 0 };
     }
 
     const newCount = currentCount + 1;
@@ -69,7 +68,7 @@ export const bumpUsageServer = createServerFn({ method: "POST" })
     await admin.from("feature_usage").upsert(
       {
         user_id: data.userId,
-        feature: GLOBAL_POOL_KEY,
+        feature: pool,
         usage_date: today,
         count: newCount,
       },
@@ -79,7 +78,7 @@ export const bumpUsageServer = createServerFn({ method: "POST" })
     return {
       allowed: true,
       used: newCount,
-      limit: DAILY_CREDIT_LIMIT,
-      remaining: Math.max(0, DAILY_CREDIT_LIMIT - newCount),
+      limit,
+      remaining: Math.max(0, limit - newCount),
     };
   });

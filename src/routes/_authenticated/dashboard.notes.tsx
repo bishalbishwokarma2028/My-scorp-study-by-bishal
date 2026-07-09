@@ -147,7 +147,7 @@ function NotesPage() {
   const [aiLoading, setAiLoading] = useState<null | string>(null);
   const [tmplOpen, setTmplOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "notes");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const { data: notes } = useQuery({
     queryKey: ["notes", user.id],

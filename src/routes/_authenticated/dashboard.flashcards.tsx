@@ -70,7 +70,7 @@ function FlashcardsPage() {
   const [typed, setTyped] = useState("");
   const [matches, setMatches] = useState<{ q: number; a: number }[]>([]);
   const [selQ, setSelQ] = useState<number | null>(null);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "flashcards");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   useEffect(() => {
     try {

@@ -50,7 +50,7 @@ function ResearchPage() {
 
   const [loading, setLoading] = useState(false);
   const [copied,  setCopied]  = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "research");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   // Restore from History navigation
   useEffect(() => {

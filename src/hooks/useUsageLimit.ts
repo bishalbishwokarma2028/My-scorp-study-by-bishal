@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getUsageServer, bumpUsageServer } from "@/lib/usageLimit.functions";
-import { DAILY_CREDIT_LIMIT } from "@/lib/usageLimit.config";
+import { limitForPool, type PoolKey, GROQ_POOL_KEY } from "@/lib/usageLimit.config";
 
 export type QuotaState = {
   used: number;
@@ -12,45 +12,47 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function localKey(userId: string): string {
-  return `scorp_quota_${userId}_global`;
+function localKey(userId: string, pool: PoolKey): string {
+  return `scorp_quota_${userId}_${pool}`;
 }
 
-function readLocal(userId: string): QuotaState {
+function readLocal(userId: string, pool: PoolKey): QuotaState {
+  const limit = limitForPool(pool);
   try {
-    const raw = localStorage.getItem(localKey(userId));
-    if (!raw) return { used: 0, limit: DAILY_CREDIT_LIMIT, remaining: DAILY_CREDIT_LIMIT };
+    const raw = localStorage.getItem(localKey(userId, pool));
+    if (!raw) return { used: 0, limit, remaining: limit };
     const parsed = JSON.parse(raw) as { date: string; used: number };
-    if (parsed.date !== todayKey()) return { used: 0, limit: DAILY_CREDIT_LIMIT, remaining: DAILY_CREDIT_LIMIT };
+    if (parsed.date !== todayKey()) return { used: 0, limit, remaining: limit };
     const used = parsed.used ?? 0;
-    return { used, limit: DAILY_CREDIT_LIMIT, remaining: Math.max(0, DAILY_CREDIT_LIMIT - used) };
+    return { used, limit, remaining: Math.max(0, limit - used) };
   } catch {
-    return { used: 0, limit: DAILY_CREDIT_LIMIT, remaining: DAILY_CREDIT_LIMIT };
+    return { used: 0, limit, remaining: limit };
   }
 }
 
-function writeLocal(userId: string, used: number): QuotaState {
+function writeLocal(userId: string, pool: PoolKey, used: number): QuotaState {
+  const limit = limitForPool(pool);
   try {
-    localStorage.setItem(localKey(userId), JSON.stringify({ date: todayKey(), used }));
+    localStorage.setItem(localKey(userId, pool), JSON.stringify({ date: todayKey(), used }));
   } catch { /* storage full */ }
-  return { used, limit: DAILY_CREDIT_LIMIT, remaining: Math.max(0, DAILY_CREDIT_LIMIT - used) };
+  return { used, limit, remaining: Math.max(0, limit - used) };
 }
 
 /**
- * Shared daily credit pool — all features share the same 30-credit balance.
- * The `feature` param is accepted for call-site backward-compat but is ignored.
+ * Per-pool daily credit hook.
+ * Pass pool = "cerebras" for all Cerebras features (10 credits/day shared),
+ * or pool = "groq" for all Groq features (20 credits/day shared).
  */
-export function useUsageLimit(userId: string, feature?: string) {
-  void feature; // accepted but unused — server uses the global pool
+export function useUsageLimit(userId: string, pool: PoolKey = GROQ_POOL_KEY) {
   const [quota, setQuota] = useState<QuotaState | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(true);
 
   useEffect(() => {
     setQuotaLoading(true);
-    const local = readLocal(userId);
+    const local = readLocal(userId, pool);
     setQuota(local);
 
-    getUsageServer({ data: { userId } })
+    getUsageServer({ data: { userId, pool } })
       .then((serverQuota) => {
         const used = Math.max(serverQuota.used, local.used);
         const synced: QuotaState = {
@@ -59,33 +61,33 @@ export function useUsageLimit(userId: string, feature?: string) {
           remaining: Math.max(0, serverQuota.limit - used),
         };
         setQuota(synced);
-        writeLocal(userId, used);
+        writeLocal(userId, pool, used);
       })
       .catch(() => { /* keep local value on network error */ })
       .finally(() => setQuotaLoading(false));
-  }, [userId]);
+  }, [userId, pool]);
 
   const bump = useCallback(async (): Promise<{ allowed: boolean }> => {
-    const current = readLocal(userId);
+    const current = readLocal(userId, pool);
     if (current.remaining <= 0) return { allowed: false };
 
-    const optimistic = writeLocal(userId, current.used + 1);
+    const optimistic = writeLocal(userId, pool, current.used + 1);
     setQuota(optimistic);
 
     try {
-      const result = await bumpUsageServer({ data: { userId } });
+      const result = await bumpUsageServer({ data: { userId, pool } });
       const synced: QuotaState = {
         used: result.used,
         limit: result.limit,
         remaining: result.remaining,
       };
       setQuota(synced);
-      writeLocal(userId, result.used);
+      writeLocal(userId, pool, result.used);
       return { allowed: result.allowed };
     } catch {
       return { allowed: true };
     }
-  }, [userId]);
+  }, [userId, pool]);
 
   return { quota, quotaLoading, bump };
 }

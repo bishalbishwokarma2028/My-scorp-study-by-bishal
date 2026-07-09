@@ -61,7 +61,7 @@ function ComparePage() {
   // Transient UI state
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "compare");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   // Restore from History navigation
   useEffect(() => {

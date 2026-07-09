@@ -591,7 +591,7 @@ function VisualExplainerPage() {
   const [loading, setLoading]   = useState(false);
   const [selected, setSelected] = useState<SelectedNode | null>(null);
   const svgRef = useRef<HTMLDivElement>(null);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "visual_explainer");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   // Restore from History navigation
   useEffect(() => {

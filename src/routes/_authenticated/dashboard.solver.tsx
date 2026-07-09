@@ -239,7 +239,7 @@ function SolverPage() {
   });
   const { problem, subject, solution, provider, revealed } = s;
   const [loading, setLoading] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "solver");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   async function solve() {
     if (!problem.trim()) return toast.error("Enter a problem to solve");
@@ -250,6 +250,7 @@ function SolverPage() {
       const res = await askAI(
         buildPrompt(problem, subject),
         "You are an expert tutor. Return ONLY valid JSON — absolutely no markdown fences or prose outside the JSON.",
+        undefined, true,
       );
       set({ provider: res.provider });
       await bump();

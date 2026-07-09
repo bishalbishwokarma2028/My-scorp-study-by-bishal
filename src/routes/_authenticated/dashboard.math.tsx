@@ -226,7 +226,7 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
   const { messages, input } = as;
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { quota, bump } = useUsageLimit(user.id, "math-ask");
+  const { quota, bump } = useUsageLimit(user.id, "cerebras");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
@@ -337,7 +337,7 @@ function MathPage() {
   });
   const { activeSubjectIdx, selectedTopic, mathData, section, provider, expandedExample } = ps;
   const [loading, setLoading] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "math");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const activeSubject = MATH_SUBJECTS[activeSubjectIdx];
 

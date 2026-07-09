@@ -369,7 +369,7 @@ function AskPanel({ topic, subject }: { topic: string; subject: string }) {
   const { messages, input } = as;
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { quota, bump } = useUsageLimit(user.id, "science-ask");
+  const { quota, bump } = useUsageLimit(user.id, "cerebras");
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
@@ -477,7 +477,7 @@ function SciencePage() {
   });
   const { activeSubjectIdx, openChapter, selectedTopic, scienceData, provider } = ps;
   const [loading, setLoading] = useState(false);
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "science");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const activeSubject = SCIENCE_SUBJECTS[activeSubjectIdx];
 

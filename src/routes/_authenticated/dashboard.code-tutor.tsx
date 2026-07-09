@@ -587,7 +587,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
       </div>
 
       {/* Right: analysis result */}
-      <div className="card-soft p-4 space-y-3 min-h-[400px] overflow-x-hidden lg:overflow-y-auto lg:h-full">
+      <div className="card-soft p-4 space-y-3 min-h-[400px] min-w-0 overflow-x-hidden lg:overflow-y-auto lg:h-full">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -623,7 +623,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           </div>
         )}
         {!loading && s.result && (
-          <div className="w-full min-w-0 overflow-x-auto max-w-full">
+          <div className="w-full min-w-0 overflow-hidden max-w-full">
             <RichMarkdown content={injectCodeSnippets(s.result, s.code)} />
           </div>
         )}
@@ -839,7 +839,7 @@ RULES YOU MUST FOLLOW:
 function CodeTutorPage() {
   const { user } = Route.useRouteContext();
   const [s, set] = usePageState("code-tutor-page", { activeTab: "analyze" as Tab });
-  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "code_tutor");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   return (
     <div className="space-y-5">

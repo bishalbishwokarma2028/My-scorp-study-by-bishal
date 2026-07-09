@@ -678,7 +678,7 @@ function ChatPage() {
   const askedQuestionsRef = useRef<Set<string>>(new Set());
   const selectedMsgIdxRef = useRef<number | null>(null);
   const chatIdRef = useRef<string | null>(null);
-  const { quota, bump } = useUsageLimit(user.id, "chat");
+  const { quota, bump } = useUsageLimit(user.id, "groq");
 
   const chatStorageKey = `scorp_chat_msgs_${user.id}`;
 
