@@ -11,8 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AdminRouteRouteImport } from './routes/_admin/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
+import { Route as AdminAdminIndexRouteImport } from './routes/_admin/admin.index'
 import { Route as AuthenticatedDashboardYoutubeRouteImport } from './routes/_authenticated/dashboard.youtube'
 import { Route as AuthenticatedDashboardVisualExplainerRouteImport } from './routes/_authenticated/dashboard.visual-explainer'
 import { Route as AuthenticatedDashboardTranslatorRouteImport } from './routes/_authenticated/dashboard.translator'
@@ -36,6 +39,9 @@ import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_aut
 import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
 import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
 import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
+import { Route as AdminAdminUsersRouteImport } from './routes/_admin/admin.users'
+import { Route as AdminAdminUsageRouteImport } from './routes/_admin/admin.usage'
+import { Route as AdminAdminCreditsRouteImport } from './routes/_admin/admin.credits'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -46,9 +52,18 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/_admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedDashboardIndexRoute =
@@ -57,6 +72,11 @@ const AuthenticatedDashboardIndexRoute =
     path: '/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AdminAdminIndexRoute = AdminAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AuthenticatedDashboardYoutubeRoute =
   AuthenticatedDashboardYoutubeRouteImport.update({
     id: '/dashboard/youtube',
@@ -195,10 +215,29 @@ const AuthenticatedDashboardCalculatorRoute =
     path: '/dashboard/calculator',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAdminUsageRoute = AdminAdminUsageRouteImport.update({
+  id: '/admin/usage',
+  path: '/admin/usage',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAdminCreditsRoute = AdminAdminCreditsRouteImport.update({
+  id: '/admin/credits',
+  path: '/admin/credits',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/credits': typeof AdminAdminCreditsRoute
+  '/admin/usage': typeof AdminAdminUsageRoute
+  '/admin/users': typeof AdminAdminUsersRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
@@ -222,11 +261,16 @@ export interface FileRoutesByFullPath {
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
   '/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
+  '/admin/': typeof AdminAdminIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/admin/credits': typeof AdminAdminCreditsRoute
+  '/admin/usage': typeof AdminAdminUsageRoute
+  '/admin/users': typeof AdminAdminUsersRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
@@ -250,13 +294,19 @@ export interface FileRoutesByTo {
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
   '/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
+  '/admin': typeof AdminAdminIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_admin': typeof AdminRouteRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/_admin/admin/credits': typeof AdminAdminCreditsRoute
+  '/_admin/admin/usage': typeof AdminAdminUsageRoute
+  '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/_authenticated/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
   '/_authenticated/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/_authenticated/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
@@ -280,6 +330,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/_authenticated/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
   '/_authenticated/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
+  '/_admin/admin/': typeof AdminAdminIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
 }
 export interface FileRouteTypes {
@@ -287,6 +338,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/admin/login'
+    | '/admin/credits'
+    | '/admin/usage'
+    | '/admin/users'
     | '/dashboard/calculator'
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
@@ -310,11 +365,16 @@ export interface FileRouteTypes {
     | '/dashboard/translator'
     | '/dashboard/visual-explainer'
     | '/dashboard/youtube'
+    | '/admin/'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/admin/login'
+    | '/admin/credits'
+    | '/admin/usage'
+    | '/admin/users'
     | '/dashboard/calculator'
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
@@ -338,12 +398,18 @@ export interface FileRouteTypes {
     | '/dashboard/translator'
     | '/dashboard/visual-explainer'
     | '/dashboard/youtube'
+    | '/admin'
     | '/dashboard'
   id:
     | '__root__'
     | '/'
+    | '/_admin'
     | '/_authenticated'
     | '/auth'
+    | '/admin/login'
+    | '/_admin/admin/credits'
+    | '/_admin/admin/usage'
+    | '/_admin/admin/users'
     | '/_authenticated/dashboard/calculator'
     | '/_authenticated/dashboard/chat'
     | '/_authenticated/dashboard/code-tutor'
@@ -367,13 +433,16 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/translator'
     | '/_authenticated/dashboard/visual-explainer'
     | '/_authenticated/dashboard/youtube'
+    | '/_admin/admin/'
     | '/_authenticated/dashboard/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  AdminLoginRoute: typeof AdminLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -392,11 +461,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_admin': {
+      id: '/_admin'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AdminRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/dashboard/': {
@@ -405,6 +488,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/'
       preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_admin/admin/': {
+      id: '/_admin/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminAdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/_authenticated/dashboard/youtube': {
       id: '/_authenticated/dashboard/youtube'
@@ -567,8 +657,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardCalculatorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_admin/admin/users': {
+      id: '/_admin/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminAdminUsersRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/_admin/admin/usage': {
+      id: '/_admin/admin/usage'
+      path: '/admin/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminAdminUsageRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/_admin/admin/credits': {
+      id: '/_admin/admin/credits'
+      path: '/admin/credits'
+      fullPath: '/admin/credits'
+      preLoaderRoute: typeof AdminAdminCreditsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
   }
 }
+
+interface AdminRouteRouteChildren {
+  AdminAdminCreditsRoute: typeof AdminAdminCreditsRoute
+  AdminAdminUsageRoute: typeof AdminAdminUsageRoute
+  AdminAdminUsersRoute: typeof AdminAdminUsersRoute
+  AdminAdminIndexRoute: typeof AdminAdminIndexRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminAdminCreditsRoute: AdminAdminCreditsRoute,
+  AdminAdminUsageRoute: AdminAdminUsageRoute,
+  AdminAdminUsersRoute: AdminAdminUsersRoute,
+  AdminAdminIndexRoute: AdminAdminIndexRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardCalculatorRoute: typeof AuthenticatedDashboardCalculatorRoute
@@ -631,8 +760,10 @@ const AuthenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  AdminLoginRoute: AdminLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

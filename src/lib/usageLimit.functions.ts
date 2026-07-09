@@ -18,14 +18,27 @@ function todayUTC(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * Resolves the effective daily limit for a pool: prefers the admin-configurable
+ * value in `pool_limits`, falling back to the hardcoded default if no row exists
+ * (e.g. before the table is seeded). This is what makes the admin panel's
+ * credit-limit editor actually take effect for every feature.
+ */
+async function resolveLimit(admin: ReturnType<typeof getAdminClient>, pool: "cerebras" | "groq"): Promise<number> {
+  const { data } = await admin.from("pool_limits").select("daily_limit").eq("pool", pool).maybeSingle();
+  const dynamic = (data as { daily_limit: number } | null)?.daily_limit;
+  return typeof dynamic === "number" ? dynamic : limitForPool(pool);
+}
+
 export const getUsageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
     const pool = data.pool ?? GROQ_POOL_KEY;
-    const limit = limitForPool(pool);
+    const admin = getAdminClient();
+    const limit = await resolveLimit(admin, pool);
     const today = todayUTC();
 
-    const { data: row } = await getAdminClient()
+    const { data: row } = await admin
       .from("feature_usage")
       .select("count")
       .eq("user_id", data.userId)
@@ -45,9 +58,9 @@ export const bumpUsageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
     const pool = data.pool ?? GROQ_POOL_KEY;
-    const limit = limitForPool(pool);
-    const today = todayUTC();
     const admin = getAdminClient();
+    const limit = await resolveLimit(admin, pool);
+    const today = todayUTC();
 
     const { data: row } = await admin
       .from("feature_usage")
