@@ -4,12 +4,12 @@ import { cacheGet, cacheSet } from "./aiCache";
 import { identityCacheLookup } from "./identityCache";
 import { serverConfig } from "./config";
 
-const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(3000) });
+const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(1500) });
 
 const Input = z.object({
   prompt: z.string().min(1).max(50000),
   systemPrompt: z.string().max(44000).optional(),
-  history: z.array(HistoryMsg).max(12).optional(),
+  history: z.array(HistoryMsg).max(6).optional(),
   /** When true: skip Groq entirely and route through Cerebras for long, detailed answers. */
   preferCerebras: z.boolean().optional(),
   /** Override the Groq max_tokens cap (default 1024). Use for bulk-generation (quiz / flashcards). */

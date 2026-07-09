@@ -714,7 +714,7 @@ RULES YOU MUST FOLLOW:
 5. For follow-up requests: modify ONLY what was asked, then return the complete updated code
 6. If asked to add tests, error handling, or async support — implement it properly`;
 
-    const history: HistoryMsg[] = newMessages.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    const history: HistoryMsg[] = newMessages.slice(0, -1).slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
     const res = await askAI(prompt, systemPrompt, history, true);
     set({ messages: [...newMessages, { role: "assistant", content: res.text, provider: res.provider }] });
     await bump();

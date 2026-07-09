@@ -238,7 +238,7 @@ FORMATTING RULES (strict):
 - Break your answer into short paragraphs or a numbered/bulleted list. Never write a big wall of unbroken text.
 - Use *italics* for example sentences or words being discussed, to set them apart from the explanation.
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.`;
-    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 2500) }));
+    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
     const res = await askAI(text, system, history, true);
     await bump();
     setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });

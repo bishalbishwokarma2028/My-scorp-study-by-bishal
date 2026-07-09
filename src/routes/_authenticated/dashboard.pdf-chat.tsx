@@ -256,7 +256,7 @@ function PdfChatPage() {
     set({ messages: msgsWithUser, input: "" });
     setLoading(true);
 
-    const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 2500) }));
+    const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 1500) }));
 
     try {
       const res = await askWithResilience(text, pdfName, chunks, history);

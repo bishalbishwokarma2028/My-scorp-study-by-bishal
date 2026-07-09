@@ -826,11 +826,11 @@ function ChatPage() {
       ? `${WEB_SYSTEM_PROMPT}${greeting}${variationNote}`
       : `${resolvedPrompt}${topperMode ? TOPPER_PROMPT : ""}${greeting}${variationNote}`;
 
-    // Step 3: Build conversation history for multi-turn context (last 10 messages, skip images/visual)
+    // Step 3: Build conversation history for multi-turn context (last 6 messages, skip images/visual)
     const history = messages
       .filter(m => !m.visualCard && typeof m.content === "string" && !m.content.startsWith("[Image:"))
-      .slice(-10)
-      .map(m => ({ role: m.role as "user" | "assistant", content: m.content.slice(0, 2500) }));
+      .slice(-6)
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.content.slice(0, 1500) }));
 
     // Step 4: AI call
     setLoading(true);
