@@ -12,6 +12,8 @@ const Input = z.object({
   history: z.array(HistoryMsg).max(6).optional(),
   /** When true: skip Groq entirely and route through Cerebras for long, detailed answers. */
   preferCerebras: z.boolean().optional(),
+  /** When true: use ONLY the groq/compound-mini keys, no fallback to Cerebras/OpenRouter/HuggingFace. */
+  compoundOnly: z.boolean().optional(),
   /** Override the Groq max_tokens cap (default 1024). Use for bulk-generation (quiz / flashcards). */
   maxTokens: z.number().int().min(256).max(6000).optional(),
 });
@@ -249,6 +251,24 @@ export const askAIServer = createServerFn({ method: "POST" })
     }
 
     let result: Result | null = null;
+
+    if (data.compoundOnly) {
+      // ── compound-mini ONLY — no fallback to any other provider ──────────
+      for (const key of serverConfig.ai.groqCompoundKeys) {
+        result = await tryCompoundMini(data.prompt, system, key, history);
+        if (result) break;
+      }
+
+      if (!result) {
+        result = { text: "AI is busy right now, please try again in a moment.", provider: "none" };
+      }
+
+      if (!hasHistory && result.provider !== "none") {
+        cacheSet(data.prompt, result.text);
+      }
+
+      return result;
+    }
 
     if (data.preferCerebras) {
       // ── compound-mini-first path (long-answer features) ─────────────────

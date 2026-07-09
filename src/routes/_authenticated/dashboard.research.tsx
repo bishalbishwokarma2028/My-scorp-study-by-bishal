@@ -119,7 +119,7 @@ FORMATTING RULES:
 
       const res = await askAI(prompt,
         "You are an expert research assistant. Write comprehensive, beautifully formatted research reports with rich markdown — bold key terms, tables, and blockquotes throughout. Every fact must be accurate, well-verified, and unbiased — prioritize reliable, trustworthy sources and never fabricate information.",
-        undefined, true);
+        undefined, true, undefined, true);
       set({ provider: res.provider, report: res.text });
       await bump();
 

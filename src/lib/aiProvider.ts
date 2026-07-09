@@ -9,9 +9,10 @@ export async function askAI(
   history?: HistoryMsg[],
   preferCerebras?: boolean,
   maxTokens?: number,
+  compoundOnly?: boolean,
 ): Promise<AIResult> {
   try {
-    const result = await askAIServer({ data: { prompt, systemPrompt, history, preferCerebras, maxTokens } });
+    const result = await askAIServer({ data: { prompt, systemPrompt, history, preferCerebras, maxTokens, compoundOnly } });
     console.log(`[ScorpStudy AI] Answered by: ${result.provider}`);
     return result;
   } catch (err) {
