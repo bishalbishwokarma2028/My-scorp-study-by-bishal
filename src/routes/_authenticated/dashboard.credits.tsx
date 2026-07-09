@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/credits")({
   component: CreditsPage,
 });
 
-const CEREBRAS_FEATURES = [
+const DEEP_ENGINE_FEATURES = [
   { icon: "🧩", label: "Compare Concepts" },
   { icon: "🔬", label: "Deep Research" },
   { icon: "▶️", label: "YouTube Summarizer" },
@@ -24,7 +24,7 @@ const CEREBRAS_FEATURES = [
   { icon: "🪜", label: "Step-by-Step Solver" },
 ];
 
-const GROQ_FEATURES = [
+const RAPID_ENGINE_FEATURES = [
   { icon: "💬", label: "Bishal's Assistant (Chat)" },
   { icon: "🃏", label: "Flashcards" },
   { icon: "❓", label: "Quiz Generator" },
@@ -184,11 +184,11 @@ function CreditsPage() {
           <div className="mt-5 flex flex-wrap gap-3">
             <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur-sm">
               <Brain className="h-4 w-4" />
-              <span>Cerebras Pool — {CEREBRAS_DAILY_LIMIT} credits</span>
+              <span>Deep Engine — {CEREBRAS_DAILY_LIMIT} credits</span>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur-sm">
               <Zap className="h-4 w-4" />
-              <span>Groq Pool — {GROQ_DAILY_LIMIT} credits</span>
+              <span>Rapid Engine — {GROQ_DAILY_LIMIT} credits</span>
             </div>
           </div>
         </div>
@@ -197,12 +197,12 @@ function CreditsPage() {
       {/* Pool cards */}
       <div className="grid gap-6 lg:grid-cols-2">
         <PoolCard
-          title="Cerebras Pool"
+          title="Deep Engine"
           subtitle="Powers deep-thinking, long-answer features"
           used={cQuota?.used ?? 0}
           limit={CEREBRAS_DAILY_LIMIT}
           loading={cLoad}
-          features={CEREBRAS_FEATURES}
+          features={DEEP_ENGINE_FEATURES}
           gradient="bg-gradient-to-br from-violet-400 via-purple-400 to-pink-400"
           iconBg="bg-violet-100 dark:bg-violet-900/40"
           Icon={Brain}
@@ -211,12 +211,12 @@ function CreditsPage() {
           badgeColor="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
         />
         <PoolCard
-          title="Groq Pool"
+          title="Rapid Engine"
           subtitle="Powers fast, conversational features"
           used={gQuota?.used ?? 0}
           limit={GROQ_DAILY_LIMIT}
           loading={gLoad}
-          features={GROQ_FEATURES}
+          features={RAPID_ENGINE_FEATURES}
           gradient="bg-gradient-to-br from-amber-400 via-orange-400 to-rose-400"
           iconBg="bg-amber-100 dark:bg-amber-900/40"
           Icon={Zap}
@@ -249,7 +249,7 @@ function CreditsPage() {
             {
               icon: <Sparkles className="h-5 w-5 text-amber-500" />,
               title: "Shared across features",
-              desc: "All Cerebras features share the same 10-credit pool. All Groq features share the 20-credit pool.",
+              desc: "All Deep Engine features share the same 10-credit pool. All Rapid Engine features share the 20-credit pool.",
             },
           ].map((item) => (
             <div key={item.title} className="rounded-xl bg-muted/50 p-4 space-y-2">
