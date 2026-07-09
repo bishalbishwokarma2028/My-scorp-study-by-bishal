@@ -40,20 +40,22 @@ export const serverConfig = {
     };
   },
   get ai() {
+    // Groq pool — merges the 7 original GROQ_API_KEY_N keys with the 8
+    // former "compound" keys (now unused for compound-mini) into a single
+    // 15-key rotating pool used for all Groq-routed features.
+    const groqKeys = [
+      ...[1, 2, 3, 4, 5, 6, 7].map((i) => getEnv(`GROQ_API_KEY_${i}`)),
+      ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => getEnv(`GROQ_COMPOUND_KEY_${i}`)),
+    ].filter(Boolean);
+
+    // Cerebras pool — up to 16 keys, rotated for load balancing.
+    const cerebrasKeys = Array.from({ length: 16 }, (_, i) => getEnv(`CEREBRAS_API_KEY_${i + 1}`))
+      .filter(Boolean);
+
     return {
-      groqPrimaryKeys: [1, 2, 3, 4, 5]
-        .map((i) => getEnv(`GROQ_API_KEY_${i}`))
-        .filter(Boolean),
-      groqSecondaryKeys: [6, 7]
-        .map((i) => getEnv(`GROQ_API_KEY_${i}`))
-        .filter(Boolean),
-      groqCompoundKeys: [1, 2, 3, 4, 5, 6, 7, 8]
-        .map((i) => getEnv(`GROQ_COMPOUND_KEY_${i}`))
-        .filter(Boolean),
+      groqKeys,
+      cerebrasKeys,
       openrouterKey: getEnv("OPENROUTER_API_KEY"),
-      cerebrasKeys: [1, 2, 3, 4, 5, 6]
-        .map((i) => getEnv(`CEREBRAS_API_KEY_${i}`))
-        .filter(Boolean),
       huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
     };
   },
@@ -83,8 +85,7 @@ export function validateConfig(): string[] {
 
   const ai = serverConfig.ai;
   const hasAnyAI =
-    ai.groqPrimaryKeys.length > 0 ||
-    ai.groqSecondaryKeys.length > 0 ||
+    ai.groqKeys.length > 0 ||
     !!ai.openrouterKey ||
     ai.cerebrasKeys.length > 0 ||
     !!ai.huggingfaceKey;

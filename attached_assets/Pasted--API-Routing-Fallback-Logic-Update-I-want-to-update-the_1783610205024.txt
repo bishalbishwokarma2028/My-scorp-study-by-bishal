@@ -1,0 +1,76 @@
+## API Routing & Fallback Logic Update
+
+I want to update the API routing logic for my application as follows.
+
+### 1. Features that must use Cerebras
+
+The following features should **no longer use the Groq Compound Mini model**:
+
+* Step-by-Step Solver
+* Chat with PDF
+* YouTube Summarizer
+* Grammar
+* Mathematics
+* Science
+* Code Tutor
+* Compare Concepts
+* Deep Research
+* Visual Explainer
+* Smart Notes
+* Formula Sheet
+* Mock Test
+* Calculator → Formula Helper
+
+These features should use **only Cerebras API keys**.
+
+I already have **6 Cerebras API keys**, and I will add **10 more Cerebras API keys**, making a total of **16 Cerebras API keys**.
+
+The application should automatically rotate between these **16 Cerebras API keys** for load balancing and rate-limit handling.
+
+### Fallback Order for These Features
+
+If **all 16 Cerebras API keys** have reached their limits or are temporarily unavailable:
+
+1. Use the **OpenRouter API** as the first fallback.
+2. If OpenRouter is also unavailable or reaches its limit, use the **Hugging Face API** as the final fallback.
+
+So the routing order for these features should be:
+
+**16 Cerebras API Keys → OpenRouter → Hugging Face**
+
+---
+
+## 2. All Other Features
+
+Every feature **not listed above** should continue using **Groq**.
+
+Currently, I already have **7 Groq API keys**.
+
+I also have **8 Groq API keys using the Compound Mini model** that are currently assigned to the features listed above.
+
+After moving those features to Cerebras, those **8 Groq Compound Mini API keys should be added to the existing 7 Groq API keys**, creating a total pool of **15 Groq API keys**.
+
+All remaining features in the application should use these **15 Groq API keys**, with automatic key rotation for load balancing and rate-limit handling.
+
+### Fallback Order for All Other Features
+
+If **all 15 Groq API keys** reach their limits or become unavailable:
+
+1. Automatically switch to the **16 Cerebras API keys**.
+2. If all **16 Cerebras API keys** are also exhausted or unavailable, switch to the **OpenRouter API**.
+3. If OpenRouter is also unavailable or reaches its limit, use the **Hugging Face API** as the final fallback.
+
+So the routing order for all other features should be:
+
+**15 Groq API Keys → 16 Cerebras API Keys → OpenRouter → Hugging Face**
+
+---
+
+## Final Requirements
+
+* Keep all existing functionality unchanged.
+* Only update the API routing logic.
+* Implement automatic API key rotation within each provider.
+* Automatically switch to the next provider when the current provider is exhausted, rate-limited, or unavailable.
+* Ensure users experience uninterrupted service without manual intervention.
+* All switching and fallback logic should happen automatically in the background.

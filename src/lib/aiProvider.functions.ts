@@ -10,13 +10,26 @@ const Input = z.object({
   prompt: z.string().min(1).max(50000),
   systemPrompt: z.string().max(44000).optional(),
   history: z.array(HistoryMsg).max(6).optional(),
-  /** When true: skip Groq entirely and route through Cerebras for long, detailed answers. */
+  /** When true: route through the Cerebras-first path (long-answer features). */
   preferCerebras: z.boolean().optional(),
-  /** When true: use ONLY the groq/compound-mini keys, no fallback to Cerebras/OpenRouter/HuggingFace. */
-  compoundOnly: z.boolean().optional(),
   /** Override the Groq max_tokens cap (default 1024). Use for bulk-generation (quiz / flashcards). */
   maxTokens: z.number().int().min(256).max(6000).optional(),
 });
+
+/**
+ * Rotating pointer per key-pool so consecutive requests spread across all
+ * available keys instead of always hammering key #1 first. On a rate-limit
+ * or failure we still fall through the rest of the pool in order starting
+ * from the rotated position.
+ */
+const rotationPointers = new Map<string, number>();
+
+function rotatedKeys(poolName: string, keys: string[]): string[] {
+  if (keys.length === 0) return keys;
+  const start = (rotationPointers.get(poolName) ?? 0) % keys.length;
+  rotationPointers.set(poolName, (start + 1) % keys.length);
+  return [...keys.slice(start), ...keys.slice(0, start)];
+}
 
 type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
 type Turn = { role: "user" | "assistant" | "system"; content: string };
@@ -141,43 +154,6 @@ async function tryGemini(
   }
 }
 
-async function tryCompoundMini(
-  prompt: string,
-  system: string,
-  key: string,
-  history: Turn[],
-): Promise<Result | null> {
-  try {
-    const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: "groq/compound-mini",
-        messages,
-        max_tokens: 6000,
-        // Disable compound-mini's built-in agentic tool use (web search / code
-        // execution / visit-website) — those internally invoke extra worker
-        // models (llama-3.3-70b-versatile, gpt-oss-120b, etc.), which shows up
-        // as multiple calls per request. We already do our own web search, so
-        // we only want the compound-mini model itself to answer.
-        compound_custom: { tools: { enabled_tools: [] } },
-      }),
-    });
-    const body = await res.text();
-    if (!res.ok) {
-      if (isRateLimited(res.status, body)) return null;
-      return null;
-    }
-    const data = JSON.parse(body);
-    const text = data?.choices?.[0]?.message?.content;
-    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 async function tryCerebras(
   prompt: string,
   system: string,
@@ -258,42 +234,18 @@ export const askAIServer = createServerFn({ method: "POST" })
 
     let result: Result | null = null;
 
-    if (data.compoundOnly) {
-      // ── compound-mini ONLY — no fallback to any other provider ──────────
-      for (const key of serverConfig.ai.groqCompoundKeys) {
-        result = await tryCompoundMini(data.prompt, system, key, history);
-        if (result) break;
-      }
-
-      if (!result) {
-        result = { text: "AI is busy right now, please try again in a moment.", provider: "none" };
-      }
-
-      if (!hasHistory && result.provider !== "none") {
-        cacheSet(data.prompt, result.text);
-      }
-
-      return result;
-    }
-
     if (data.preferCerebras) {
-      // ── compound-mini-first path (long-answer features) ─────────────────
-      // Compare, Research, YouTube, CodeTutor, MockTest, PDFChat, Visual,
-      // FormulaSheet, Calculator, Grammar, Math, Science, Notes, Solver
-      for (const key of serverConfig.ai.groqCompoundKeys) {
-        result = await tryCompoundMini(data.prompt, system, key, history);
+      // ── Cerebras-first path (long-answer features) ───────────────────────
+      // Solver, PDFChat, YouTube, Grammar, Math, Science, CodeTutor, Compare,
+      // Research, VisualExplainer, Notes, FormulaSheet, MockTest, Calculator
+      // Uses ONLY the Cerebras key pool (rotated for load balancing) — Groq
+      // is never used for these features.
+      for (const key of rotatedKeys("cerebras", serverConfig.ai.cerebrasKeys)) {
+        result = await tryCerebras(data.prompt, system, key, history);
         if (result) break;
       }
 
-      // Fallback 1 — Cerebras (global fallback for all features)
-      if (!result) {
-        for (const key of serverConfig.ai.cerebrasKeys) {
-          result = await tryCerebras(data.prompt, system, key, history);
-          if (result) break;
-        }
-      }
-
-      // Fallback 2 — OpenRouter
+      // Fallback 1 — OpenRouter
       if (!result && serverConfig.ai.openrouterKey) {
         result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
       }
@@ -301,28 +253,22 @@ export const askAIServer = createServerFn({ method: "POST" })
         result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
       }
 
-      // Fallback 3 — HuggingFace
+      // Fallback 2 — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }
     } else {
-      // ── Groq llama-first path (quick/short answers) ──────────────────────
+      // ── Groq-first path (all other features) ─────────────────────────────
+      // Rotated across the full 15-key Groq pool for load balancing.
       const groqMax = data.maxTokens ?? 1024;
-      for (const key of serverConfig.ai.groqPrimaryKeys) {
+      for (const key of rotatedKeys("groq", serverConfig.ai.groqKeys)) {
         result = await tryGroq(data.prompt, system, key, history, groqMax);
         if (result) break;
       }
 
+      // Fallback 1 — Cerebras
       if (!result) {
-        for (const key of serverConfig.ai.groqSecondaryKeys) {
-          result = await tryGroq(data.prompt, system, key, history, groqMax);
-          if (result) break;
-        }
-      }
-
-      // Fallback 1 — Cerebras (global fallback for all features)
-      if (!result) {
-        for (const key of serverConfig.ai.cerebrasKeys) {
+        for (const key of rotatedKeys("cerebras", serverConfig.ai.cerebrasKeys)) {
           result = await tryCerebras(data.prompt, system, key, history);
           if (result) break;
         }

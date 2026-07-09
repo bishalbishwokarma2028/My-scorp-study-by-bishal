@@ -625,7 +625,7 @@ function VisualExplainerPage() {
     for (let attempt = 0; attempt < 3; attempt++) {
       const result = await askAIJSON<DiagramData>(
         attempt === 0 ? prompt : `${prompt}\n\nIMPORTANT: Your previous attempt returned invalid or incomplete JSON. Double-check every bracket, comma, and quote before responding. Output ONLY the raw JSON object.`,
-        undefined, undefined, true, undefined, true,
+        undefined, undefined, true,
       );
       prov = result.provider || prov;
       if (result.data && isValidDiagram(result.data)) {
