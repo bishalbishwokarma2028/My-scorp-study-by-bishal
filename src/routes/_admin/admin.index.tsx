@@ -73,8 +73,9 @@ function AdminOverview() {
             <span className="text-sm font-semibold text-white">Deep Engine</span>
           </div>
           <div className="text-2xl font-bold text-white">
-            {data.usageToday.cerebras} <span className="text-sm font-normal text-slate-500">/ {cerebrasLimit} credits used today (all users)</span>
+            {data.usageToday.cerebras} <span className="text-sm font-normal text-slate-500">requests today, across all users</span>
           </div>
+          <div className="mt-1 text-xs text-slate-500">Per-user daily limit: {cerebrasLimit} credits</div>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <div className="mb-3 flex items-center gap-2">
@@ -82,8 +83,9 @@ function AdminOverview() {
             <span className="text-sm font-semibold text-white">Rapid Engine</span>
           </div>
           <div className="text-2xl font-bold text-white">
-            {data.usageToday.groq} <span className="text-sm font-normal text-slate-500">/ {groqLimit} credits used today (all users)</span>
+            {data.usageToday.groq} <span className="text-sm font-normal text-slate-500">requests today, across all users</span>
           </div>
+          <div className="mt-1 text-xs text-slate-500">Per-user daily limit: {groqLimit} credits</div>
         </div>
       </div>
     </div>
