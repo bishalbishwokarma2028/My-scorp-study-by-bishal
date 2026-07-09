@@ -8,9 +8,10 @@ export async function askAI(
   systemPrompt?: string,
   history?: HistoryMsg[],
   preferCerebras?: boolean,
+  maxTokens?: number,
 ): Promise<AIResult> {
   try {
-    const result = await askAIServer({ data: { prompt, systemPrompt, history, preferCerebras } });
+    const result = await askAIServer({ data: { prompt, systemPrompt, history, preferCerebras, maxTokens } });
     console.log(`[ScorpStudy AI] Answered by: ${result.provider}`);
     return result;
   } catch (err) {
@@ -46,11 +47,12 @@ export async function askAIJSON<T>(
   systemPrompt?: string,
   history?: HistoryMsg[],
   preferCerebras?: boolean,
+  maxTokens?: number,
 ): Promise<{ data: T | null; provider: string }> {
   const BASE_JSON_SYSTEM = "You MUST return only a single valid JSON object or array. Do NOT wrap it in markdown code fences. Do NOT include any prose, explanation, or comments — output the raw JSON only.";
 
   // First attempt
-  const first = await askAI(prompt, systemPrompt || BASE_JSON_SYSTEM, history, preferCerebras);
+  const first = await askAI(prompt, systemPrompt || BASE_JSON_SYSTEM, history, preferCerebras, maxTokens);
   if (first.provider !== "none") {
     const parsed = extractJSON<T>(first.text);
     if (parsed !== null) return { data: parsed, provider: first.provider };
@@ -58,7 +60,7 @@ export async function askAIJSON<T>(
 
   // Retry with ultra-strict JSON instruction
   const strictSystem = BASE_JSON_SYSTEM + "\n\nPREVIOUS ATTEMPT FAILED TO RETURN VALID JSON. THIS TIME output ONLY the raw JSON — no backticks, no markdown, no other text.";
-  const second = await askAI(prompt, strictSystem, history, preferCerebras);
+  const second = await askAI(prompt, strictSystem, history, preferCerebras, maxTokens);
   const parsed2 = extractJSON<T>(second.text);
   return { data: parsed2, provider: second.provider || first.provider };
 }

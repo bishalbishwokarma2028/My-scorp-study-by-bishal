@@ -88,7 +88,9 @@ function FlashcardsPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
     const prompt = buildFlashcardPrompt(topic, count, cardType);
-    const res = await askAI(prompt, "Output JSON only.");
+    // Scale token budget: each card needs ~150-400 tokens depending on type; add 500 for overhead
+    const maxTokens = Math.min(count * 350 + 500, 5500);
+    const res = await askAI(prompt, "Output JSON only.", undefined, false, maxTokens);
     await bump();
     const parsed = extractJSON<Card[]>(res.text);
     if (parsed && parsed.length) {
@@ -151,8 +153,8 @@ function FlashcardsPage() {
           </div>
         </div>
 
-        <select value={count} onChange={(e) => setCount(+e.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
-          {[5, 10, 15, 20].map((n) => <option key={n}>{n} cards</option>)}
+        <select value={count} onChange={(e) => setCount(Number(e.target.value))} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+          {[5, 10, 15, 20].map((n) => <option key={n} value={n}>{n} cards</option>)}
         </select>
 
         <button onClick={generate} disabled={loading} className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">

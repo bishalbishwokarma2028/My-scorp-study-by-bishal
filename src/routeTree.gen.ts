@@ -31,6 +31,7 @@ import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_aut
 import { Route as AuthenticatedDashboardGrammarRouteImport } from './routes/_authenticated/dashboard.grammar'
 import { Route as AuthenticatedDashboardFormulaSheetRouteImport } from './routes/_authenticated/dashboard.formula-sheet'
 import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
+import { Route as AuthenticatedDashboardCreditsRouteImport } from './routes/_authenticated/dashboard.credits'
 import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
 import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
 import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
@@ -164,6 +165,12 @@ const AuthenticatedDashboardFlashcardsRoute =
     path: '/dashboard/flashcards',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardCreditsRoute =
+  AuthenticatedDashboardCreditsRouteImport.update({
+    id: '/dashboard/credits',
+    path: '/dashboard/credits',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardCompareRoute =
   AuthenticatedDashboardCompareRouteImport.update({
     id: '/dashboard/compare',
@@ -196,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
+  '/dashboard/credits': typeof AuthenticatedDashboardCreditsRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
@@ -223,6 +231,7 @@ export interface FileRoutesByTo {
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
+  '/dashboard/credits': typeof AuthenticatedDashboardCreditsRoute
   '/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
@@ -252,6 +261,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/_authenticated/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/_authenticated/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
+  '/_authenticated/dashboard/credits': typeof AuthenticatedDashboardCreditsRoute
   '/_authenticated/dashboard/flashcards': typeof AuthenticatedDashboardFlashcardsRoute
   '/_authenticated/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/_authenticated/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
     | '/dashboard/compare'
+    | '/dashboard/credits'
     | '/dashboard/flashcards'
     | '/dashboard/formula-sheet'
     | '/dashboard/grammar'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
     | '/dashboard/compare'
+    | '/dashboard/credits'
     | '/dashboard/flashcards'
     | '/dashboard/formula-sheet'
     | '/dashboard/grammar'
@@ -336,6 +348,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/chat'
     | '/_authenticated/dashboard/code-tutor'
     | '/_authenticated/dashboard/compare'
+    | '/_authenticated/dashboard/credits'
     | '/_authenticated/dashboard/flashcards'
     | '/_authenticated/dashboard/formula-sheet'
     | '/_authenticated/dashboard/grammar'
@@ -519,6 +532,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardFlashcardsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/credits': {
+      id: '/_authenticated/dashboard/credits'
+      path: '/dashboard/credits'
+      fullPath: '/dashboard/credits'
+      preLoaderRoute: typeof AuthenticatedDashboardCreditsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/compare': {
       id: '/_authenticated/dashboard/compare'
       path: '/dashboard/compare'
@@ -555,6 +575,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardChatRoute: typeof AuthenticatedDashboardChatRoute
   AuthenticatedDashboardCodeTutorRoute: typeof AuthenticatedDashboardCodeTutorRoute
   AuthenticatedDashboardCompareRoute: typeof AuthenticatedDashboardCompareRoute
+  AuthenticatedDashboardCreditsRoute: typeof AuthenticatedDashboardCreditsRoute
   AuthenticatedDashboardFlashcardsRoute: typeof AuthenticatedDashboardFlashcardsRoute
   AuthenticatedDashboardFormulaSheetRoute: typeof AuthenticatedDashboardFormulaSheetRoute
   AuthenticatedDashboardGrammarRoute: typeof AuthenticatedDashboardGrammarRoute
@@ -581,6 +602,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardChatRoute: AuthenticatedDashboardChatRoute,
   AuthenticatedDashboardCodeTutorRoute: AuthenticatedDashboardCodeTutorRoute,
   AuthenticatedDashboardCompareRoute: AuthenticatedDashboardCompareRoute,
+  AuthenticatedDashboardCreditsRoute: AuthenticatedDashboardCreditsRoute,
   AuthenticatedDashboardFlashcardsRoute: AuthenticatedDashboardFlashcardsRoute,
   AuthenticatedDashboardFormulaSheetRoute:
     AuthenticatedDashboardFormulaSheetRoute,

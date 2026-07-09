@@ -12,6 +12,8 @@ const Input = z.object({
   history: z.array(HistoryMsg).max(12).optional(),
   /** When true: skip Groq entirely and route through Cerebras for long, detailed answers. */
   preferCerebras: z.boolean().optional(),
+  /** Override the Groq max_tokens cap (default 1024). Use for bulk-generation (quiz / flashcards). */
+  maxTokens: z.number().int().min(256).max(6000).optional(),
 });
 
 type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
@@ -39,6 +41,7 @@ async function tryGroq(
   system: string,
   key: string,
   history: Turn[],
+  maxTokens = 1024,
 ): Promise<Result | null> {
   try {
     const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
@@ -48,7 +51,7 @@ async function tryGroq(
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages,
-        max_tokens: 1024, // Groq free tier: 6 000 TPM *total* (input + output); keep output small
+        max_tokens: maxTokens, // Groq free tier: 6 000 TPM *total* (input + output); scale with request size
       }),
     });
     const body = await res.text();
@@ -237,14 +240,15 @@ export const askAIServer = createServerFn({ method: "POST" })
       }
     } else {
       // ── Groq-first path (all other features) ────────────────────────────
+      const groqMax = data.maxTokens ?? 1024;
       for (const key of serverConfig.ai.groqPrimaryKeys) {
-        result = await tryGroq(data.prompt, system, key, history);
+        result = await tryGroq(data.prompt, system, key, history, groqMax);
         if (result) break;
       }
 
       if (!result) {
         for (const key of serverConfig.ai.groqSecondaryKeys) {
-          result = await tryGroq(data.prompt, system, key, history);
+          result = await tryGroq(data.prompt, system, key, history, groqMax);
           if (result) break;
         }
       }

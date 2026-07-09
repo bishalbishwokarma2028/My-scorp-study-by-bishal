@@ -127,7 +127,9 @@ function QuizPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); setQuestions(null); setDone(false); setCurrent(0); setAnswers([]); setShowAnswers([]);
     const prompt = buildPrompt(topic, difficulty, type, count);
-    const res = await askAI(prompt, "Output only valid JSON arrays. No code fences.");
+    // Scale token budget: each question needs ~200-300 tokens; add 600 for overhead
+    const maxTokens = Math.min(count * 300 + 600, 5500);
+    const res = await askAI(prompt, "Output only valid JSON arrays. No code fences.", undefined, false, maxTokens);
     setProvider(res.provider);
     await bump();
     const parsed = extractJSON<Q[]>(res.text);
