@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   BookOpen, Plus, Search, Trash2, Save, Wand2, Sparkles, FileQuestion,
-  Download, Eye, Pencil, Pin, Lightbulb, HelpCircle, BookMarked, Sigma,
+  Download, FileDown, Eye, Pencil, Pin, Lightbulb, HelpCircle, BookMarked, Sigma,
   CalendarDays, Table as TableIcon, CheckSquare, ChevronDown, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -146,6 +146,7 @@ function NotesPage() {
   const [view, setView] = useState<"write" | "preview">("write");
   const [aiLoading, setAiLoading] = useState<null | string>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportedPdf, setExportedPdf] = useState<{ url: string; filename: string } | null>(null);
   const [tmplOpen, setTmplOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
@@ -180,6 +181,26 @@ function NotesPage() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, dirty]);
+
+  // Any previously-exported PDF becomes stale once the note or its content changes.
+  useEffect(() => {
+    setExportedPdf((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, content, title]);
+
+  // Revoke the object URL on unmount so it doesn't leak past the page's lifetime.
+  useEffect(() => {
+    return () => {
+      setExportedPdf((prev) => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return prev;
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function persist(showToast = false) {
     if (activeId) {
@@ -339,52 +360,63 @@ function NotesPage() {
     .pdf-export-root .footer-brand { font-weight: 700; color: #7c3aed; }
   `;
 
-  async function exportPDF() {
-    if (!content.trim() && !title.trim()) return toast.error("Nothing to export");
-    setExporting(true);
-    let styleTag: HTMLStyleElement | null = null;
-    let container: HTMLDivElement | null = null;
+  // Builds the exported PDF as a Blob and hands it back with a suggested
+  // filename. Rendering happens inside a throwaway <iframe> with its OWN
+  // document — this is essential: html2canvas walks every stylesheet in
+  // the document it's given, and the main app's Tailwind theme defines its
+  // colors as oklch(...), a CSS color function html2canvas cannot parse.
+  // An iframe gets a blank document with none of that global CSS, so only
+  // our plain hex-based PDF_EXPORT_STYLES ever gets parsed.
+  async function renderNotePdfBlob(): Promise<{ blob: Blob; filename: string }> {
+    const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+      import("jspdf"),
+      import("html2canvas"),
+    ]);
+
+    const bodyHtml = mdToHtml(content);
+    const safeTitle = title || "Untitled Note";
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.top = "0";
+    iframe.style.left = "-10000px";
+    iframe.style.width = "800px";
+    iframe.style.height = "600px";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
     try {
-      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-        import("jspdf"),
-        import("html2canvas"),
-      ]);
+      const doc = iframe.contentDocument;
+      if (!doc) throw new Error("Could not create export frame");
 
-      const bodyHtml = mdToHtml(content);
-      const safeTitle = title || "Untitled Note";
-
-      styleTag = document.createElement("style");
-      styleTag.textContent = PDF_EXPORT_STYLES;
-      document.head.appendChild(styleTag);
-
-      container = document.createElement("div");
-      container.className = "pdf-export-root";
-      // Rendered fully on-screen (not display:none / visibility:hidden) so
-      // html2canvas rasterizes real, visible computed colors — just pushed
-      // off the visible viewport so the user never sees it flash by.
-      container.style.position = "fixed";
-      container.style.top = "0";
-      container.style.left = "-10000px";
-      container.style.zIndex = "-1";
-      container.innerHTML = `
-        <div class="doc-header">
-          <div>
-            <div class="doc-title">${escapeHtml(safeTitle)}</div>
-            <div class="doc-meta">ScorpStudy by Bishal Bishwokarma &nbsp;•&nbsp; ${new Date().toLocaleString()} &nbsp;•&nbsp; ${content.trim().split(/\s+/).length} words</div>
+      doc.open();
+      doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>
+        html, body { margin: 0; padding: 0; background: #ffffff; }
+        ${PDF_EXPORT_STYLES}
+      </style></head><body>
+        <div class="pdf-export-root">
+          <div class="doc-header">
+            <div>
+              <div class="doc-title">${escapeHtml(safeTitle)}</div>
+              <div class="doc-meta">ScorpStudy by Bishal Bishwokarma &nbsp;•&nbsp; ${new Date().toLocaleString()} &nbsp;•&nbsp; ${content.trim().split(/\s+/).length} words</div>
+            </div>
+            <div class="doc-badge">&#10022; Smart Notes</div>
           </div>
-          <div class="doc-badge">✦ Smart Notes</div>
+          <div class="content">${bodyHtml}</div>
+          <div class="doc-footer">
+            <span>Generated by <span class="footer-brand">ScorpStudy by Bishal Bishwokarma</span> — AI-Powered Study Assistant</span>
+          </div>
         </div>
-        <div class="content">${bodyHtml}</div>
-        <div class="doc-footer">
-          <span>Generated by <span class="footer-brand">ScorpStudy by Bishal Bishwokarma</span> — AI-Powered Study Assistant</span>
-        </div>
-      `;
-      document.body.appendChild(container);
+      </body></html>`);
+      doc.close();
 
-      // Let the browser paint/layout before rasterizing.
-      await new Promise((r) => setTimeout(r, 60));
+      // Let the iframe's own document paint/layout before rasterizing.
+      await new Promise((r) => setTimeout(r, 120));
 
-      const canvas = await html2canvas(container, {
+      const target = doc.body.querySelector(".pdf-export-root") as HTMLElement;
+      if (!target) throw new Error("Export content missing");
+
+      const canvas = await html2canvas(target, {
         scale: 2,
         backgroundColor: "#ffffff",
         useCORS: true,
@@ -410,15 +442,38 @@ function NotesPage() {
       }
 
       const filename = `${safeTitle.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "ScorpStudy_Note"}.pdf`;
-      pdf.save(filename);
-      toast.success("PDF downloaded");
-    } catch {
+      return { blob: pdf.output("blob"), filename };
+    } finally {
+      document.body.removeChild(iframe);
+    }
+  }
+
+  async function exportPDF() {
+    if (!content.trim() && !title.trim()) return toast.error("Nothing to export");
+    setExporting(true);
+    try {
+      if (exportedPdf) URL.revokeObjectURL(exportedPdf.url);
+      const { blob, filename } = await renderNotePdfBlob();
+      const url = URL.createObjectURL(blob);
+      setExportedPdf({ url, filename });
+      toast.success("PDF ready — click Download PDF to save it");
+    } catch (err) {
+      console.error("PDF export failed:", err);
       toast.error("Failed to export PDF — please try again");
     } finally {
-      if (container) document.body.removeChild(container);
-      if (styleTag) document.head.removeChild(styleTag);
       setExporting(false);
     }
+  }
+
+  function downloadPDF() {
+    if (!exportedPdf) return;
+    const a = document.createElement("a");
+    a.href = exportedPdf.url;
+    a.download = exportedPdf.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success("PDF downloaded");
   }
 
   async function del(id: string) {
@@ -546,7 +601,10 @@ function NotesPage() {
             <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /> Enhance</AiBtn>
             <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /> Summarize</AiBtn>
             <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /> Quiz Me</AiBtn>
-            <AiBtn loading={exporting} onClick={exportPDF}><Download className="h-3 w-3" /> {exporting ? "Preparing…" : "Download PDF"}</AiBtn>
+            <AiBtn loading={exporting} onClick={exportPDF}><FileDown className="h-3 w-3" /> {exporting ? "Exporting…" : "Export to PDF"}</AiBtn>
+            {exportedPdf && (
+              <AiBtn onClick={downloadPDF}><Download className="h-3 w-3" /> Download PDF</AiBtn>
+            )}
             <QuotaBadge quota={quota} loading={quotaLoading} />
             <button onClick={() => persist(true)} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 font-semibold text-white shadow-md hover:opacity-90">
               <Save className="h-3 w-3" /> Save

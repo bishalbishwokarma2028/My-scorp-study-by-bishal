@@ -309,8 +309,48 @@ const OPENROUTER_VISION_MODELS = [
   "meta-llama/llama-3.2-11b-vision-instruct",
   "anthropic/claude-3-haiku",
   "openai/gpt-4o-mini",
-  "openai/gpt-4-vision-preview",
 ];
+
+// Groq's free-tier vision model — tried first since it requires no paid
+// credits (unlike the OpenRouter fallbacks below, which need account balance).
+const GROQ_VISION_MODELS = ["meta-llama/llama-4-scout-17b-16e-instruct"];
+
+async function tryGroqVision(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  key: string,
+  model: string,
+): Promise<string | null> {
+  try {
+    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: `You are Bishal's Assistant — an expert study AI. ${prompt}` },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        }],
+        max_tokens: 4096,
+      }),
+    });
+    const body = await res.text();
+    if (!res.ok) return null;
+    const parsed = JSON.parse(body);
+    const text = parsed?.choices?.[0]?.message?.content;
+    return (typeof text === "string" && text.trim()) ? text.trim() : null;
+  } catch {
+    return null;
+  }
+}
 
 async function tryOpenRouterVision(
   prompt: string,
@@ -354,6 +394,16 @@ async function tryOpenRouterVision(
 export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
+    // Groq first — free tier, no billing required.
+    const groqKeys = rotatedKeys("groq-vision", serverConfig.ai.groqKeys);
+    for (const key of groqKeys) {
+      for (const model of GROQ_VISION_MODELS) {
+        const text = await tryGroqVision(data.prompt, data.imageBase64, data.mimeType, key, model);
+        if (text) return { text, provider: "Bishal's Assistant" };
+      }
+    }
+
+    // Fallback — OpenRouter (requires account credits).
     if (serverConfig.ai.openrouterKey) {
       for (const model of OPENROUTER_VISION_MODELS) {
         const text = await tryOpenRouterVision(
