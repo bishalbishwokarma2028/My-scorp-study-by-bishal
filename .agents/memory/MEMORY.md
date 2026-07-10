@@ -5,3 +5,5 @@
 - [MindMap SVG layout](mindmap-svg-fix.md) — viewBox must be 1500×1300 (CX=750,CY=650), BRANCH_R=270, SUB_R=480; R=545 causes top/bottom nodes to clip outside viewBox
 - [usePageState migration pitfall](usepagestate-migration.md) — after converting useState to usePageState, grep whole file for old setter names; stale calls only surface as runtime ReferenceErrors, not always caught by a quick read
 - [AI provider routing pools](ai-provider-routing.md) — preferCerebras features use ONLY Cerebras pool (no Groq); others use Groq-first; both pools rotate keys round-robin
+- [No direct Supabase DB/DDL access](supabase-ddl-access.md) — only SUPABASE_URL/ANON/SERVICE_ROLE_KEY available (PostgREST, not Postgres); schema changes need user to run SQL manually in Supabase SQL Editor
+- [Credit limit resolution priority](credit-limit-resolution.md) — resolveLimit() checks unlimited_credits > per-user override column > global pool_limits row > hardcoded constant; any new check must survive missing-column pre-migration state

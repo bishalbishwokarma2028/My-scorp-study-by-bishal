@@ -1,14 +1,51 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Loader2, Search, Ban, ShieldCheck, Sparkles } from "lucide-react";
+import { Loader2, Search, Ban, ShieldCheck, Sparkles, Brain, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { adminListUsersServer, adminSetBannedServer, adminSetUnlimitedServer } from "@/lib/admin.functions";
+import { adminListUsersServer, adminSetBannedServer, adminSetUnlimitedServer, adminSetUserLimitServer } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_admin/admin/users")({
   component: AdminUsers,
 });
 
 type AdminUser = Awaited<ReturnType<typeof adminListUsersServer>>["users"][number];
+
+// 10, 15, 20, ... 100
+const CREDIT_OPTIONS = Array.from({ length: 19 }, (_, i) => 10 + i * 5);
+
+function CreditLimitSelect({
+  icon: Icon,
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number | null;
+  disabled: boolean;
+  onChange: (value: number | null) => void;
+}) {
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-slate-400">
+      <Icon className="h-3.5 w-3.5" />
+      <span className="hidden sm:inline">{label}</span>
+      <select
+        disabled={disabled}
+        value={value === null ? "default" : String(value)}
+        onChange={(e) => onChange(e.target.value === "default" ? null : Number(e.target.value))}
+        className="rounded-md border border-slate-700 bg-slate-800 px-1.5 py-1 text-xs text-white focus:border-violet-500 focus:outline-none disabled:opacity-50"
+      >
+        <option value="default">Default</option>
+        {CREDIT_OPTIONS.map((n) => (
+          <option key={n} value={n}>
+            {n} credits
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -56,6 +93,25 @@ function AdminUsers() {
     }
   }
 
+  async function setUserLimit(u: AdminUser, pool: "cerebras" | "groq", dailyLimit: number | null) {
+    setBusyId(u.id);
+    try {
+      await adminSetUserLimitServer({ data: { userId: u.id, pool, dailyLimit } });
+      setUsers((prev) =>
+        prev?.map((x) =>
+          x.id === u.id
+            ? { ...x, ...(pool === "cerebras" ? { cerebrasLimitOverride: dailyLimit } : { groqLimitOverride: dailyLimit }) }
+            : x,
+        ) ?? null,
+      );
+      toast.success(`${pool === "cerebras" ? "Deep" : "Rapid"} Engine limit updated for ${u.email}`);
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to update credit limit — has the per-user credit migration been run yet?");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -96,6 +152,7 @@ function AdminUsers() {
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Joined</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Credit limits</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -112,6 +169,24 @@ function AdminUsers() {
                       {u.isBanned && <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] text-red-400">Banned</span>}
                       {u.unlimitedCredits && <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-400">Unlimited</span>}
                       {!u.isBanned && !u.unlimitedCredits && <span className="text-xs text-slate-600">Standard</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col gap-1.5">
+                      <CreditLimitSelect
+                        icon={Brain}
+                        label="Deep"
+                        value={u.cerebrasLimitOverride ?? null}
+                        disabled={busyId === u.id || u.unlimitedCredits}
+                        onChange={(v) => setUserLimit(u, "cerebras", v)}
+                      />
+                      <CreditLimitSelect
+                        icon={Zap}
+                        label="Rapid"
+                        value={u.groqLimitOverride ?? null}
+                        disabled={busyId === u.id || u.unlimitedCredits}
+                        onChange={(v) => setUserLimit(u, "groq", v)}
+                      />
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -142,7 +217,7 @@ function AdminUsers() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                     No users found.
                   </td>
                 </tr>

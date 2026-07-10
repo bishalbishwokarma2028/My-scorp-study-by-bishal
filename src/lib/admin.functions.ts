@@ -95,14 +95,38 @@ export const adminListUsersServer = createServerFn({ method: "POST" })
     const authUsers = (body.users ?? []) as { id: string; email: string; created_at: string; last_sign_in_at: string | null }[];
     const ids = authUsers.map((u) => u.id);
 
-    const { data: profiles } = ids.length
-      ? await admin.from("profiles").select("id, full_name, is_admin, is_banned, unlimited_credits").in("id", ids)
-      : { data: [] };
+    // The *_limit_override columns are only present once the per-user credit
+    // migration has been run; fall back gracefully if they don't exist yet
+    // so the Users page keeps working either way.
+    let profiles: Record<string, unknown>[] | null = null;
+    if (ids.length) {
+      const withOverrides = await admin
+        .from("profiles")
+        .select("id, full_name, is_admin, is_banned, unlimited_credits, cerebras_limit_override, groq_limit_override")
+        .in("id", ids);
+      if (!withOverrides.error) {
+        profiles = withOverrides.data;
+      } else {
+        const fallback = await admin.from("profiles").select("id, full_name, is_admin, is_banned, unlimited_credits").in("id", ids);
+        profiles = fallback.data;
+      }
+    } else {
+      profiles = [];
+    }
 
     const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
     let merged = authUsers.map((u) => {
-      const p = profileById.get(u.id);
+      const p = profileById.get(u.id) as
+        | {
+            full_name: string | null;
+            is_admin: boolean;
+            is_banned: boolean;
+            unlimited_credits: boolean;
+            cerebras_limit_override: number | null;
+            groq_limit_override: number | null;
+          }
+        | undefined;
       return {
         id: u.id,
         email: u.email,
@@ -112,6 +136,8 @@ export const adminListUsersServer = createServerFn({ method: "POST" })
         isAdmin: p?.is_admin ?? false,
         isBanned: p?.is_banned ?? false,
         unlimitedCredits: p?.unlimited_credits ?? false,
+        cerebrasLimitOverride: p?.cerebras_limit_override ?? null,
+        groqLimitOverride: p?.groq_limit_override ?? null,
       };
     });
 
@@ -146,6 +172,25 @@ export const adminSetUnlimitedServer = createServerFn({ method: "POST" })
     await requireAdmin();
     const admin = getAdminClient();
     const { error } = await admin.from("profiles").update({ unlimited_credits: data.value }).eq("id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const SetUserLimitInput = z.object({
+  userId: z.string().uuid(),
+  pool: z.enum(["cerebras", "groq"]),
+  /** null clears the override and falls back to the global pool limit. */
+  dailyLimit: z.number().int().min(0).max(2000).nullable(),
+});
+
+/** Set (or clear) a per-user custom daily credit limit for one pool. */
+export const adminSetUserLimitServer = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => SetUserLimitInput.parse(d))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const admin = getAdminClient();
+    const column = data.pool === "cerebras" ? "cerebras_limit_override" : "groq_limit_override";
+    const { error } = await admin.from("profiles").update({ [column]: data.dailyLimit }).eq("id", data.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -186,9 +231,9 @@ export const adminApiCallLogServer = createServerFn({ method: "GET" }).handler(a
   const admin = getAdminClient();
   const { data, error } = await admin
     .from("api_call_log")
-    .select("id, user_email, pool, feature, provider, created_at")
+    .select("id, user_id, user_email, pool, feature, provider, created_at")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
   if (error) throw new Error(error.message);
   return data ?? [];
 });

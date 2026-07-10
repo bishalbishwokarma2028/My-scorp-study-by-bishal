@@ -41,6 +41,7 @@ import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authen
 import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin/admin.users'
 import { Route as AdminAdminUsageRouteImport } from './routes/_admin/admin.usage'
+import { Route as AdminAdminLogsRouteImport } from './routes/_admin/admin.logs'
 import { Route as AdminAdminCreditsRouteImport } from './routes/_admin/admin.credits'
 
 const AuthRoute = AuthRouteImport.update({
@@ -225,6 +226,11 @@ const AdminAdminUsageRoute = AdminAdminUsageRouteImport.update({
   path: '/admin/usage',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminAdminLogsRoute = AdminAdminLogsRouteImport.update({
+  id: '/admin/logs',
+  path: '/admin/logs',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminAdminCreditsRoute = AdminAdminCreditsRouteImport.update({
   id: '/admin/credits',
   path: '/admin/credits',
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/credits': typeof AdminAdminCreditsRoute
+  '/admin/logs': typeof AdminAdminLogsRoute
   '/admin/usage': typeof AdminAdminUsageRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/credits': typeof AdminAdminCreditsRoute
+  '/admin/logs': typeof AdminAdminLogsRoute
   '/admin/usage': typeof AdminAdminUsageRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/admin/login': typeof AdminLoginRoute
   '/_admin/admin/credits': typeof AdminAdminCreditsRoute
+  '/_admin/admin/logs': typeof AdminAdminLogsRoute
   '/_admin/admin/usage': typeof AdminAdminUsageRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/_authenticated/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
@@ -340,6 +349,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin/login'
     | '/admin/credits'
+    | '/admin/logs'
     | '/admin/usage'
     | '/admin/users'
     | '/dashboard/calculator'
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin/login'
     | '/admin/credits'
+    | '/admin/logs'
     | '/admin/usage'
     | '/admin/users'
     | '/dashboard/calculator'
@@ -408,6 +419,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/admin/login'
     | '/_admin/admin/credits'
+    | '/_admin/admin/logs'
     | '/_admin/admin/usage'
     | '/_admin/admin/users'
     | '/_authenticated/dashboard/calculator'
@@ -671,6 +683,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminUsageRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/_admin/admin/logs': {
+      id: '/_admin/admin/logs'
+      path: '/admin/logs'
+      fullPath: '/admin/logs'
+      preLoaderRoute: typeof AdminAdminLogsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/_admin/admin/credits': {
       id: '/_admin/admin/credits'
       path: '/admin/credits'
@@ -683,6 +702,7 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteRouteChildren {
   AdminAdminCreditsRoute: typeof AdminAdminCreditsRoute
+  AdminAdminLogsRoute: typeof AdminAdminLogsRoute
   AdminAdminUsageRoute: typeof AdminAdminUsageRoute
   AdminAdminUsersRoute: typeof AdminAdminUsersRoute
   AdminAdminIndexRoute: typeof AdminAdminIndexRoute
@@ -690,6 +710,7 @@ interface AdminRouteRouteChildren {
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminAdminCreditsRoute: AdminAdminCreditsRoute,
+  AdminAdminLogsRoute: AdminAdminLogsRoute,
   AdminAdminUsageRoute: AdminAdminUsageRoute,
   AdminAdminUsersRoute: AdminAdminUsersRoute,
   AdminAdminIndexRoute: AdminAdminIndexRoute,

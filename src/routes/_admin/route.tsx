@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Coins, Users, BarChart3, LogOut, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Coins, Users, BarChart3, LogOut, ShieldCheck, ScrollText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Client-side gate only (UX / redirect). Every admin server function
@@ -27,6 +27,7 @@ const navItems = [
   { to: "/admin/credits", label: "Credit Limits", icon: Coins },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/usage", label: "Usage Analytics", icon: BarChart3 },
+  { to: "/admin/logs", label: "Request Logs", icon: ScrollText },
 ] as const;
 
 function AdminLayout() {
