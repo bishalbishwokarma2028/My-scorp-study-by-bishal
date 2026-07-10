@@ -29,6 +29,7 @@ import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authe
 import { Route as AuthenticatedDashboardMockTestRouteImport } from './routes/_authenticated/dashboard.mock-test'
 import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
 import { Route as AuthenticatedDashboardMathRouteImport } from './routes/_authenticated/dashboard.math'
+import { Route as AuthenticatedDashboardImageSolverRouteImport } from './routes/_authenticated/dashboard.image-solver'
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
 import { Route as AuthenticatedDashboardGrammarRouteImport } from './routes/_authenticated/dashboard.grammar'
@@ -156,6 +157,12 @@ const AuthenticatedDashboardMathRoute =
     path: '/dashboard/math',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardImageSolverRoute =
+  AuthenticatedDashboardImageSolverRouteImport.update({
+    id: '/dashboard/image-solver',
+    path: '/dashboard/image-solver',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardImageGenRoute =
   AuthenticatedDashboardImageGenRouteImport.update({
     id: '/dashboard/image-gen',
@@ -255,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
+  '/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
@@ -289,6 +297,7 @@ export interface FileRoutesByTo {
   '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
+  '/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
@@ -326,6 +335,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
+  '/_authenticated/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/_authenticated/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/_authenticated/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/_authenticated/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
@@ -362,6 +372,7 @@ export interface FileRouteTypes {
     | '/dashboard/grammar'
     | '/dashboard/history'
     | '/dashboard/image-gen'
+    | '/dashboard/image-solver'
     | '/dashboard/math'
     | '/dashboard/mindmap'
     | '/dashboard/mock-test'
@@ -396,6 +407,7 @@ export interface FileRouteTypes {
     | '/dashboard/grammar'
     | '/dashboard/history'
     | '/dashboard/image-gen'
+    | '/dashboard/image-solver'
     | '/dashboard/math'
     | '/dashboard/mindmap'
     | '/dashboard/mock-test'
@@ -432,6 +444,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/grammar'
     | '/_authenticated/dashboard/history'
     | '/_authenticated/dashboard/image-gen'
+    | '/_authenticated/dashboard/image-solver'
     | '/_authenticated/dashboard/math'
     | '/_authenticated/dashboard/mindmap'
     | '/_authenticated/dashboard/mock-test'
@@ -599,6 +612,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardMathRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/image-solver': {
+      id: '/_authenticated/dashboard/image-solver'
+      path: '/dashboard/image-solver'
+      fullPath: '/dashboard/image-solver'
+      preLoaderRoute: typeof AuthenticatedDashboardImageSolverRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/image-gen': {
       id: '/_authenticated/dashboard/image-gen'
       path: '/dashboard/image-gen'
@@ -731,6 +751,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardGrammarRoute: typeof AuthenticatedDashboardGrammarRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
+  AuthenticatedDashboardImageSolverRoute: typeof AuthenticatedDashboardImageSolverRoute
   AuthenticatedDashboardMathRoute: typeof AuthenticatedDashboardMathRoute
   AuthenticatedDashboardMindmapRoute: typeof AuthenticatedDashboardMindmapRoute
   AuthenticatedDashboardMockTestRoute: typeof AuthenticatedDashboardMockTestRoute
@@ -759,6 +780,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardGrammarRoute: AuthenticatedDashboardGrammarRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
   AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
+  AuthenticatedDashboardImageSolverRoute:
+    AuthenticatedDashboardImageSolverRoute,
   AuthenticatedDashboardMathRoute: AuthenticatedDashboardMathRoute,
   AuthenticatedDashboardMindmapRoute: AuthenticatedDashboardMindmapRoute,
   AuthenticatedDashboardMockTestRoute: AuthenticatedDashboardMockTestRoute,

@@ -145,6 +145,7 @@ function NotesPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [view, setView] = useState<"write" | "preview">("write");
   const [aiLoading, setAiLoading] = useState<null | string>(null);
+  const [exporting, setExporting] = useState(false);
   const [tmplOpen, setTmplOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
@@ -271,8 +272,9 @@ function NotesPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setAiLoading("enhance");
     const res = await askAI(
-      `Improve, structure and polish these study notes. Keep meaning, fix grammar, use clear Markdown headings/bullets. Bold the key terms with **.\n\nNotes:\n${content}`,
-      undefined, undefined, true,
+      `Improve, restructure, and substantially expand these study notes into a long, thorough, exam-ready version — do NOT just lightly polish them, make them noticeably longer and more detailed. Keep the original meaning and facts, fix grammar, and:\n- Add clear Markdown headings and sub-headings to organize the material\n- Expand every key point with more explanation, context, and relevant detail a student would need to fully understand it (not just one-line bullets)\n- Add examples, analogies, or clarifying notes wherever they would help understanding\n- Bold every key term with **\n- If helpful, add a short summary section at the end\n\nBe comprehensive and detailed throughout — a long, complete write-up is required, not a brief rewording.\n\nNotes:\n${content}`,
+      "You are an expert study tutor who writes long, thorough, detailed notes — never brief ones. Always expand and add useful depth rather than just rephrasing.",
+      undefined, true,
     );
     setContent(res.text);
     setDirty(true);
@@ -299,177 +301,124 @@ function NotesPage() {
     navigate({ to: "/dashboard/quiz" });
   }
 
-  function exportPDF() {
+  // Every selector below is scoped under `.pdf-export-root` so it can be
+  // rendered in an offscreen container attached to the *live* document
+  // (required for html2canvas to rasterize real computed colors) without
+  // leaking styles onto the rest of the app.
+  const PDF_EXPORT_STYLES = `
+    .pdf-export-root { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; color: #0f172a; background: #fff; line-height: 1.75; width: 800px; padding: 48px 40px; box-sizing: border-box; }
+    .pdf-export-root * { box-sizing: border-box; }
+    .pdf-export-root .doc-header { border-bottom: 3px solid #7c3aed; padding-bottom: 20px; margin-bottom: 32px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .pdf-export-root .doc-title { font-size: 28px; font-weight: 700; color: #1e1b4b; line-height: 1.2; }
+    .pdf-export-root .doc-meta { font-size: 11px; color: #64748b; margin-top: 6px; }
+    .pdf-export-root .doc-badge { flex-shrink: 0; background: #7c3aed; color: #ffffff; font-size: 10px; font-weight: 700; padding: 6px 12px; border-radius: 20px; white-space: nowrap; letter-spacing: 0.5px; text-transform: uppercase; }
+    .pdf-export-root h1 { font-size: 22px; font-weight: 700; color: #1e1b4b; margin: 28px 0 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+    .pdf-export-root h2 { font-size: 17px; font-weight: 700; color: #4c1d95; margin: 22px 0 8px; padding: 8px 14px; background: #f5f3ff; border-left: 4px solid #7c3aed; border-radius: 0 8px 8px 0; }
+    .pdf-export-root h3 { font-size: 14px; font-weight: 700; color: #1e1b4b; margin: 18px 0 6px; }
+    .pdf-export-root h4 { font-size: 13px; font-weight: 600; color: #334155; margin: 14px 0 4px; }
+    .pdf-export-root p { margin: 8px 0; color: #334155; }
+    .pdf-export-root strong { color: #4c1d95; font-weight: 700; background: #fef9c3; padding: 1px 4px; border-radius: 3px; }
+    .pdf-export-root em { color: #64748b; font-style: italic; }
+    .pdf-export-root del { color: #94a3b8; text-decoration: line-through; }
+    .pdf-export-root ul, .pdf-export-root ol { margin: 10px 0 10px 20px; color: #334155; }
+    .pdf-export-root li { margin: 4px 0; padding-left: 4px; }
+    .pdf-export-root li.checked { list-style: none; color: #15803d; }
+    .pdf-export-root li.unchecked { list-style: none; color: #64748b; }
+    .pdf-export-root .inline-code { font-family: 'Fira Mono', 'Courier New', monospace; background: #f1f5f9; color: #7c3aed; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .pdf-export-root .code-block { background: #1e293b; color: #e2f4ff; padding: 16px 20px; border-radius: 10px; margin: 16px 0; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+    .pdf-export-root .code-block code { font-family: 'Fira Mono', 'Courier New', monospace; color: #e2f4ff; }
+    .pdf-export-root blockquote { border-left: 4px solid #7c3aed; background: #f5f3ff; padding: 10px 16px; margin: 14px 0; border-radius: 0 8px 8px 0; color: #4c1d95; font-style: italic; }
+    .pdf-export-root table { border-collapse: collapse; width: 100%; margin: 14px 0; }
+    .pdf-export-root thead { background: #7c3aed; }
+    .pdf-export-root th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pdf-export-root td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px; }
+    .pdf-export-root tr:nth-child(even) td { background: #f8faff; }
+    .pdf-export-root tr:last-child td { border-bottom: none; }
+    .pdf-export-root hr { border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; }
+    .pdf-export-root .doc-footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #94a3b8; }
+    .pdf-export-root .footer-brand { font-weight: 700; color: #7c3aed; }
+  `;
+
+  async function exportPDF() {
     if (!content.trim() && !title.trim()) return toast.error("Nothing to export");
+    setExporting(true);
+    let styleTag: HTMLStyleElement | null = null;
+    let container: HTMLDivElement | null = null;
+    try {
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas"),
+      ]);
 
-    const bodyHtml = mdToHtml(content);
-    const safeTitle = title || "Untitled Note";
+      const bodyHtml = mdToHtml(content);
+      const safeTitle = title || "Untitled Note";
 
-    const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>${safeTitle} — ScorpStudy</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      font-size: 14px;
-      color: #0f172a;
-      background: #fff;
-      line-height: 1.75;
+      styleTag = document.createElement("style");
+      styleTag.textContent = PDF_EXPORT_STYLES;
+      document.head.appendChild(styleTag);
+
+      container = document.createElement("div");
+      container.className = "pdf-export-root";
+      // Rendered fully on-screen (not display:none / visibility:hidden) so
+      // html2canvas rasterizes real, visible computed colors — just pushed
+      // off the visible viewport so the user never sees it flash by.
+      container.style.position = "fixed";
+      container.style.top = "0";
+      container.style.left = "-10000px";
+      container.style.zIndex = "-1";
+      container.innerHTML = `
+        <div class="doc-header">
+          <div>
+            <div class="doc-title">${escapeHtml(safeTitle)}</div>
+            <div class="doc-meta">ScorpStudy by Bishal Bishwokarma &nbsp;•&nbsp; ${new Date().toLocaleString()} &nbsp;•&nbsp; ${content.trim().split(/\s+/).length} words</div>
+          </div>
+          <div class="doc-badge">✦ Smart Notes</div>
+        </div>
+        <div class="content">${bodyHtml}</div>
+        <div class="doc-footer">
+          <span>Generated by <span class="footer-brand">ScorpStudy by Bishal Bishwokarma</span> — AI-Powered Study Assistant</span>
+        </div>
+      `;
+      document.body.appendChild(container);
+
+      // Let the browser paint/layout before rasterizing.
+      await new Promise((r) => setTimeout(r, 60));
+
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        windowWidth: 800,
+      });
+
+      const pdf = new jsPDF({ unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const filename = `${safeTitle.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "ScorpStudy_Note"}.pdf`;
+      pdf.save(filename);
+      toast.success("PDF downloaded");
+    } catch {
+      toast.error("Failed to export PDF — please try again");
+    } finally {
+      if (container) document.body.removeChild(container);
+      if (styleTag) document.head.removeChild(styleTag);
+      setExporting(false);
     }
-    .page { max-width: 800px; margin: 0 auto; padding: 48px 40px; }
-
-    /* Header */
-    .doc-header {
-      border-bottom: 3px solid #7c3aed;
-      padding-bottom: 20px;
-      margin-bottom: 32px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-    }
-    .doc-title {
-      font-size: 28px;
-      font-weight: 700;
-      color: #1e1b4b;
-      line-height: 1.2;
-    }
-    .doc-meta {
-      font-size: 11px;
-      color: #64748b;
-      margin-top: 6px;
-    }
-    .doc-badge {
-      flex-shrink: 0;
-      background: linear-gradient(135deg, #7c3aed, #a855f7);
-      color: white;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 6px 12px;
-      border-radius: 20px;
-      white-space: nowrap;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-
-    /* Typography */
-    h1 { font-size: 22px; font-weight: 700; color: #1e1b4b; margin: 28px 0 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-    h2 { font-size: 17px; font-weight: 700; color: #4c1d95; margin: 22px 0 8px; padding: 8px 14px; background: linear-gradient(135deg, #f5f3ff, #faf5ff); border-left: 4px solid #7c3aed; border-radius: 0 8px 8px 0; }
-    h3 { font-size: 14px; font-weight: 700; color: #1e1b4b; margin: 18px 0 6px; }
-    h4 { font-size: 13px; font-weight: 600; color: #334155; margin: 14px 0 4px; }
-    p { margin: 8px 0; color: #334155; }
-    strong { color: #4c1d95; font-weight: 700; background: #fef9c3; padding: 1px 4px; border-radius: 3px; }
-    em { color: #64748b; font-style: italic; }
-    del { color: #94a3b8; text-decoration: line-through; }
-
-    /* Lists */
-    ul, ol { margin: 10px 0 10px 20px; color: #334155; }
-    li { margin: 4px 0; padding-left: 4px; }
-    ul li::marker { color: #7c3aed; font-size: 16px; }
-    ol li::marker { color: #7c3aed; font-weight: 700; }
-    li.checked { list-style: none; color: #15803d; }
-    li.unchecked { list-style: none; color: #64748b; }
-
-    /* Code */
-    .inline-code {
-      font-family: 'Fira Mono', 'Courier New', monospace;
-      background: #f1f5f9;
-      color: #7c3aed;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 12px;
-    }
-    .code-block {
-      background: #1e293b;
-      color: #a5f3fc;
-      padding: 16px 20px;
-      border-radius: 10px;
-      margin: 16px 0;
-      overflow-x: auto;
-      font-size: 12px;
-      line-height: 1.6;
-    }
-    .code-block code {
-      font-family: 'Fira Mono', 'Courier New', monospace;
-      color: #a5f3fc;
-    }
-
-    /* Blockquote */
-    blockquote {
-      border-left: 4px solid #7c3aed;
-      background: #f5f3ff;
-      padding: 10px 16px;
-      margin: 14px 0;
-      border-radius: 0 8px 8px 0;
-      color: #4c1d95;
-      font-style: italic;
-    }
-
-    /* Tables */
-    table { border-collapse: collapse; width: 100%; margin: 14px 0; border-radius: 8px; overflow: hidden; }
-    thead { background: linear-gradient(135deg, #7c3aed, #a855f7); }
-    th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.5px; }
-    td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px; }
-    tr:nth-child(even) td { background: #f8faff; }
-    tr:last-child td { border-bottom: none; }
-
-    /* HR */
-    hr { border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; }
-
-    /* Footer */
-    .doc-footer {
-      margin-top: 48px;
-      padding-top: 16px;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      color: #94a3b8;
-    }
-    .footer-brand { font-weight: 700; color: #7c3aed; }
-
-    @media print {
-      body { font-size: 13px; }
-      .page { padding: 32px 28px; }
-      .doc-header { page-break-after: avoid; }
-      h1, h2, h3 { page-break-after: avoid; }
-      .code-block { page-break-inside: avoid; }
-      table { page-break-inside: avoid; }
-    }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <div class="doc-header">
-      <div>
-        <div class="doc-title">${escapeHtml(safeTitle)}</div>
-        <div class="doc-meta">ScorpStudy by Bishal Bishwokarma &nbsp;•&nbsp; ${new Date().toLocaleString()} &nbsp;•&nbsp; ${content.trim().split(/\s+/).length} words</div>
-      </div>
-      <div class="doc-badge">✦ Smart Notes</div>
-    </div>
-
-    <div class="content">
-      ${bodyHtml}
-    </div>
-
-    <div class="doc-footer">
-      <span>Generated by <span class="footer-brand">ScorpStudy by Bishal Bishwokarma</span> — AI-Powered Study Assistant</span>
-      <span>Page 1</span>
-    </div>
-  </div>
-  <script>window.onload = () => setTimeout(() => window.print(), 500);<\/script>
-</body>
-</html>`;
-
-    const w = window.open("", "_blank");
-    if (!w) return toast.error("Allow pop-ups to export PDF");
-    w.document.write(html);
-    w.document.close();
   }
 
   async function del(id: string) {
@@ -597,7 +546,7 @@ function NotesPage() {
             <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /> Enhance</AiBtn>
             <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /> Summarize</AiBtn>
             <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /> Quiz Me</AiBtn>
-            <AiBtn onClick={exportPDF}><Download className="h-3 w-3" /> Export PDF</AiBtn>
+            <AiBtn loading={exporting} onClick={exportPDF}><Download className="h-3 w-3" /> {exporting ? "Preparing…" : "Download PDF"}</AiBtn>
             <QuotaBadge quota={quota} loading={quotaLoading} />
             <button onClick={() => persist(true)} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 font-semibold text-white shadow-md hover:opacity-90">
               <Save className="h-3 w-3" /> Save
