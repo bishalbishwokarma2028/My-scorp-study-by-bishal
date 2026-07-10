@@ -326,6 +326,14 @@ function NotesPage() {
   // rendered in an offscreen container attached to the *live* document
   // (required for html2canvas to rasterize real computed colors) without
   // leaking styles onto the rest of the app.
+  // IMPORTANT: inline elements here (strong, .inline-code, etc.) must NOT
+  // use horizontal padding or border-radius. html2canvas measures inline
+  // text flow width without accounting for inline padding, so a padded
+  // highlight/background box gets painted at a different offset than the
+  // glyphs underneath it — this is what caused bold/highlighted text to
+  // visually overlap and misalign in exported PDFs. Background-color alone
+  // (no padding) is safe. Block-level elements (h1, h2, blockquote, etc.)
+  // are unaffected and may keep padding/border-radius.
   const PDF_EXPORT_STYLES = `
     .pdf-export-root { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; color: #0f172a; background: #fff; line-height: 1.75; width: 800px; padding: 48px 40px; box-sizing: border-box; }
     .pdf-export-root * { box-sizing: border-box; }
@@ -338,14 +346,14 @@ function NotesPage() {
     .pdf-export-root h3 { font-size: 14px; font-weight: 700; color: #1e1b4b; margin: 18px 0 6px; }
     .pdf-export-root h4 { font-size: 13px; font-weight: 600; color: #334155; margin: 14px 0 4px; }
     .pdf-export-root p { margin: 8px 0; color: #334155; }
-    .pdf-export-root strong { color: #4c1d95; font-weight: 700; background: #fef9c3; padding: 1px 4px; border-radius: 3px; }
+    .pdf-export-root strong { color: #4c1d95; font-weight: 700; background: #fef9c3; }
     .pdf-export-root em { color: #64748b; font-style: italic; }
     .pdf-export-root del { color: #94a3b8; text-decoration: line-through; }
     .pdf-export-root ul, .pdf-export-root ol { margin: 10px 0 10px 20px; color: #334155; }
     .pdf-export-root li { margin: 4px 0; padding-left: 4px; }
     .pdf-export-root li.checked { list-style: none; color: #15803d; }
     .pdf-export-root li.unchecked { list-style: none; color: #64748b; }
-    .pdf-export-root .inline-code { font-family: 'Fira Mono', 'Courier New', monospace; background: #f1f5f9; color: #7c3aed; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .pdf-export-root .inline-code { font-family: 'Fira Mono', 'Courier New', monospace; background: #f1f5f9; color: #7c3aed; font-size: 12px; }
     .pdf-export-root .code-block { background: #1e293b; color: #e2f4ff; padding: 16px 20px; border-radius: 10px; margin: 16px 0; overflow-x: auto; font-size: 12px; line-height: 1.6; }
     .pdf-export-root .code-block code { font-family: 'Fira Mono', 'Courier New', monospace; color: #e2f4ff; }
     .pdf-export-root blockquote { border-left: 4px solid #7c3aed; background: #f5f3ff; padding: 10px 16px; margin: 14px 0; border-radius: 0 8px 8px 0; color: #4c1d95; font-style: italic; }
@@ -381,7 +389,7 @@ function NotesPage() {
     iframe.style.top = "0";
     iframe.style.left = "-10000px";
     iframe.style.width = "800px";
-    iframe.style.height = "600px";
+    iframe.style.height = "1200px";
     iframe.style.border = "none";
     document.body.appendChild(iframe);
 
@@ -410,17 +418,35 @@ function NotesPage() {
       </body></html>`);
       doc.close();
 
-      // Let the iframe's own document paint/layout before rasterizing.
-      await new Promise((r) => setTimeout(r, 120));
+      // Let the iframe's own document paint/layout — and its fonts finish
+      // loading — before rasterizing. Rendering too early is what causes
+      // html2canvas to measure text with fallback metrics and then paint
+      // with the real font, producing overlapping/misaligned glyphs.
+      try {
+        await (doc as any).fonts?.ready;
+      } catch { /* ignore */ }
+      await new Promise((r) => setTimeout(r, 200));
 
       const target = doc.body.querySelector(".pdf-export-root") as HTMLElement;
       if (!target) throw new Error("Export content missing");
+
+      // Grow the iframe to the content's real height so html2canvas never
+      // captures a clipped/scrolled viewport (a second source of shifted or
+      // overlapping content when notes are longer than the offscreen frame).
+      const fullHeight = Math.max(target.scrollHeight, target.offsetHeight);
+      iframe.style.height = `${fullHeight}px`;
+      await new Promise((r) => setTimeout(r, 30));
 
       const canvas = await html2canvas(target, {
         scale: 2,
         backgroundColor: "#ffffff",
         useCORS: true,
         windowWidth: 800,
+        windowHeight: fullHeight,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
       });
 
       const pdf = new jsPDF({ unit: "pt", format: "a4" });
