@@ -233,7 +233,45 @@ export const adminApiCallLogServer = createServerFn({ method: "GET" }).handler(a
     .from("api_call_log")
     .select("id, user_id, user_email, pool, feature, provider, created_at")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(300);
   if (error) throw new Error(error.message);
   return data ?? [];
+});
+
+/** Top users by total requests over the last 14 days, split by pool. Used for the Usage Analytics leaderboard. */
+export const adminTopUsersServer = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdmin();
+  const admin = getAdminClient();
+
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - 13);
+  const sinceStr = since.toISOString().slice(0, 10);
+
+  const { data, error } = await admin.from("feature_usage").select("user_id, feature, count").gte("usage_date", sinceStr);
+  if (error) throw new Error(error.message);
+
+  const byUser = new Map<string, { userId: string; cerebras: number; groq: number; total: number }>();
+  for (const row of (data ?? []) as { user_id: string; feature: string; count: number }[]) {
+    if (!byUser.has(row.user_id)) byUser.set(row.user_id, { userId: row.user_id, cerebras: 0, groq: 0, total: 0 });
+    const entry = byUser.get(row.user_id)!;
+    if (row.feature === "cerebras") entry.cerebras += row.count;
+    else if (row.feature === "groq") entry.groq += row.count;
+  }
+  for (const entry of byUser.values()) {
+    entry.total = entry.cerebras + entry.groq;
+  }
+
+  const top = Array.from(byUser.values())
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10);
+
+  if (top.length === 0) return [];
+
+  const { data: profiles } = await admin.from("profiles").select("id, full_name").in(
+    "id",
+    top.map((t) => t.userId),
+  );
+  const nameById = new Map((profiles ?? []).map((p) => [(p as { id: string }).id, (p as { full_name: string | null }).full_name]));
+
+  return top.map((t) => ({ ...t, fullName: nameById.get(t.userId) ?? null }));
 });

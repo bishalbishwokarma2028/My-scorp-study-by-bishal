@@ -121,12 +121,18 @@ export const bumpUsageServer = createServerFn({ method: "POST" })
       { onConflict: "user_id,feature,usage_date" },
     );
 
-    // Best-effort request log for the admin panel — never blocks or fails the request.
-    admin.from("api_call_log").insert({
-      user_id: data.userId,
-      pool,
-      provider: pool === "cerebras" ? "Deep Engine" : "Rapid Engine",
-    }).then(() => {}, () => {});
+    // Best-effort request log for the admin panel — never blocks or fails the request,
+    // but errors are logged server-side so silent log-table failures are diagnosable.
+    try {
+      const { error: logError } = await admin.from("api_call_log").insert({
+        user_id: data.userId,
+        pool,
+        provider: pool === "cerebras" ? "Deep Engine" : "Rapid Engine",
+      });
+      if (logError) console.error("[api_call_log] insert failed:", logError.message);
+    } catch (e) {
+      console.error("[api_call_log] insert threw:", e);
+    }
 
     return {
       allowed: true,
