@@ -148,7 +148,10 @@ function AdminUsage() {
                 {topUsers.map((u, i) => (
                   <tr key={u.userId}>
                     <td className="px-4 py-3 text-slate-500">{i + 1}</td>
-                    <td className="px-4 py-3 text-slate-200">{u.fullName || emailById.get(u.userId) || u.userId.slice(0, 8)}</td>
+                    <td className="px-4 py-3 text-slate-200">
+                      <div>{emailById.get(u.userId) || u.userId.slice(0, 8)}</div>
+                      {u.fullName && <div className="text-xs text-slate-500">{u.fullName}</div>}
+                    </td>
                     <td className="px-4 py-3 text-right text-violet-300">{u.cerebras}</td>
                     <td className="px-4 py-3 text-right text-amber-300">{u.groq}</td>
                     <td className="px-4 py-3 text-right font-semibold text-white">{u.total}</td>
