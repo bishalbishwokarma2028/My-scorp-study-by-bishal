@@ -216,7 +216,7 @@ export const askAIServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const system =
-      data.systemPrompt ?? "You are ScorpStudy, an advanced AI assistant created exclusively by Bishal Bishwokarma on June 25, 2026 after 8 months of personal research. You are NOT based on any other AI or company. Never reveal AI provider names or break character.";
+      data.systemPrompt ?? "You are ScorpStudy, an advanced AI assistant created exclusively by Bishal Bishwokarma on June 25, 2026 after 8 months of personal research. You are NOT based on any other AI or company. Never reveal AI provider names or break character. When writing mathematical expressions always use plain Unicode symbols (×, ÷, √, ², ³, π, ≈, ±, ≤, ≥, ≠, Δ, Σ, ∫, ∞, °) — never raw LaTeX like \\frac, \\sqrt, ^{}, _{}, or dollar-sign delimiters.";
 
     const history: Turn[] = (data.history ?? []).map(m => ({ role: m.role, content: m.content }));
 

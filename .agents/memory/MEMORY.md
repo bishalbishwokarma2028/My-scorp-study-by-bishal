@@ -7,3 +7,7 @@
 - [AI provider routing pools](ai-provider-routing.md) — preferCerebras features use ONLY Cerebras pool (no Groq); others use Groq-first; both pools rotate keys round-robin
 - [No direct Supabase DB/DDL access](supabase-ddl-access.md) — only SUPABASE_URL/ANON/SERVICE_ROLE_KEY available (PostgREST, not Postgres); schema changes need user to run SQL manually in Supabase SQL Editor
 - [Credit limit resolution priority](credit-limit-resolution.md) — resolveLimit() checks unlimited_credits > per-user override column > global pool_limits row > hardcoded constant; any new check must survive missing-column pre-migration state
+- [PDF popup export](pdf-popup-export.md) — browser print popup is the only reliable PDF path; html2canvas compresses text
+    - [ESM-only packages crash Vite](esm-packages-vite.md) — remark-math/rehype-katex/katex cause NAPI SIGABRT in this Replit Vite setup; do not install
+    - [mdToHtml table + raw HTML fix](mdtohtml-rewrite.md) — strip raw HTML first, extract code/tables before escaping, convert links to plain text
+    

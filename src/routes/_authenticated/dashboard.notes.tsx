@@ -5,8 +5,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   BookOpen, Plus, Search, Trash2, Save, Wand2, Sparkles, FileQuestion,
-  Download, FileDown, Eye, Pencil, Pin, Lightbulb, HelpCircle, BookMarked, Sigma,
-  CalendarDays, Table as TableIcon, CheckSquare, ChevronDown, Loader2,
+  FileDown, Eye, Pencil, Pin, Lightbulb, HelpCircle, BookMarked, Sigma,
+  CalendarDays, Table as TableIcon, CheckSquare, ChevronDown, Loader2, Menu, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
@@ -74,26 +74,108 @@ const TEMPLATES: Record<TemplateKey, string> = {
 `,
 };
 
-function mdToHtml(md: string): string {
-  let html = escapeHtmlBasic(md);
-  html = html.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) =>
-    `<pre class="code-block"><code>${code.trim()}</code></pre>`);
-  html = html.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
-  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-  html = html.replace(/^---+$/gm, '<hr>');
-  html = html.replace(/^\d+\. (.+)$/gm, '<li class="ol-item">$1</li>');
-  html = html.replace(/^[-*] \[x\] (.+)$/gm, '<li class="checked">✅ $1</li>');
-  html = html.replace(/^[-*] \[ \] (.+)$/gm, '<li class="unchecked">☐ $1</li>');
-  html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+// ─── PDF markdown → HTML ────────────────────────────────────────────────────
+// Converts markdown to clean HTML for the print-preview popup.
+// Rules:
+//  • Strip raw HTML tags LLMs sometimes embed (<a name="...">, etc.)
+//  • Handle GFM tables (pipe syntax)
+//  • Convert [link text](url) → plain text only (no hyperlinks needed)
+//  • Escape remaining HTML special chars
+//  • Process headings, bold, italic, lists, blockquotes, HR, math, code
 
-  const lines = html.split('\n');
+function escH(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+}
+
+function applyInlineMd(t: string): string {
+  // Applied to already-HTML-escaped text; converts markdown inline syntax to HTML
+  return t
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    .replace(/\$([^$\n]+)\$/g, '<span class="math-inline">$1</span>')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // strip links, keep text
+}
+
+function parseCells(row: string): string[] {
+  return row.replace(/^\||\|[\s]*$/g, '').split('|').map((c) => c.trim());
+}
+
+function mdToHtml(md: string): string {
+  // 1. Strip raw HTML tags (anchors LLMs generate for ToC etc.)
+  let t = md.replace(/<[^>]+>/g, '');
+
+  // Placeholder bucket
+  const blocks: string[] = [];
+  const bk = (html: string) => { const i = blocks.length; blocks.push(html); return `\x00B${i}\x00`; };
+
+  // 2. Fenced code blocks (extract before escaping)
+  t = t.replace(/```[\w]*\r?\n?([\s\S]*?)```/g, (_, code) =>
+    bk(`<pre class="code-block"><code>${escH(code.trim())}</code></pre>`));
+
+  // 3. Inline code (extract before escaping)
+  t = t.replace(/`([^`\n]+)`/g, (_, code) =>
+    bk(`<code class="inline-code">${escH(code)}</code>`));
+
+  // 4. Block math $...$ (extract before escaping)
+  t = t.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) =>
+    bk(`<div class="math-block">${escH(math.trim())}</div>`));
+
+  // 5. GFM tables — header | separator | rows
+  // Match: header row \n separator row \n optional body rows
+  const tableRe = /^(\|[^\n]+\|\n)(\|[-| :]+\|\n)((?:\|[^\n]+\|\n?)*)/gm;
+  t = t.replace(tableRe, (_, headerLine, _sep, bodyStr) => {
+    const headers = parseCells(headerLine);
+    const bodyRows = bodyStr ? bodyStr.trim().split('\n').filter(Boolean) : [];
+    let html = '<table><thead><tr>';
+    html += headers.map((h) => `<th>${applyInlineMd(escH(h))}</th>`).join('');
+    html += '</tr></thead>';
+    if (bodyRows.length) {
+      html += '<tbody>';
+      html += bodyRows.map((rowLine: string) => {
+        const cells = parseCells(rowLine);
+        return '<tr>' + cells.map((c: string) => `<td>${applyInlineMd(escH(c))}</td>`).join('') + '</tr>';
+      }).join('');
+      html += '</tbody>';
+    }
+    html += '</table>';
+    return bk(html) + '\n';
+  });
+
+  // 6. Escape remaining HTML special chars in body text
+  t = t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+
+  // 7. Headings
+  t = t.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  t = t.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  t = t.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  t = t.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // 8. Blockquotes (> is escaped to &gt; in step 6)
+  t = t.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // 9. Horizontal rules
+  t = t.replace(/^---+$/gm, '<hr>');
+
+  // 10. Inline markdown (bold, italic, etc.) on body text
+  t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  t = t.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
+  // 11. Inline math $...$
+  t = t.replace(/\$([^$\n]+)\$/g, '<span class="math-inline">$1</span>');
+
+  // 12. Markdown links → keep text only
+  t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+
+  // 13. Lists
+  t = t.replace(/^\d+\. (.+)$/gm, '<li class="ol-item">$1</li>');
+  t = t.replace(/^[-*] \[x\] (.+)$/gm, '<li class="checked">✅ $1</li>');
+  t = t.replace(/^[-*] \[ \] (.+)$/gm, '<li class="unchecked">☐ $1</li>');
+  t = t.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+
+  // 14. Group list items and wrap plain lines in <p>
+  const lines = t.split('\n');
   const result: string[] = [];
   let i = 0;
   while (i < lines.length) {
@@ -101,7 +183,7 @@ function mdToHtml(md: string): string {
     if (line.startsWith('<li class="ol-item">')) {
       result.push('<ol>');
       while (i < lines.length && lines[i].startsWith('<li class="ol-item">')) {
-        result.push(lines[i].replace('<li class="ol-item">', '<li>'));
+        result.push(lines[i].replace(' class="ol-item"', ''));
         i++;
       }
       result.push('</ol>');
@@ -113,7 +195,11 @@ function mdToHtml(md: string): string {
       }
       result.push('</ul>');
     } else {
-      if (line.trim() && !line.startsWith('<h') && !line.startsWith('<pre') && !line.startsWith('<blockquote') && !line.startsWith('<hr') && !line.startsWith('<ul') && !line.startsWith('<ol')) {
+      const isBlock = line.startsWith('<h') || line.startsWith('<pre') ||
+        line.startsWith('<blockquote') || line.startsWith('<hr') ||
+        line.startsWith('<ul') || line.startsWith('<ol') ||
+        line.startsWith('<table') || /^\x00B\d+\x00$/.test(line.trim());
+      if (line.trim() && !isBlock) {
         result.push(`<p>${line}</p>`);
       } else {
         result.push(line);
@@ -121,16 +207,11 @@ function mdToHtml(md: string): string {
       i++;
     }
   }
-  return result.join('\n');
-}
 
-function escapeHtmlBasic(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  // 15. Restore extracted blocks
+  let html = result.join('\n');
+  blocks.forEach((b, idx) => { html = html.replaceAll(`\x00B${idx}\x00`, b); });
+  return html;
 }
 
 function NotesPage() {
@@ -146,7 +227,7 @@ function NotesPage() {
   const [view, setView] = useState<"write" | "preview">("write");
   const [aiLoading, setAiLoading] = useState<null | string>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportedPdf, setExportedPdf] = useState<{ url: string; filename: string } | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [tmplOpen, setTmplOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
@@ -182,25 +263,6 @@ function NotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, content, dirty]);
 
-  // Any previously-exported PDF becomes stale once the note or its content changes.
-  useEffect(() => {
-    setExportedPdf((prev) => {
-      if (prev) URL.revokeObjectURL(prev.url);
-      return null;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, content, title]);
-
-  // Revoke the object URL on unmount so it doesn't leak past the page's lifetime.
-  useEffect(() => {
-    return () => {
-      setExportedPdf((prev) => {
-        if (prev) URL.revokeObjectURL(prev.url);
-        return prev;
-      });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function persist(showToast = false) {
     if (activeId) {
@@ -322,184 +384,173 @@ function NotesPage() {
     navigate({ to: "/dashboard/quiz" });
   }
 
-  // Every selector below is scoped under `.pdf-export-root` so it can be
-  // rendered in an offscreen container attached to the *live* document
-  // (required for html2canvas to rasterize real computed colors) without
-  // leaking styles onto the rest of the app.
-  // IMPORTANT: inline elements here (strong, .inline-code, etc.) must NOT
-  // use horizontal padding or border-radius. html2canvas measures inline
-  // text flow width without accounting for inline padding, so a padded
-  // highlight/background box gets painted at a different offset than the
-  // glyphs underneath it — this is what caused bold/highlighted text to
-  // visually overlap and misalign in exported PDFs. Background-color alone
-  // (no padding) is safe. Block-level elements (h1, h2, blockquote, etc.)
-  // are unaffected and may keep padding/border-radius.
-  const PDF_EXPORT_STYLES = `
-    .pdf-export-root { font-family: 'Inter', system-ui, sans-serif; font-size: 14px; color: #0f172a; background: #fff; line-height: 1.75; width: 800px; padding: 48px 40px; box-sizing: border-box; }
-    .pdf-export-root * { box-sizing: border-box; }
-    .pdf-export-root .doc-header { border-bottom: 3px solid #7c3aed; padding-bottom: 20px; margin-bottom: 32px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-    .pdf-export-root .doc-title { font-size: 28px; font-weight: 700; color: #1e1b4b; line-height: 1.2; }
-    .pdf-export-root .doc-meta { font-size: 11px; color: #64748b; margin-top: 6px; }
-    .pdf-export-root .doc-badge { flex-shrink: 0; background: #7c3aed; color: #ffffff; font-size: 10px; font-weight: 700; padding: 6px 12px; border-radius: 20px; white-space: nowrap; letter-spacing: 0.5px; text-transform: uppercase; }
-    .pdf-export-root h1 { font-size: 22px; font-weight: 700; color: #1e1b4b; margin: 28px 0 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
-    .pdf-export-root h2 { font-size: 17px; font-weight: 700; color: #4c1d95; margin: 22px 0 8px; padding: 8px 14px; background: #f5f3ff; border-left: 4px solid #7c3aed; border-radius: 0 8px 8px 0; }
-    .pdf-export-root h3 { font-size: 14px; font-weight: 700; color: #1e1b4b; margin: 18px 0 6px; }
-    .pdf-export-root h4 { font-size: 13px; font-weight: 600; color: #334155; margin: 14px 0 4px; }
-    .pdf-export-root p { margin: 8px 0; color: #334155; }
-    .pdf-export-root strong { color: #4c1d95; font-weight: 700; background: #fef9c3; }
-    .pdf-export-root em { color: #64748b; font-style: italic; }
-    .pdf-export-root del { color: #94a3b8; text-decoration: line-through; }
-    .pdf-export-root ul, .pdf-export-root ol { margin: 10px 0 10px 20px; color: #334155; }
-    .pdf-export-root li { margin: 4px 0; padding-left: 4px; }
-    .pdf-export-root li.checked { list-style: none; color: #15803d; }
-    .pdf-export-root li.unchecked { list-style: none; color: #64748b; }
-    .pdf-export-root .inline-code { font-family: 'Fira Mono', 'Courier New', monospace; background: #f1f5f9; color: #7c3aed; font-size: 12px; }
-    .pdf-export-root .code-block { background: #1e293b; color: #e2f4ff; padding: 16px 20px; border-radius: 10px; margin: 16px 0; overflow-x: auto; font-size: 12px; line-height: 1.6; }
-    .pdf-export-root .code-block code { font-family: 'Fira Mono', 'Courier New', monospace; color: #e2f4ff; }
-    .pdf-export-root blockquote { border-left: 4px solid #7c3aed; background: #f5f3ff; padding: 10px 16px; margin: 14px 0; border-radius: 0 8px 8px 0; color: #4c1d95; font-style: italic; }
-    .pdf-export-root table { border-collapse: collapse; width: 100%; margin: 14px 0; }
-    .pdf-export-root thead { background: #7c3aed; }
-    .pdf-export-root th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; }
-    .pdf-export-root td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 13px; }
-    .pdf-export-root tr:nth-child(even) td { background: #f8faff; }
-    .pdf-export-root tr:last-child td { border-bottom: none; }
-    .pdf-export-root hr { border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; }
-    .pdf-export-root .doc-footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #94a3b8; }
-    .pdf-export-root .footer-brand { font-weight: 700; color: #7c3aed; }
-  `;
-
-  // Builds the exported PDF as a Blob and hands it back with a suggested
-  // filename. Rendering happens inside a throwaway <iframe> with its OWN
-  // document — this is essential: html2canvas walks every stylesheet in
-  // the document it's given, and the main app's Tailwind theme defines its
-  // colors as oklch(...), a CSS color function html2canvas cannot parse.
-  // An iframe gets a blank document with none of that global CSS, so only
-  // our plain hex-based PDF_EXPORT_STYLES ever gets parsed.
-  async function renderNotePdfBlob(): Promise<{ blob: Blob; filename: string }> {
-    const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-      import("jspdf"),
-      import("html2canvas"),
-    ]);
-
-    const bodyHtml = mdToHtml(content);
-    const safeTitle = title || "Untitled Note";
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.top = "0";
-    iframe.style.left = "-10000px";
-    iframe.style.width = "800px";
-    iframe.style.height = "1200px";
-    iframe.style.border = "none";
-    document.body.appendChild(iframe);
-
-    try {
-      const doc = iframe.contentDocument;
-      if (!doc) throw new Error("Could not create export frame");
-
-      doc.open();
-      doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>
-        html, body { margin: 0; padding: 0; background: #ffffff; }
-        ${PDF_EXPORT_STYLES}
-      </style></head><body>
-        <div class="pdf-export-root">
-          <div class="doc-header">
-            <div>
-              <div class="doc-title">${escapeHtml(safeTitle)}</div>
-              <div class="doc-meta">ScorpStudy by Bishal Bishwokarma &nbsp;•&nbsp; ${new Date().toLocaleString()} &nbsp;•&nbsp; ${content.trim().split(/\s+/).length} words</div>
-            </div>
-            <div class="doc-badge">&#10022; Smart Notes</div>
-          </div>
-          <div class="content">${bodyHtml}</div>
-          <div class="doc-footer">
-            <span>Generated by <span class="footer-brand">ScorpStudy by Bishal Bishwokarma</span> — AI-Powered Study Assistant</span>
-          </div>
-        </div>
-      </body></html>`);
-      doc.close();
-
-      // Let the iframe's own document paint/layout — and its fonts finish
-      // loading — before rasterizing. Rendering too early is what causes
-      // html2canvas to measure text with fallback metrics and then paint
-      // with the real font, producing overlapping/misaligned glyphs.
-      try {
-        await (doc as any).fonts?.ready;
-      } catch { /* ignore */ }
-      await new Promise((r) => setTimeout(r, 200));
-
-      const target = doc.body.querySelector(".pdf-export-root") as HTMLElement;
-      if (!target) throw new Error("Export content missing");
-
-      // Grow the iframe to the content's real height so html2canvas never
-      // captures a clipped/scrolled viewport (a second source of shifted or
-      // overlapping content when notes are longer than the offscreen frame).
-      const fullHeight = Math.max(target.scrollHeight, target.offsetHeight);
-      iframe.style.height = `${fullHeight}px`;
-      await new Promise((r) => setTimeout(r, 30));
-
-      const canvas = await html2canvas(target, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        windowWidth: 800,
-        windowHeight: fullHeight,
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-      });
-
-      const pdf = new jsPDF({ unit: "pt", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      const filename = `${safeTitle.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "ScorpStudy_Note"}.pdf`;
-      return { blob: pdf.output("blob"), filename };
-    } finally {
-      document.body.removeChild(iframe);
-    }
-  }
-
-  async function exportPDF() {
+  // Opens a styled print-preview popup window with a "Download PDF" button.
+  // Uses the browser's native print engine — avoids html2canvas entirely,
+  // giving perfect word-spacing, correct highlight positions, and proper tables.
+  function exportPDF() {
     if (!content.trim() && !title.trim()) return toast.error("Nothing to export");
-    setExporting(true);
-    try {
-      if (exportedPdf) URL.revokeObjectURL(exportedPdf.url);
-      const { blob, filename } = await renderNotePdfBlob();
-      const url = URL.createObjectURL(blob);
-      setExportedPdf({ url, filename });
-      toast.success("PDF ready — click Download PDF to save it");
-    } catch (err) {
-      console.error("PDF export failed:", err);
-      toast.error("Failed to export PDF — please try again");
-    } finally {
-      setExporting(false);
-    }
-  }
+    const safeTitle = title || "Untitled Note";
+    const bodyHtml = mdToHtml(content);
+    const wordCount = content.trim().split(/\s+/).length;
+    const dateStr = new Date().toLocaleString();
 
-  function downloadPDF() {
-    if (!exportedPdf) return;
-    const a = document.createElement("a");
-    a.href = exportedPdf.url;
-    a.download = exportedPdf.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    toast.success("PDF downloaded");
+    const popup = window.open("", "_blank", "width=960,height=750,scrollbars=yes,resizable=yes");
+    if (!popup) { toast.error("Please allow popups for this site to export PDFs"); return; }
+
+    popup.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${escapeHtml(safeTitle)} — ScorpStudy</title>
+  <style>
+    /* ── Screen: floating download bar ─────────────────────────────── */
+    @media screen {
+      .dl-bar {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+        background: #4c1d95; color: #fff;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 28px; gap: 12px;
+        font-family: -apple-system,'Segoe UI',Arial,sans-serif; font-size: 13px;
+        box-shadow: 0 2px 12px rgba(0,0,0,.25);
+      }
+      .dl-bar .brand { font-weight: 700; letter-spacing: .4px; }
+      .dl-bar .hint { font-size: 11px; opacity: .8; }
+      .dl-bar .btn {
+        background: #fff; color: #4c1d95; border: none; cursor: pointer;
+        padding: 8px 22px; border-radius: 8px; font-size: 13px; font-weight: 700;
+        display: flex; align-items: center; gap: 6px; white-space: nowrap;
+        transition: background .15s;
+      }
+      .dl-bar .btn:hover { background: #f5f3ff; }
+      body { margin-top: 54px; }
+    }
+    /* ── Print: hide bar, set margins ───────────────────────────────── */
+    @media print {
+      .dl-bar { display: none !important; }
+      body { margin: 0 !important; }
+      @page { margin: 22mm 20mm 22mm 20mm; }
+      h1, h2, h3, h4 { page-break-after: avoid; }
+      pre, table, blockquote { page-break-inside: avoid; }
+    }
+    /* ── Document body ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: Georgia,'Times New Roman',serif;
+      font-size: 11pt; line-height: 1.85; color: #1a1a2e;
+      background: #fff; max-width: 780px;
+      margin-left: auto; margin-right: auto;
+      padding: 36px 52px 72px;
+    }
+    /* Header */
+    .doc-header {
+      border-bottom: 3px solid #7c3aed;
+      padding-bottom: 18px; margin-bottom: 34px;
+    }
+    .doc-title {
+      font-family: -apple-system,'Segoe UI',Arial,sans-serif;
+      font-size: 26pt; font-weight: 800; color: #1e1b4b;
+      margin: 0 0 6px; line-height: 1.2; word-break: break-word;
+    }
+    .doc-meta {
+      font-family: -apple-system,'Segoe UI',Arial,sans-serif;
+      font-size: 9pt; color: #64748b;
+    }
+    /* Headings */
+    h1, h2, h3, h4 {
+      font-family: -apple-system,'Segoe UI',Arial,sans-serif;
+      color: #1e1b4b; margin-top: 28px; margin-bottom: 8px; line-height: 1.3;
+    }
+    h1 { font-size: 17pt; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+    h2 {
+      font-size: 13pt; color: #4c1d95;
+      background: #f5f3ff; padding: 8px 14px;
+      border-left: 4px solid #7c3aed; margin-top: 26px;
+    }
+    h3 { font-size: 12pt; }
+    h4 { font-size: 11pt; color: #334155; }
+    /* Body text */
+    p { margin: 9px 0; color: #334155; }
+    strong { color: #4c1d95; font-weight: 700; background: #fef9c3; padding: 0 2px; }
+    em { color: #475569; }
+    del { color: #94a3b8; text-decoration: line-through; }
+    /* Lists */
+    ul, ol { margin: 10px 0 10px 26px; color: #334155; }
+    li { margin: 5px 0; line-height: 1.7; }
+    li.checked { list-style: none; margin-left: -20px; color: #15803d; }
+    li.unchecked { list-style: none; margin-left: -20px; color: #64748b; }
+    /* Code */
+    code.inline-code {
+      font-family: 'Courier New',Courier,monospace;
+      background: #f1f5f9; color: #7c3aed; font-size: 9.5pt;
+      padding: 0 3px;
+    }
+    pre.code-block {
+      background: #1e293b; color: #e2f4ff;
+      padding: 16px 20px; border-radius: 8px; margin: 16px 0;
+      font-size: 9pt; line-height: 1.65;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    pre.code-block code {
+      font-family: 'Courier New',Courier,monospace; color: #e2f4ff;
+      background: none; font-size: inherit; padding: 0;
+    }
+    /* Blockquote */
+    blockquote {
+      border-left: 4px solid #7c3aed; background: #f5f3ff;
+      padding: 10px 16px; margin: 14px 0; color: #4c1d95; font-style: italic;
+    }
+    /* Tables */
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 10pt; font-family: -apple-system,'Segoe UI',Arial,sans-serif; }
+    thead { background: #7c3aed; }
+    th { padding: 9px 13px; text-align: left; font-size: 9pt; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .4px; }
+    td { padding: 8px 13px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+    tr:nth-child(even) td { background: #f8faff; }
+    tr:last-child td { border-bottom: none; }
+    /* Math */
+    .math-block {
+      font-family: 'Courier New',Courier,monospace;
+      background: #f8faff; border: 1px solid #e2e8f0;
+      border-left: 4px solid #7c3aed;
+      padding: 12px 16px; margin: 16px 0; font-size: 11pt;
+      white-space: pre-wrap; color: #1e1b4b;
+    }
+    .math-inline { font-family: 'Courier New',Courier,monospace; color: #4c1d95; }
+    /* HR */
+    hr { border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; }
+    /* Footer */
+    .doc-footer {
+      margin-top: 52px; padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      font-family: -apple-system,'Segoe UI',Arial,sans-serif;
+      font-size: 8.5pt; color: #94a3b8;
+    }
+    .footer-brand { font-weight: 700; color: #7c3aed; }
+  </style>
+</head>
+<body>
+  <div class="dl-bar">
+    <div>
+      <span class="brand">📄 ScorpStudy Smart Notes Preview</span>
+      <span class="hint"> &nbsp;—&nbsp; In the print dialog, set Destination to "Save as PDF"</span>
+    </div>
+    <button class="btn" onclick="window.print()">⬇ Download PDF</button>
+  </div>
+
+  <div class="doc-header">
+    <div class="doc-title">${escapeHtml(safeTitle)}</div>
+    <div class="doc-meta">ScorpStudy by Bishal Bishwokarma &nbsp;•&nbsp; ${escapeHtml(dateStr)} &nbsp;•&nbsp; ${wordCount} words</div>
+  </div>
+
+  ${bodyHtml}
+
+  <div class="doc-footer">
+    Generated by <span class="footer-brand">ScorpStudy by Bishal Bishwokarma</span> — AI‑Powered Study Assistant
+  </div>
+</body>
+</html>`);
+    popup.document.close();
+    toast.success("Preview opened — click \"Download PDF\" in the popup to save");
   }
 
   async function del(id: string) {
@@ -522,9 +573,29 @@ function NotesPage() {
   const readMin = Math.max(1, Math.round(words / 200));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-      <aside className="rounded-2xl border border-border bg-white p-4">
-        <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[300px_1fr]">
+
+      {/* ── Mobile top bar: toggle sidebar ── */}
+      <div className="flex items-center justify-between lg:hidden rounded-2xl border border-border bg-white px-4 py-3">
+        <div className="flex items-center gap-2 font-bold text-sm">
+          <img src={logoUrl} alt="" className="h-5 w-5 object-contain" />
+          <span>Smart Notes</span>
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">{(notes ?? []).length}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={newNote} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md">
+            <Plus className="h-3.5 w-3.5" /> New
+          </button>
+          <button onClick={() => setShowSidebar((v) => !v)} className="grid h-8 w-8 place-items-center rounded-lg border border-border bg-white hover:bg-accent">
+            {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Sidebar (always on lg, toggled on mobile) ── */}
+      <aside className={`rounded-2xl border border-border bg-white p-4 ${showSidebar ? "block" : "hidden"} lg:block`}>
+        {/* Desktop header */}
+        <div className="hidden lg:flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold">
             <img src={logoUrl} alt="" className="h-6 w-6 object-contain" />
             <span>Smart Notes</span>
@@ -543,18 +614,18 @@ function NotesPage() {
             className="w-full rounded-lg border border-border bg-slate-50/60 px-8 py-2 text-xs outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
           />
         </div>
-        <ul className="mt-3 max-h-[65vh] space-y-1 overflow-y-auto">
+        <ul className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto">
           {filtered.length === 0 && (
             <li className="grid place-items-center py-10 text-center">
               <div className="grid h-14 w-14 place-items-center rounded-2xl bg-violet-100 text-violet-500"><BookOpen className="h-7 w-7" /></div>
               <p className="mt-3 text-sm font-semibold">No notes yet</p>
-              <p className="text-xs text-muted-foreground">Click + New Note to start writing</p>
+              <p className="text-xs text-muted-foreground">Create your first note above</p>
             </li>
           )}
           {filtered.map((n) => (
             <li
               key={n.id}
-              onClick={() => loadNote(n)}
+              onClick={() => { loadNote(n); setShowSidebar(false); }}
               className={`group cursor-pointer rounded-lg p-2.5 text-sm transition ${activeId === n.id ? "bg-violet-50 ring-1 ring-violet-200" : "hover:bg-accent"}`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -571,37 +642,39 @@ function NotesPage() {
         </ul>
       </aside>
 
-      <section className="rounded-2xl border border-border bg-white p-5">
+      {/* ── Main editor / preview ── */}
+      <section className="rounded-2xl border border-border bg-white p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <input
             value={title}
             onChange={(e) => { setTitle(e.target.value); setDirty(true); }}
             placeholder="Note Title"
-            className="w-full border-0 bg-transparent text-xl font-bold outline-none"
+            className="min-w-0 flex-1 border-0 bg-transparent text-lg font-bold outline-none sm:text-xl"
           />
-          <span className={`whitespace-nowrap text-xs font-semibold ${dirty ? "text-amber-600" : "text-emerald-600"}`}>
+          <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${dirty ? "text-amber-600" : "text-emerald-600"}`}>
             {dirty ? "● Unsaved" : `✓ ${savedAt ? `Saved ${savedAt}` : "Saved"}`}
           </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-y border-border py-2 text-xs">
+        {/* Toolbar */}
+        <div className="mt-3 flex flex-wrap items-center gap-1 border-y border-border py-2 text-xs">
           <ToolBtn onClick={() => wrapSelection("**", "**", "bold text")} title="Bold (Ctrl+B)"><b>B</b></ToolBtn>
           <ToolBtn onClick={() => wrapSelection("*", "*", "italic")} title="Italic (Ctrl+I)"><i>I</i></ToolBtn>
           <Sep />
-          <ToolBtn onClick={() => insertAtCursor("\n\n> 📌 **Important:** ")} title="Important"><Pin className="h-3 w-3 text-rose-500" /> Important</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n💡 **Key Concept:** ")} title="Key Concept"><Lightbulb className="h-3 w-3 text-amber-500" /> Key Concept</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n❓ **Study Question:** ")} title="Study Question"><HelpCircle className="h-3 w-3 text-violet-500" /> Study Q</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n📖 **Definition** — ")} title="Definition"><BookMarked className="h-3 w-3 text-emerald-500" /> Definition</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n$$ formula $$\n\n")} title="Formula"><Sigma className="h-3 w-3 text-blue-500" /> Formula</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor(`\n\n📅 ${new Date().toLocaleDateString()} — `)} title="Insert date"><CalendarDays className="h-3 w-3 text-orange-500" /> Date</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n| Column 1 | Column 2 |\n| --- | --- |\n| Row 1 | Row 1 |\n| Row 2 | Row 2 |\n\n")} title="Table"><TableIcon className="h-3 w-3 text-indigo-500" /> Table</ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n- [ ] ")} title="Task"><CheckSquare className="h-3 w-3 text-emerald-600" /> Task</ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n> 📌 **Important:** ")} title="Important"><Pin className="h-3 w-3 text-rose-500" /><span className="hidden sm:inline"> Important</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n💡 **Key Concept:** ")} title="Key Concept"><Lightbulb className="h-3 w-3 text-amber-500" /><span className="hidden sm:inline"> Key Concept</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n❓ **Study Question:** ")} title="Study Question"><HelpCircle className="h-3 w-3 text-violet-500" /><span className="hidden sm:inline"> Study Q</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n📖 **Definition** — ")} title="Definition"><BookMarked className="h-3 w-3 text-emerald-500" /><span className="hidden sm:inline"> Definition</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n$ formula $\n\n")} title="Formula"><Sigma className="h-3 w-3 text-blue-500" /><span className="hidden sm:inline"> Formula</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor(`\n\n📅 ${new Date().toLocaleDateString()} — `)} title="Insert date"><CalendarDays className="h-3 w-3 text-orange-500" /><span className="hidden sm:inline"> Date</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n| Column 1 | Column 2 |\n| --- | --- |\n| Row 1 | Row 1 |\n| Row 2 | Row 2 |\n\n")} title="Table"><TableIcon className="h-3 w-3 text-indigo-500" /><span className="hidden sm:inline"> Table</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n- [ ] ")} title="Task"><CheckSquare className="h-3 w-3 text-emerald-600" /><span className="hidden sm:inline"> Task</span></ToolBtn>
           <div className="relative">
             <ToolBtn onClick={() => setTmplOpen((v) => !v)} title="Templates">
-              <span className="inline-flex items-center gap-1">Template <ChevronDown className="h-3 w-3" /></span>
+              <span className="inline-flex items-center gap-1"><span className="hidden sm:inline">Template</span><span className="sm:hidden">Tmpl</span> <ChevronDown className="h-3 w-3" /></span>
             </ToolBtn>
             {tmplOpen && (
-              <div className="absolute right-0 z-10 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-white shadow-lg">
+              <div className="absolute left-0 z-10 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-white shadow-lg">
                 {(Object.keys(TEMPLATES) as TemplateKey[]).map((k) => (
                   <button
                     key={k}
@@ -614,6 +687,7 @@ function NotesPage() {
           </div>
         </div>
 
+        {/* Action bar */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="inline-flex rounded-lg border border-border bg-slate-50 p-0.5 text-xs">
             <button onClick={() => setView("write")} className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 font-medium ${view === "write" ? "bg-white shadow-sm" : "text-muted-foreground"}`}>
@@ -624,32 +698,30 @@ function NotesPage() {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /> Enhance</AiBtn>
-            <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /> Summarize</AiBtn>
-            <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /> Quiz Me</AiBtn>
-            <AiBtn loading={exporting} onClick={exportPDF}><FileDown className="h-3 w-3" /> {exporting ? "Exporting…" : "Export to PDF"}</AiBtn>
-            {exportedPdf && (
-              <AiBtn onClick={downloadPDF}><Download className="h-3 w-3" /> Download PDF</AiBtn>
-            )}
+            <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /><span className="hidden sm:inline"> Enhance</span></AiBtn>
+            <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /><span className="hidden sm:inline"> Summarize</span></AiBtn>
+            <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /><span className="hidden sm:inline"> Quiz Me</span></AiBtn>
+            <AiBtn onClick={exportPDF}><FileDown className="h-3 w-3" /><span className="hidden sm:inline"> Export PDF</span></AiBtn>
             <QuotaBadge quota={quota} loading={quotaLoading} />
             <button onClick={() => persist(true)} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 font-semibold text-white shadow-md hover:opacity-90">
-              <Save className="h-3 w-3" /> Save
+              <Save className="h-3 w-3" /><span className="hidden sm:inline"> Save</span>
             </button>
           </div>
         </div>
 
-        <div className="mt-4 min-h-[420px]">
+        {/* Write / Preview pane */}
+        <div className="mt-4 min-h-[360px] sm:min-h-[420px]">
           {view === "write" ? (
             <textarea
               ref={editorRef}
               value={content}
               onChange={(e) => { setContent(e.target.value); setDirty(true); }}
-              rows={20}
-              placeholder={`Start writing your notes here...\n\nPro tips:\n• Use the smart toolbar above to insert key concepts, important callouts, formulas, tables & tasks\n• Click "Template" for pre-built Lecture, Cornell, Study Guide formats\n• Ctrl+S saves • Ctrl+B bold • Ctrl+I italic\n• Switch to Preview to see your formatted notes rendered beautifully`}
-              className="h-full min-h-[420px] w-full resize-none rounded-xl border border-border bg-slate-50/40 p-4 font-mono text-sm leading-relaxed outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200"
+              rows={18}
+              placeholder={`Start writing your notes here…\n\nTips:\n• Toolbar above for bold, headings, tables, formulas & tasks\n• "Template" for pre-built study formats\n• Ctrl+S saves • Ctrl+B bold • Ctrl+I italic\n• Switch to Preview to see formatted notes`}
+              className="h-full min-h-[360px] w-full resize-none rounded-xl border border-border bg-slate-50/40 p-4 font-mono text-sm leading-relaxed outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-200 sm:min-h-[420px]"
             />
           ) : (
-            <div className="min-h-[420px] rounded-xl border border-border bg-white p-5">
+            <div className="min-h-[360px] overflow-x-auto rounded-xl border border-border bg-white p-4 sm:min-h-[420px] sm:p-5">
               {content.trim() ? (
                 <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:my-2 prose-li:my-0.5">
                   <ReactMarkdown
@@ -668,7 +740,7 @@ function NotesPage() {
 
         <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs text-muted-foreground">
           <span>{words} words • {readMin} min read</span>
-          <span>{aiLoading && <span className="inline-flex items-center gap-1 text-violet-600"><Loader2 className="h-3 w-3 animate-spin" /> Bishal's Assistant working…</span>}</span>
+          <span>{aiLoading && <span className="inline-flex items-center gap-1 text-violet-600"><Loader2 className="h-3 w-3 animate-spin" /> AI working…</span>}</span>
         </div>
       </section>
     </div>
