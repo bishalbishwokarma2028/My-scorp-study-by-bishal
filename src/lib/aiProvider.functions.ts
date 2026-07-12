@@ -305,10 +305,12 @@ const VisionInput = z.object({
   mimeType: z.string().default("image/jpeg"),
 });
 
+// Claude 3 Haiku first — significantly more accurate for maths/science problems
+// than the Llama vision model. GPT-4o-mini as second fallback.
 const OPENROUTER_VISION_MODELS = [
-  "meta-llama/llama-3.2-11b-vision-instruct",
   "anthropic/claude-3-haiku",
   "openai/gpt-4o-mini",
+  "meta-llama/llama-3.2-11b-vision-instruct",
 ];
 
 // Groq's free-tier vision model — tried first since it requires no paid

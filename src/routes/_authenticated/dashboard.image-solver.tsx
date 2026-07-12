@@ -170,6 +170,14 @@ function ImageSolverPage() {
       else if (t.includes("✅") || t.includes("solution") || t.includes("answer")) cls = "bg-emerald-50 border-emerald-300 text-emerald-900";
       return <div className={`rounded-xl border-l-4 px-3 py-2 mt-5 mb-3 ${cls}`}><h2 className="font-bold text-sm">{children}</h2></div>;
     },
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 px-3 py-2 mt-4 mb-2">
+        <h3 className="font-extrabold text-sm text-amber-900">{mapMathChildren(children)}</h3>
+      </div>
+    ),
+    h4: ({ children }: { children?: React.ReactNode }) => (
+      <h4 className="font-bold text-sm text-violet-800 mt-3 mb-1 px-2 py-1 bg-violet-50 rounded border-l-2 border-violet-400">{mapMathChildren(children)}</h4>
+    ),
     p: ({ children }: { children?: React.ReactNode }) => <p className="my-3 leading-relaxed">{mapMathChildren(children)}</p>,
     ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-3 space-y-3 pl-5 list-decimal">{children}</ol>,
     ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-3 space-y-2 pl-5 list-disc">{children}</ul>,
