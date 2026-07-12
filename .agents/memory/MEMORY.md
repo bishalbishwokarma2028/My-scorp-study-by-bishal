@@ -13,4 +13,5 @@
 - [Plain-text math rendering](plain-text-math-rendering.md) — sup/sub/fraction regex must handle nested parens + strict paren pairing, or it silently fails/corrupts on real AI output
 - [Print/PDF export full width](print-css-width.md) — `@media print` must explicitly reset max-width/width; screen CSS isn't print-safe by default
 - [HEIC upload support](heic-upload-support.md) — heic2any dynamic-imported client-side converts HEIC→JPEG before FileReader; wired into all image `<input type="file">` points
-    
+- [LaTeX safety-net rendering](latex-safety-net.md) — AI models sometimes ignore anti-LaTeX prompts; convert raw LaTeX to plain-text math at render time, don't rely on prompting alone
+- [Popup-window PDF export pitfall](popup-window-print-export.md) — window.open() based print export is unreliable in iframe-proxied previews; print an in-page hidden node instead

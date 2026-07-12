@@ -46,7 +46,7 @@ Use this exact Markdown structure:
 - For maths/science/physics: show every step of the working clearly.
 - Use proper Unicode math symbols inline: ×, ÷, √, ², ³, ⁴, π, ≈, ±, ≤, ≥, ≠, Δ, Σ, ∫, ∞, °.
 - For fractions write "a/b"; for exponents write "x²" or "x^n"; for square roots write "√x".
-- Never output raw LaTeX like \\frac, \\sqrt, ^{}, _{}.
+- NEVER output raw LaTeX commands under any circumstance — not \\frac{}{}, \\sqrt{}, \\bar{}, \\hat{}, \\vec{}, \\pi, \\Delta, \\times, \\cdot, \\left(, \\right), $...$, or any other backslash command. If you catch yourself typing a backslash before a math command, stop and rewrite that piece using plain Unicode symbols instead (e.g. write "3/2 kT", not "\\frac{3}{2}kT"; write "√2", not "\\sqrt{2}"; write "c̄" or "average c", not "\\bar{c}").
 - Use **bold** for every key term and final answer.
 - If the question is in a non-English language, answer in that same language.]
 
