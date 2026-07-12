@@ -9,6 +9,8 @@ import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge } from "@/components/ai-ui";
 import { usePageState } from "@/lib/pageState";
+import { mapMathChildren } from "@/lib/mathText";
+import { ensureBrowserSupportedImage, isImageFile } from "@/lib/imageUpload";
 
 export const Route = createFileRoute("/_authenticated/dashboard/image-solver")({
   component: ImageSolverPage,
@@ -25,9 +27,9 @@ function buildPrompt(instructions: string): string {
 
 Step 1 — Extract: read ALL visible text from the image exactly as written, preserving the original language.
 Step 2 — Understand: identify precisely what is being asked and assess the question's complexity:
-  • Very short / simple question (1–2 sentences) → answer in 3–5 clear sentences.
-  • Short or medium question / single problem → give approximately one full page of detailed explanation with all working shown.
-  • Long, multi-part, or complex question / worksheet → give 1.5–2 full pages: complete step-by-step derivation, explanations for every step, worked examples where helpful, and a summary at the end.
+  • Very short question (a quick fact, definition, or 1-line question) → answer in around 4–5 meaningful, complete sentences. Do not pad it out further.
+  • Short question (a single well-defined problem) → give approximately one full page of clear, step-by-step explanation with all working shown.
+  • Long question (multi-part, a full worksheet, or a complex problem) → give around 2–2.5 full pages: complete step-by-step derivation, an explanation for every step, worked examples where helpful, and a short summary at the end.
 Step 3 — Answer: ${userInstructions}
 
 FORMATTING:
@@ -72,9 +74,19 @@ function ImageSolverPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  function loadFile(file: File) {
-    if (!file.type.startsWith("image/")) return toast.error("Please upload or paste an image file");
-    if (file.size > 8_000_000) return toast.error("Image too large — max 8 MB");
+  async function loadFile(rawFile: File) {
+    if (!isImageFile(rawFile)) return toast.error("Please upload or paste an image file");
+    if (rawFile.size > 8_000_000) return toast.error("Image too large — max 8 MB");
+    let file = rawFile;
+    try {
+      if (rawFile.name.toLowerCase().match(/\.(heic|heif)$/) || /heic|heif/i.test(rawFile.type)) {
+        toast.info("Converting HEIC image…");
+      }
+      file = await ensureBrowserSupportedImage(rawFile);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not read this image");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
@@ -139,7 +151,7 @@ function ImageSolverPage() {
 
   const mdComponents = {
     strong: ({ children }: { children?: React.ReactNode }) => (
-      <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5">{children}</mark>
+      <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5">{mapMathChildren(children)}</mark>
     ),
     h2: ({ children }: { children?: React.ReactNode }) => {
       const t = String(children).toLowerCase();
@@ -149,10 +161,10 @@ function ImageSolverPage() {
       else if (t.includes("✅") || t.includes("answer")) cls = "bg-emerald-50 border-emerald-300 text-emerald-900";
       return <div className={`rounded-xl border-l-4 px-3 py-2 mt-5 mb-3 ${cls}`}><h2 className="font-bold text-sm">{children}</h2></div>;
     },
-    p: ({ children }: { children?: React.ReactNode }) => <p className="my-3 leading-relaxed">{children}</p>,
+    p: ({ children }: { children?: React.ReactNode }) => <p className="my-3 leading-relaxed">{mapMathChildren(children)}</p>,
     ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-3 space-y-3 pl-5 list-decimal">{children}</ol>,
     ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-3 space-y-2 pl-5 list-disc">{children}</ul>,
-    li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed pl-1">{children}</li>,
+    li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed pl-1">{mapMathChildren(children)}</li>,
     code: ({ children }: { children?: React.ReactNode }) => (
       <pre className="bg-slate-900 text-green-400 rounded-xl p-3.5 overflow-x-auto font-mono text-sm my-2 leading-relaxed"><code>{children}</code></pre>
     ),
@@ -160,10 +172,10 @@ function ImageSolverPage() {
       <div className="overflow-x-auto my-3"><table className="min-w-full border-collapse text-sm">{children}</table></div>
     ),
     th: ({ children }: { children?: React.ReactNode }) => (
-      <th className="bg-violet-600 text-white px-3 py-2 text-left text-xs font-semibold">{children}</th>
+      <th className="bg-violet-600 text-white px-3 py-2 text-left text-xs font-semibold">{mapMathChildren(children)}</th>
     ),
     td: ({ children }: { children?: React.ReactNode }) => (
-      <td className="border-b border-border px-3 py-2 text-sm">{children}</td>
+      <td className="border-b border-border px-3 py-2 text-sm">{mapMathChildren(children)}</td>
     ),
   };
 
@@ -194,7 +206,7 @@ function ImageSolverPage() {
             </div>
             <p className="text-sm font-semibold">Click to upload, drag & drop, or paste an image</p>
             <p className="inline-flex items-center gap-1 text-xs text-muted-foreground"><ClipboardPaste className="h-3.5 w-3.5" /> Ctrl+V works anywhere on this page</p>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+            <input ref={fileRef} type="file" accept="image/*,.heic,.heif" onChange={handleFileInput} className="hidden" />
           </div>
         ) : (
           <div className="space-y-3">
@@ -220,7 +232,7 @@ function ImageSolverPage() {
               <button onClick={() => fileRef.current?.click()} className="rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium hover:bg-accent">
                 Replace
               </button>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+              <input ref={fileRef} type="file" accept="image/*,.heic,.heif" onChange={handleFileInput} className="hidden" />
             </div>
           </div>
         )}

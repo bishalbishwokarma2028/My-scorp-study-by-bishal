@@ -10,4 +10,7 @@
 - [PDF popup export](pdf-popup-export.md) — browser print popup is the only reliable PDF path; html2canvas compresses text
     - [ESM-only packages crash Vite](esm-packages-vite.md) — remark-math/rehype-katex/katex cause NAPI SIGABRT in this Replit Vite setup; do not install
     - [mdToHtml table + raw HTML fix](mdtohtml-rewrite.md) — strip raw HTML first, extract code/tables before escaping, convert links to plain text
+- [Plain-text math rendering](plain-text-math-rendering.md) — sup/sub/fraction regex must handle nested parens + strict paren pairing, or it silently fails/corrupts on real AI output
+- [Print/PDF export full width](print-css-width.md) — `@media print` must explicitly reset max-width/width; screen CSS isn't print-safe by default
+- [HEIC upload support](heic-upload-support.md) — heic2any dynamic-imported client-side converts HEIC→JPEG before FileReader; wired into all image `<input type="file">` points
     

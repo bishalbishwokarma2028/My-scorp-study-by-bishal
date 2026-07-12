@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { askAI, extractJSON } from "@/lib/aiProvider";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
 import { extractPdfText } from "@/lib/pdfExtract";
+import { ensureBrowserSupportedImage, isImageFile } from "@/lib/imageUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { ProviderBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
@@ -78,14 +79,15 @@ function SummarizerPage() {
       return;
     }
 
-    if (file.type.startsWith("image/")) {
-      toast.info("Extracting text from image…");
+    if (isImageFile(file)) {
+      toast.info(/\.(heic|heif)$/i.test(file.name) || /heic|heif/i.test(file.type) ? "Converting HEIC image…" : "Extracting text from image…");
       try {
+        const convertedFile = await ensureBrowserSupportedImage(file);
         const reader = new FileReader();
         reader.onload = async () => {
           const dataUrl = reader.result as string;
           const base64 = dataUrl.split(",")[1];
-          const mimeType = file.type || "image/jpeg";
+          const mimeType = convertedFile.type || "image/jpeg";
           const res = await analyzeImageServer({
             data: {
               prompt: "Extract ALL visible text from this image exactly as it appears. If there is study content (notes, diagrams with labels, textbook pages), describe what you see and transcribe all text. Output only the extracted text content, no commentary.",
@@ -101,9 +103,9 @@ function SummarizerPage() {
             toast.success("Text extracted from image — ready to summarize");
           }
         };
-        reader.readAsDataURL(file);
-      } catch {
-        toast.error("Failed to read image");
+        reader.readAsDataURL(convertedFile);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to read image");
       }
       e.target.value = "";
       return;
@@ -191,7 +193,7 @@ ${source.slice(0, 12000)}`;
             <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium hover:bg-accent">
               <Paperclip className="h-4 w-4" /> Upload File
             </button>
-            <input ref={fileRef} type="file" accept=".pdf,.txt,.md,.csv,image/*" onChange={handleFile} className="hidden" />
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.md,.csv,image/*,.heic,.heif" onChange={handleFile} className="hidden" />
           </div>
 
           <textarea

@@ -1,0 +1,70 @@
+Please fix the following issues in my app:
+
+1. Smart Notes (Mobile UI)
+
+Inside the Smart Notes feature, when opened on a mobile phone, the red-highlighted icons shown in the first image are not clear. Users cannot easily understand what each icon represents because only the icons are visible.
+
+Please add text labels below or beside each icon on the mobile version so users can immediately understand their purpose. The desktop version is already fine, so this change is only required for mobile devices.
+
+2. Smart Notes – Export to PDF
+
+There is an issue with the Export to PDF feature.
+
+Currently, the exported PDF only uses about half of the page width, leaving a large empty space on the right side. This happens on both mobile and desktop.
+
+Please fix this so that:
+
+- The exported PDF utilizes the full page width.
+- The layout is properly responsive on both mobile and desktop.
+- The formatting looks clean and professional.
+- The Download button works correctly.
+- After clicking Download, the PDF should automatically be downloaded and saved to the user's device.
+
+3. Mathematical Equations, Formulas, and Symbols
+
+Across all features of the app, mathematical content is currently displayed in a way that is difficult to read and understand.
+
+Please fix the rendering of:
+
+- Mathematical symbols
+- Equations
+- Formulas
+- Fractions
+- Exponents
+- Subscripts and superscripts
+- Scientific notation
+- Any other mathematical expressions
+
+They should be displayed using proper mathematical formatting so they are clear, accurate, and easy to understand.
+
+This improvement should apply throughout the entire app, including Mathematics, Physics, Chemistry, Accounting, and any other subject that contains numerical calculations or formulas.
+
+4. Numerical Solutions
+
+Whenever the app solves numerical problems (whether in Mathematics, Physics, Chemistry, Accounting, or any other subject), the solutions should be:
+
+- Well-structured
+- Step-by-step
+- Easy to understand
+- Clearly formatted
+- Simple and readable
+
+The explanation should always be presented in a clean, student-friendly format.
+
+5. Image Solver
+
+Please improve the Image Solver so that it understands uploaded questions more accurately.
+
+The response length should adapt based on the question:
+
+- Very short questions: Around 4–5 meaningful sentences.
+- Short questions: Approximately one page of explanation.
+- Long questions: Around 2–2.5 pages with detailed, well-structured explanations.
+
+The explanations should remain clear, relevant, and easy to understand.
+
+6. HEIC Image Support
+
+Currently, .HEIC images cannot be uploaded.
+
+Please add full support for HEIC image uploads, ensuring that users can upload and process HEIC files without any issues.

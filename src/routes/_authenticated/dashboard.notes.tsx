@@ -15,6 +15,8 @@ import logoUrl from "@/assets/scorpstudy-logo.png";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge } from "@/components/ai-ui";
+import { askMdComponents } from "@/lib/askMdComponents";
+import { mapMathChildren } from "@/lib/mathText";
 
 export const Route = createFileRoute("/_authenticated/dashboard/notes")({
   component: NotesPage,
@@ -87,14 +89,43 @@ function escH(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
+// Converts plain-text math conventions (caret exponents, underscore
+// subscripts, "(num) / (den)" fractions) into HTML sup/sub/fraction markup —
+// same conventions as src/lib/mathText.tsx, reimplemented for server-side
+// string building since the PDF preview is plain HTML, not React.
+// Matches parens with up to one level of nesting inside — mirrors
+// src/lib/mathText.tsx's BAL_PAREN so nested expressions like
+// "(-b ± √(b² - 4ac)) / 2a" still parse as a single fraction.
+const BAL_PAREN = "\\(((?:[^()]|\\([^()]*\\))*)\\)";
+function stripWrap(s: string): string {
+  return s.startsWith('(') && s.endsWith(')') ? s.slice(1, -1) : s;
+}
+function applyMathFormatting(t: string): string {
+  t = t.replace(new RegExp(`${BAL_PAREN}\\s*\\/\\s*(${BAL_PAREN}|[A-Za-zΑ-Ωα-ω0-9²³πθαβγΔΣ°.\\-]+)`, 'g'), (...args: string[]) => {
+    const [, num, den] = args;
+    return `<span class="frac"><span class="frac-num">${num}</span><span class="frac-den">${stripWrap(den)}</span></span>`;
+  });
+  t = t.replace(new RegExp(`(°|[A-Za-zΑ-Ωα-ω0-9\\)\\]])\\^(${BAL_PAREN}|-?[A-Za-z0-9+\\-.]+)`, 'g'), (...args: string[]) => {
+    const [, base, exp] = args;
+    return `${base}<sup>${stripWrap(exp)}</sup>`;
+  });
+  t = t.replace(new RegExp(`([A-Za-zΑ-Ωα-ω0-9\\)\\]])_(${BAL_PAREN}|-?[A-Za-z0-9+\\-.]+)`, 'g'), (...args: string[]) => {
+    const [, base, sub] = args;
+    return `${base}<sub>${stripWrap(sub)}</sub>`;
+  });
+  return t;
+}
+
 function applyInlineMd(t: string): string {
   // Applied to already-HTML-escaped text; converts markdown inline syntax to HTML
-  return t
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(/\$([^$\n]+)\$/g, '<span class="math-inline">$1</span>')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'); // strip links, keep text
+  return applyMathFormatting(
+    t
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/~~(.+?)~~/g, '<del>$1</del>')
+      .replace(/\$([^$\n]+)\$/g, '<span class="math-inline">$1</span>')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1'), // strip links, keep text
+  );
 }
 
 function parseCells(row: string): string[] {
@@ -164,6 +195,10 @@ function mdToHtml(md: string): string {
 
   // 11. Inline math $...$
   t = t.replace(/\$([^$\n]+)\$/g, '<span class="math-inline">$1</span>');
+
+  // 11b. Plain-text math conventions (caret exponents, underscore subscripts,
+  // "(num) / (den)" fractions) → sup/sub/fraction markup
+  t = applyMathFormatting(t);
 
   // 12. Markdown links → keep text only
   t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
@@ -428,20 +463,25 @@ function NotesPage() {
     /* ── Print: hide bar, set margins ───────────────────────────────── */
     @media print {
       .dl-bar { display: none !important; }
-      body { margin: 0 !important; }
-      @page { margin: 22mm 20mm 22mm 20mm; }
+      body {
+        margin: 0 !important; max-width: none !important; width: 100% !important;
+        padding: 0 !important;
+      }
+      @page { size: auto; margin: 16mm 16mm 18mm 16mm; }
       h1, h2, h3, h4 { page-break-after: avoid; }
       pre, table, blockquote { page-break-inside: avoid; }
     }
     /* ── Document body ────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; }
+    html, body { width: 100%; }
     body {
       font-family: Georgia,'Times New Roman',serif;
       font-size: 11pt; line-height: 1.85; color: #1a1a2e;
-      background: #fff; max-width: 780px;
+      background: #fff; max-width: 900px;
       margin-left: auto; margin-right: auto;
       padding: 36px 52px 72px;
     }
+    table, .math-block, pre.code-block { width: 100%; }
     /* Header */
     .doc-header {
       border-bottom: 3px solid #7c3aed;
@@ -516,6 +556,10 @@ function NotesPage() {
       white-space: pre-wrap; color: #1e1b4b;
     }
     .math-inline { font-family: 'Courier New',Courier,monospace; color: #4c1d95; }
+    .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; margin: 0 3px; font-size: 0.92em; line-height: 1.2; }
+    .frac-num { border-bottom: 1.4px solid currentColor; padding: 0 3px 1px; }
+    .frac-den { padding: 1px 3px 0; }
+    sup, sub { font-size: 0.7em; }
     /* HR */
     hr { border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; }
     /* Footer */
@@ -661,17 +705,17 @@ function NotesPage() {
           <ToolBtn onClick={() => wrapSelection("**", "**", "bold text")} title="Bold (Ctrl+B)"><b>B</b></ToolBtn>
           <ToolBtn onClick={() => wrapSelection("*", "*", "italic")} title="Italic (Ctrl+I)"><i>I</i></ToolBtn>
           <Sep />
-          <ToolBtn onClick={() => insertAtCursor("\n\n> 📌 **Important:** ")} title="Important"><Pin className="h-3 w-3 text-rose-500" /><span className="hidden sm:inline"> Important</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n💡 **Key Concept:** ")} title="Key Concept"><Lightbulb className="h-3 w-3 text-amber-500" /><span className="hidden sm:inline"> Key Concept</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n❓ **Study Question:** ")} title="Study Question"><HelpCircle className="h-3 w-3 text-violet-500" /><span className="hidden sm:inline"> Study Q</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n📖 **Definition** — ")} title="Definition"><BookMarked className="h-3 w-3 text-emerald-500" /><span className="hidden sm:inline"> Definition</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n$ formula $\n\n")} title="Formula"><Sigma className="h-3 w-3 text-blue-500" /><span className="hidden sm:inline"> Formula</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor(`\n\n📅 ${new Date().toLocaleDateString()} — `)} title="Insert date"><CalendarDays className="h-3 w-3 text-orange-500" /><span className="hidden sm:inline"> Date</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n\n| Column 1 | Column 2 |\n| --- | --- |\n| Row 1 | Row 1 |\n| Row 2 | Row 2 |\n\n")} title="Table"><TableIcon className="h-3 w-3 text-indigo-500" /><span className="hidden sm:inline"> Table</span></ToolBtn>
-          <ToolBtn onClick={() => insertAtCursor("\n- [ ] ")} title="Task"><CheckSquare className="h-3 w-3 text-emerald-600" /><span className="hidden sm:inline"> Task</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n> 📌 **Important:** ")} title="Important"><Pin className="h-3 w-3 text-rose-500" /><span className="text-[11px] sm:text-xs"> Important</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n💡 **Key Concept:** ")} title="Key Concept"><Lightbulb className="h-3 w-3 text-amber-500" /><span className="text-[11px] sm:text-xs"> Key Concept</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n❓ **Study Question:** ")} title="Study Question"><HelpCircle className="h-3 w-3 text-violet-500" /><span className="text-[11px] sm:text-xs"> Study Q</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n📖 **Definition** — ")} title="Definition"><BookMarked className="h-3 w-3 text-emerald-500" /><span className="text-[11px] sm:text-xs"> Definition</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n$ formula $\n\n")} title="Formula"><Sigma className="h-3 w-3 text-blue-500" /><span className="text-[11px] sm:text-xs"> Formula</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor(`\n\n📅 ${new Date().toLocaleDateString()} — `)} title="Insert date"><CalendarDays className="h-3 w-3 text-orange-500" /><span className="text-[11px] sm:text-xs"> Date</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n\n| Column 1 | Column 2 |\n| --- | --- |\n| Row 1 | Row 1 |\n| Row 2 | Row 2 |\n\n")} title="Table"><TableIcon className="h-3 w-3 text-indigo-500" /><span className="text-[11px] sm:text-xs"> Table</span></ToolBtn>
+          <ToolBtn onClick={() => insertAtCursor("\n- [ ] ")} title="Task"><CheckSquare className="h-3 w-3 text-emerald-600" /><span className="text-[11px] sm:text-xs"> Task</span></ToolBtn>
           <div className="relative">
             <ToolBtn onClick={() => setTmplOpen((v) => !v)} title="Templates">
-              <span className="inline-flex items-center gap-1"><span className="hidden sm:inline">Template</span><span className="sm:hidden">Tmpl</span> <ChevronDown className="h-3 w-3" /></span>
+              <span className="inline-flex items-center gap-1"><span className="text-[11px] sm:text-xs">Template</span> <ChevronDown className="h-3 w-3" /></span>
             </ToolBtn>
             {tmplOpen && (
               <div className="absolute left-0 z-10 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-white shadow-lg">
@@ -698,13 +742,13 @@ function NotesPage() {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /><span className="hidden sm:inline"> Enhance</span></AiBtn>
-            <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /><span className="hidden sm:inline"> Summarize</span></AiBtn>
-            <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /><span className="hidden sm:inline"> Quiz Me</span></AiBtn>
-            <AiBtn onClick={exportPDF}><FileDown className="h-3 w-3" /><span className="hidden sm:inline"> Export PDF</span></AiBtn>
+            <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Enhance</span></AiBtn>
+            <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Summarize</span></AiBtn>
+            <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Quiz Me</span></AiBtn>
+            <AiBtn onClick={exportPDF}><FileDown className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Export PDF</span></AiBtn>
             <QuotaBadge quota={quota} loading={quotaLoading} />
             <button onClick={() => persist(true)} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 font-semibold text-white shadow-md hover:opacity-90">
-              <Save className="h-3 w-3" /><span className="hidden sm:inline"> Save</span>
+              <Save className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Save</span>
             </button>
           </div>
         </div>
@@ -727,7 +771,8 @@ function NotesPage() {
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      strong: ({ children }) => <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5 not-italic">{children}</mark>,
+                      ...askMdComponents,
+                      strong: ({ children }) => <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5 not-italic">{mapMathChildren(children)}</mark>,
                     }}
                   >{content}</ReactMarkdown>
                 </div>
