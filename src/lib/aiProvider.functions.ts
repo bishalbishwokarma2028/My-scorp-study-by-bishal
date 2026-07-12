@@ -299,10 +299,14 @@ export const askAIServer = createServerFn({ method: "POST" })
     };
   });
 
+const VisionMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) });
+
 const VisionInput = z.object({
   prompt: z.string().min(1).max(10000),
   imageBase64: z.string(),
   mimeType: z.string().default("image/jpeg"),
+  /** Conversation history from previous turns (first item = initial user prompt). */
+  history: z.array(VisionMsg).max(20).optional(),
 });
 
 // Claude 3 Haiku first — significantly more accurate for maths/science problems
@@ -317,30 +321,63 @@ const OPENROUTER_VISION_MODELS = [
 // credits (unlike the OpenRouter fallbacks below, which need account balance).
 const GROQ_VISION_MODELS = ["meta-llama/llama-4-scout-17b-16e-instruct"];
 
+type VisionHistory = Array<{ role: "user" | "assistant"; content: string }>;
+
+/** Build the messages array for a vision API call.
+ *  - First user message always includes the image (required for context).
+ *  - Subsequent turns from `history` are plain text (image already seen).
+ *  - The current `prompt` is appended as the final user message.
+ */
+function buildVisionMessages(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  history: VisionHistory,
+): object[] {
+  const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+  const prefix = "You are Bishal's Assistant — an expert study AI.";
+
+  if (history.length === 0) {
+    // Initial solve — single message with image + prompt
+    return [{
+      role: "user",
+      content: [
+        { type: "text", text: `${prefix} ${prompt}` },
+        { type: "image_url", image_url: { url: dataUrl } },
+      ],
+    }];
+  }
+
+  // Follow-up: reconstruct conversation, attaching image only to the first message
+  const [first, ...rest] = history;
+  return [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: `${prefix} ${first.content}` },
+        { type: "image_url", image_url: { url: dataUrl } },
+      ],
+    },
+    ...rest.map((h) => ({ role: h.role, content: h.content })),
+    { role: "user", content: prompt },
+  ];
+}
+
 async function tryGroqVision(
   prompt: string,
   imageBase64: string,
   mimeType: string,
   key: string,
   model: string,
+  history: VisionHistory = [],
 ): Promise<string | null> {
   try {
-    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
         model,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: `You are Bishal's Assistant — an expert study AI. ${prompt}` },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        }],
+        messages: buildVisionMessages(prompt, imageBase64, mimeType, history),
         max_tokens: 4096,
       }),
     });
@@ -360,9 +397,9 @@ async function tryOpenRouterVision(
   mimeType: string,
   key: string,
   model: string,
+  history: VisionHistory = [],
 ): Promise<string | null> {
   try {
-    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -373,13 +410,7 @@ async function tryOpenRouterVision(
       },
       body: JSON.stringify({
         model,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: `You are Bishal's Assistant — an expert study AI. ${prompt}` },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        }],
+        messages: buildVisionMessages(prompt, imageBase64, mimeType, history),
         max_tokens: 4096,
       }),
     });
@@ -396,11 +427,13 @@ async function tryOpenRouterVision(
 export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
+    const history: VisionHistory = data.history ?? [];
+
     // Groq first — free tier, no billing required.
     const groqKeys = rotatedKeys("groq-vision", serverConfig.ai.groqKeys);
     for (const key of groqKeys) {
       for (const model of GROQ_VISION_MODELS) {
-        const text = await tryGroqVision(data.prompt, data.imageBase64, data.mimeType, key, model);
+        const text = await tryGroqVision(data.prompt, data.imageBase64, data.mimeType, key, model, history);
         if (text) return { text, provider: "Bishal's Assistant" };
       }
     }
@@ -414,6 +447,7 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
           data.mimeType,
           serverConfig.ai.openrouterKey,
           model,
+          history,
         );
         if (text) return { text, provider: "Bishal's Assistant" };
       }

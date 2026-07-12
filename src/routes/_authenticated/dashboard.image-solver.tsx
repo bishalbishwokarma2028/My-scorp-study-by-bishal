@@ -2,14 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, ImagePlus, ClipboardPaste, X, ScanText, Sparkles } from "lucide-react";
+import { Loader2, ImagePlus, ClipboardPaste, X, ScanText, Sparkles, Send, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge } from "@/components/ai-ui";
 import { usePageState } from "@/lib/pageState";
-import { mapMathChildren } from "@/lib/mathText";
+import { mapMathChildren, convertLatexToPlainMath } from "@/lib/mathText";
 import { ensureBrowserSupportedImage, isImageFile } from "@/lib/imageUpload";
 
 export const Route = createFileRoute("/_authenticated/dashboard/image-solver")({
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/image-solver")({
 });
 
 type PendingImage = { base64: string; mimeType: string; name: string; preview: string };
+type ConvMsg = { role: "user" | "assistant"; content: string };
 
 function buildPrompt(instructions: string): string {
   const userInstructions = instructions.trim()
@@ -27,32 +28,70 @@ function buildPrompt(instructions: string): string {
 
 Step 1 — Extract: read ALL visible text from the image exactly as written, preserving the original language.
 Step 2 — Understand: identify precisely what is being asked and assess the question's complexity:
-  • Very short question (a quick fact, definition, or 1-line question) → give a thorough explanation of at least 8–10 complete sentences covering the concept, why it is true, and a worked example if applicable.
-  • Short question (a single well-defined problem) → give a full, detailed solution of at least 1.5–2 pages: introduce the concept, state all relevant formulas, show every calculation step with substitution, explain WHY each step is taken, and close with a clear summary of the answer.
-  • Long question (multi-part, a full worksheet, or a complex problem) → give a comprehensive solution of at least 3 full pages: solve each part separately with its own heading, provide complete step-by-step derivations, explain every step's reasoning, include verification where possible, and add a summary at the end.
+  • Very short question → thorough explanation, at least 8–10 complete sentences, concept + worked example.
+  • Short question → full detailed solution, at least 1.5–2 pages: introduce the concept, state all formulas, show every calculation step, explain WHY each step is taken, close with a clear summary.
+  • Long / multi-part question → comprehensive solution, at least 3 full pages: solve each part separately with its own heading, complete derivations, reasoning for every step, verification, and a summary.
+  • Advanced / university-level → full treatment: concepts, derivations, calculations, verification, and final conclusions.
 Step 3 — Answer: ${userInstructions}
 
-ACCURACY IS THE HIGHEST PRIORITY. Double-check every calculation before writing it. Never guess — if you are not certain, say so. For numerical problems: substitute exact values, simplify step by step, and always state the final answer with correct units.
+ACCURACY IS THE HIGHEST PRIORITY. Double-check every calculation before writing it. Never guess — if you are not certain, say so.
 
-FORMATTING:
-Use this exact Markdown structure:
+For ALL numerical / mathematical / science questions, use this EXACT structure (use Markdown headings exactly as shown):
 
 ## 📝 Detected Question
-[Copy the exact question or task from the image verbatim. If the image contains multiple questions, list each one clearly numbered.]
+[Copy the exact question or task from the image verbatim.]
 
+## 📊 Given Data
+[List every piece of information given in the problem, one item per bullet. Include units.]
+
+## 🎯 Required
+[State clearly what needs to be found or proven.]
+
+## 📐 Formula
+[Write out every relevant formula that will be used. Explain each variable briefly.]
+
+## 💡 Concept
+[Explain the underlying principle or theory in 2–4 sentences so the student understands WHY the formula applies.]
+
+## 🔢 Step-by-Step Solution
+[Number every step. For each step: state what you're doing, write the formula, substitute the values, simplify.]
+
+## 🧮 Calculation
+[Show the full arithmetic/algebra in detail. Every intermediate result on its own line. State units at every step.]
+
+## ✅ Verification
+[Verify the answer using a different method, unit analysis, or by substituting back. Confirm it is reasonable.]
+
+> **🎯 Final Answer:** [State the complete final answer with correct units, bold and clear.]
+
+## 📖 Short Explanation
+[2–3 sentences summarising the solution in plain student-friendly language.]
+
+For non-numerical questions (essays, definitions, history, languages, etc.), use:
+
+## 📝 Detected Question
 ## 🧠 Understanding the Problem
-[Bold the key question in the first line. Explain clearly what is being asked, what information is given, and what needs to be found. State the complexity level: Very Short / Short / Long.]
+## ✅ Complete Answer
 
-## ✅ Complete Solution
-[Full, detailed solution. Structure it with numbered steps for any calculation or multi-part answer.
-- For maths/science/physics: state the formula first, then substitute values, then simplify step by step, then state the result with units.
-- Use proper Unicode math symbols inline: ×, ÷, √, ², ³, ⁴, π, ≈, ±, ≤, ≥, ≠, Δ, Σ, ∫, ∞, °.
-- For fractions write "a/b"; for exponents write "x²" or "x^n"; for square roots write "√x".
-- NEVER output raw LaTeX commands — not \\frac{}{}, \\sqrt{}, \\bar{}, \\hat{}, \\vec{}, \\pi, \\Delta, \\times, \\cdot, \\left(, \\right), $...$, or any other backslash command. Use plain Unicode only.
-- Use **bold** for every key term, formula, and final answer.
-- If the question is in a non-English language, answer in that same language.]
+FORMATTING RULES — follow these exactly:
+- Use proper Unicode math symbols inline: ×, ÷, √, ², ³, ⁴, π, ≈, ±, ≤, ≥, ≠, Δ, Σ, ∫, ∞, °, θ, α, β, γ, λ, μ.
+- For fractions write "(numerator) / (denominator)" — e.g. "(v₀ × sin θ) / (g)".
+- For exponents write "x²" or "x^n"; for square roots write "√(x)".
+- For subscripts write them as: v₀, t_max, h_max (Unicode subscripts preferred; use underscore only when Unicode unavailable).
+- NEVER output raw LaTeX commands — not \\frac{}{}, \\sqrt{}, \\bar{}, \\hat{}, \\vec{}, \\pi, \\Delta, \\times, \\cdot, \\left(, \\right), $...$, or ANY other backslash command. Unicode only.
+- Use **bold** for every key term, formula name, and final answer value.
+- Tables are encouraged for comparing values or listing data.
+- If the question is in a non-English language, answer in that same language.
 
 Never reveal AI provider names.`;
+}
+
+function buildFollowupPrompt(question: string): string {
+  return `Continue answering the student's follow-up question below. You can see the original image and all previous conversation turns above.
+
+ACCURACY IS THE HIGHEST PRIORITY. Be thorough and well-structured. Use the same formatting rules as before — Unicode math symbols, no LaTeX backslash commands, bold key terms, numbered steps for calculations.
+
+Follow-up question: ${question}`;
 }
 
 function ImageSolverPage() {
@@ -64,10 +103,11 @@ function ImageSolverPage() {
     answer: "",
     instructions: "",
     loading: false,
+    chatHistory: [] as ConvMsg[],
+    followupInput: "",
+    followupLoading: false,
   });
 
-  // Image is NOT persisted (binary data too large for module cache),
-  // but we keep it in local component state for the current visit.
   const [imgState, setImgState] = usePageState<{ image: PendingImage | null }>(
     "image-solver-img",
     { image: null },
@@ -75,6 +115,8 @@ function ImageSolverPage() {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const followupRef = useRef<HTMLTextAreaElement>(null);
 
   async function loadFile(rawFile: File) {
     if (!isImageFile(rawFile)) return toast.error("Please upload or paste an image file");
@@ -93,7 +135,7 @@ function ImageSolverPage() {
     reader.onload = () => {
       const dataUrl = reader.result as string;
       const base64 = dataUrl.split(",")[1];
-      setState({ answer: "" });
+      setState({ answer: "", chatHistory: [], followupInput: "" });
       setImgState({ image: { base64, mimeType: file.type || "image/jpeg", name: file.name || "pasted-image.png", preview: dataUrl } });
       toast.success("Image loaded — click Solve");
     };
@@ -134,16 +176,24 @@ function ImageSolverPage() {
     if (state.loading) return;
     if (!imgState.image) return toast.error("Upload or paste an image first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setState({ loading: true, answer: "" });
+    setState({ loading: true, answer: "", chatHistory: [], followupInput: "" });
     try {
+      const prompt = buildPrompt(state.instructions);
       const res = await analyzeImageServer({
         data: {
-          prompt: buildPrompt(state.instructions),
+          prompt,
           imageBase64: imgState.image.base64,
           mimeType: imgState.image.mimeType,
         },
       });
-      setState({ answer: res.text, loading: false });
+      setState({
+        answer: res.text,
+        loading: false,
+        chatHistory: [
+          { role: "user", content: prompt },
+          { role: "assistant", content: res.text },
+        ],
+      });
       await bump();
     } catch {
       toast.error("Failed to read/solve the image — please try again");
@@ -151,24 +201,69 @@ function ImageSolverPage() {
     }
   }
 
+  async function sendFollowup() {
+    const q = state.followupInput.trim();
+    if (!q || state.followupLoading || !imgState.image) return;
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
+    setState({ followupLoading: true, followupInput: "" });
+    try {
+      const res = await analyzeImageServer({
+        data: {
+          prompt: buildFollowupPrompt(q),
+          imageBase64: imgState.image.base64,
+          mimeType: imgState.image.mimeType,
+          history: state.chatHistory,
+        },
+      });
+      setState((prev: typeof state) => ({
+        followupLoading: false,
+        chatHistory: [
+          ...prev.chatHistory,
+          { role: "user", content: q },
+          { role: "assistant", content: res.text },
+        ],
+      }));
+      await bump();
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    } catch {
+      toast.error("Follow-up failed — please try again");
+      setState({ followupLoading: false });
+    }
+  }
+
+  function handleFollowupKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendFollowup();
+    }
+  }
+
+  // The conversation thread excluding the initial solve (shown separately)
+  const followupMsgs = state.chatHistory.slice(2);
+
   const mdComponents = {
     strong: ({ children }: { children?: React.ReactNode }) => (
       <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5">{mapMathChildren(children)}</mark>
     ),
     h2: ({ children }: { children?: React.ReactNode }) => {
       const t = String(children).toLowerCase();
-      // "📝 Detected Question" — amber/gold highlight so the question jumps out
-      if (t.includes("📝") || t.includes("detected") || t.includes("extracted")) {
+      if (t.includes("📝") || t.includes("detected")) {
         return (
           <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 mt-5 mb-3">
             <h2 className="font-extrabold text-sm text-amber-900 tracking-wide">{children}</h2>
           </div>
         );
       }
-      let cls = "bg-blue-50 border-blue-300 text-blue-900";
-      if (t.includes("🧠") || t.includes("understanding") || t.includes("asked")) cls = "bg-violet-50 border-violet-300 text-violet-900";
-      else if (t.includes("✅") || t.includes("solution") || t.includes("answer")) cls = "bg-emerald-50 border-emerald-300 text-emerald-900";
-      return <div className={`rounded-xl border-l-4 px-3 py-2 mt-5 mb-3 ${cls}`}><h2 className="font-bold text-sm">{children}</h2></div>;
+      if (t.includes("📊") || t.includes("given")) return <div className="rounded-xl border-l-4 border-blue-400 bg-blue-50 px-3 py-2 mt-5 mb-3"><h2 className="font-bold text-sm text-blue-900">{children}</h2></div>;
+      if (t.includes("🎯") || t.includes("required")) return <div className="rounded-xl border-l-4 border-violet-400 bg-violet-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-violet-900">{children}</h2></div>;
+      if (t.includes("📐") || t.includes("formula")) return <div className="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-indigo-900">{children}</h2></div>;
+      if (t.includes("💡") || t.includes("concept")) return <div className="rounded-xl border-l-4 border-yellow-400 bg-yellow-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-yellow-900">{children}</h2></div>;
+      if (t.includes("🔢") || t.includes("step")) return <div className="rounded-xl border-l-4 border-orange-400 bg-orange-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-orange-900">{children}</h2></div>;
+      if (t.includes("🧮") || t.includes("calculat")) return <div className="rounded-xl border-l-4 border-pink-400 bg-pink-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-pink-900">{children}</h2></div>;
+      if (t.includes("✅") || t.includes("verif") || t.includes("solution") || t.includes("answer") || t.includes("complete")) return <div className="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-emerald-900">{children}</h2></div>;
+      if (t.includes("📖") || t.includes("explanation") || t.includes("summary")) return <div className="rounded-xl border-l-4 border-teal-400 bg-teal-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-teal-900">{children}</h2></div>;
+      if (t.includes("🧠") || t.includes("understanding") || t.includes("asked")) return <div className="rounded-xl border-l-4 border-purple-400 bg-purple-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-purple-900">{children}</h2></div>;
+      return <div className="rounded-xl border-l-4 border-slate-300 bg-slate-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-slate-800">{children}</h2></div>;
     },
     h3: ({ children }: { children?: React.ReactNode }) => (
       <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 px-3 py-2 mt-4 mb-2">
@@ -178,18 +273,29 @@ function ImageSolverPage() {
     h4: ({ children }: { children?: React.ReactNode }) => (
       <h4 className="font-bold text-sm text-violet-800 mt-3 mb-1 px-2 py-1 bg-violet-50 rounded border-l-2 border-violet-400">{mapMathChildren(children)}</h4>
     ),
+    blockquote: ({ children }: { children?: React.ReactNode }) => (
+      <div className="my-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 shadow-sm">
+        <div className="text-sm font-semibold text-emerald-800 leading-relaxed">{children}</div>
+      </div>
+    ),
     p: ({ children }: { children?: React.ReactNode }) => <p className="my-3 leading-relaxed">{mapMathChildren(children)}</p>,
     ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-3 space-y-3 pl-5 list-decimal">{children}</ol>,
     ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-3 space-y-2 pl-5 list-disc">{children}</ul>,
     li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed pl-1">{mapMathChildren(children)}</li>,
     code: ({ children }: { children?: React.ReactNode }) => (
-      <pre className="bg-slate-900 text-green-400 rounded-xl p-3.5 overflow-x-auto font-mono text-sm my-2 leading-relaxed"><code>{children}</code></pre>
+      <code className="bg-slate-100 text-violet-700 rounded px-1.5 py-0.5 font-mono text-[0.85em]">{mapMathChildren(children)}</code>
+    ),
+    pre: ({ children }: { children?: React.ReactNode }) => (
+      <pre className="bg-slate-900 text-green-400 rounded-xl p-3.5 overflow-x-auto font-mono text-sm my-2 leading-relaxed">{children}</pre>
     ),
     table: ({ children }: { children?: React.ReactNode }) => (
-      <div className="overflow-x-auto my-3"><table className="min-w-full border-collapse text-sm">{children}</table></div>
+      <div className="overflow-x-auto my-3 rounded-xl border border-border">
+        <table className="min-w-full border-collapse text-sm">{children}</table>
+      </div>
     ),
+    thead: ({ children }: { children?: React.ReactNode }) => <thead className="bg-violet-600 text-white">{children}</thead>,
     th: ({ children }: { children?: React.ReactNode }) => (
-      <th className="bg-violet-600 text-white px-3 py-2 text-left text-xs font-semibold">{mapMathChildren(children)}</th>
+      <th className="px-3 py-2 text-left text-xs font-semibold">{mapMathChildren(children)}</th>
     ),
     td: ({ children }: { children?: React.ReactNode }) => (
       <td className="border-b border-border px-3 py-2 text-sm">{mapMathChildren(children)}</td>
@@ -198,8 +304,20 @@ function ImageSolverPage() {
 
   const { image } = imgState;
 
+  // Pre-process markdown: convert any raw LaTeX the AI might have emitted
+  // despite the prompt instructions, before react-markdown sees it.
+  function renderAnswer(text: string) {
+    const clean = convertLatexToPlainMath(text);
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+        {clean}
+      </ReactMarkdown>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
+      {/* ── Upload / Image panel ── */}
       <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
         <div className="mb-1 flex items-center justify-between flex-wrap gap-2">
           <h2 className="flex items-center gap-2 font-bold"><ScanText className="h-5 w-5 text-violet-600" /> Image Solver</h2>
@@ -229,7 +347,7 @@ function ImageSolverPage() {
           <div className="space-y-3">
             <div className="relative overflow-hidden rounded-xl border border-border bg-slate-50">
               <img src={image.preview} alt={image.name} className="max-h-80 w-full object-contain" />
-              <button onClick={() => { setImgState({ image: null }); setState({ answer: "" }); }} className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white hover:bg-black/80">
+              <button onClick={() => { setImgState({ image: null }); setState({ answer: "", chatHistory: [], followupInput: "" }); }} className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white hover:bg-black/80">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -255,6 +373,7 @@ function ImageSolverPage() {
         )}
       </div>
 
+      {/* ── Loading state ── */}
       {state.loading && (
         <div className="rounded-2xl border border-border bg-white p-8 text-center shadow-sm">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-violet-600" />
@@ -262,14 +381,66 @@ function ImageSolverPage() {
         </div>
       )}
 
+      {/* ── Initial answer ── */}
       {state.answer && !state.loading && (
         <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
           <div className="prose prose-sm max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={mdComponents}
-            >{state.answer}</ReactMarkdown>
+            {renderAnswer(state.answer)}
           </div>
+        </div>
+      )}
+
+      {/* ── Follow-up conversation thread ── */}
+      {followupMsgs.length > 0 && (
+        <div className="space-y-3">
+          {followupMsgs.map((msg, i) =>
+            msg.role === "user" ? (
+              <div key={i} className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-violet-600 px-4 py-3 text-sm text-white shadow-sm">
+                  {msg.content}
+                </div>
+              </div>
+            ) : (
+              <div key={i} className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+                <div className="prose prose-sm max-w-none">
+                  {renderAnswer(msg.content)}
+                </div>
+              </div>
+            )
+          )}
+          <div ref={chatEndRef} />
+        </div>
+      )}
+
+      {/* ── Follow-up chat input (appears once initial answer exists) ── */}
+      {state.answer && !state.loading && imgState.image && (
+        <div className="rounded-2xl border border-violet-200 bg-white p-4 shadow-sm">
+          <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-violet-700">
+            <MessageCircle className="h-4 w-4" />
+            Ask a follow-up question about this image
+          </p>
+          <div className="flex gap-2">
+            <textarea
+              ref={followupRef}
+              value={state.followupInput}
+              onChange={(e) => setState({ followupInput: e.target.value })}
+              onKeyDown={handleFollowupKey}
+              placeholder='e.g. "Explain step 3 in more detail" or "Solve it using a different method"'
+              rows={2}
+              disabled={state.followupLoading}
+              className="flex-1 resize-none rounded-xl border border-border bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:opacity-50"
+            />
+            <button
+              onClick={sendFollowup}
+              disabled={state.followupLoading || !state.followupInput.trim()}
+              className="flex h-auto w-12 flex-shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow hover:bg-violet-700 disabled:opacity-40"
+            >
+              {state.followupLoading
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Send className="h-4 w-4" />}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">Press Enter to send · Shift+Enter for new line</p>
         </div>
       )}
     </div>
