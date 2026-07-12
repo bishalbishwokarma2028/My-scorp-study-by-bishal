@@ -27,27 +27,29 @@ function buildPrompt(instructions: string): string {
 
 Step 1 — Extract: read ALL visible text from the image exactly as written, preserving the original language.
 Step 2 — Understand: identify precisely what is being asked and assess the question's complexity:
-  • Very short question (a quick fact, definition, or 1-line question) → answer in around 4–5 meaningful, complete sentences. Do not pad it out further.
-  • Short question (a single well-defined problem) → give approximately one full page of clear, step-by-step explanation with all working shown.
-  • Long question (multi-part, a full worksheet, or a complex problem) → give around 2–2.5 full pages: complete step-by-step derivation, an explanation for every step, worked examples where helpful, and a short summary at the end.
+  • Very short question (a quick fact, definition, or 1-line question) → give a thorough explanation of at least 8–10 complete sentences covering the concept, why it is true, and a worked example if applicable.
+  • Short question (a single well-defined problem) → give a full, detailed solution of at least 1.5–2 pages: introduce the concept, state all relevant formulas, show every calculation step with substitution, explain WHY each step is taken, and close with a clear summary of the answer.
+  • Long question (multi-part, a full worksheet, or a complex problem) → give a comprehensive solution of at least 3 full pages: solve each part separately with its own heading, provide complete step-by-step derivations, explain every step's reasoning, include verification where possible, and add a summary at the end.
 Step 3 — Answer: ${userInstructions}
+
+ACCURACY IS THE HIGHEST PRIORITY. Double-check every calculation before writing it. Never guess — if you are not certain, say so. For numerical problems: substitute exact values, simplify step by step, and always state the final answer with correct units.
 
 FORMATTING:
 Use this exact Markdown structure:
 
-## 📝 Extracted Text
-[Verbatim transcription of all text in the image, in its original language. If no readable text, say so.]
+## 📝 Detected Question
+[Copy the exact question or task from the image verbatim. If the image contains multiple questions, list each one clearly numbered.]
 
-## 🧠 What's Being Asked
-[Clear restatement of the question/task. Note the complexity level you determined: Very Short / Short-Medium / Long-Complex.]
+## 🧠 Understanding the Problem
+[Bold the key question in the first line. Explain clearly what is being asked, what information is given, and what needs to be found. State the complexity level: Very Short / Short / Long.]
 
-## ✅ Answer / Solution
-[Complete, correctly-scaled answer.
-- For maths/science/physics: show every step of the working clearly.
+## ✅ Complete Solution
+[Full, detailed solution. Structure it with numbered steps for any calculation or multi-part answer.
+- For maths/science/physics: state the formula first, then substitute values, then simplify step by step, then state the result with units.
 - Use proper Unicode math symbols inline: ×, ÷, √, ², ³, ⁴, π, ≈, ±, ≤, ≥, ≠, Δ, Σ, ∫, ∞, °.
 - For fractions write "a/b"; for exponents write "x²" or "x^n"; for square roots write "√x".
-- NEVER output raw LaTeX commands under any circumstance — not \\frac{}{}, \\sqrt{}, \\bar{}, \\hat{}, \\vec{}, \\pi, \\Delta, \\times, \\cdot, \\left(, \\right), $...$, or any other backslash command. If you catch yourself typing a backslash before a math command, stop and rewrite that piece using plain Unicode symbols instead (e.g. write "3/2 kT", not "\\frac{3}{2}kT"; write "√2", not "\\sqrt{2}"; write "c̄" or "average c", not "\\bar{c}").
-- Use **bold** for every key term and final answer.
+- NEVER output raw LaTeX commands — not \\frac{}{}, \\sqrt{}, \\bar{}, \\hat{}, \\vec{}, \\pi, \\Delta, \\times, \\cdot, \\left(, \\right), $...$, or any other backslash command. Use plain Unicode only.
+- Use **bold** for every key term, formula, and final answer.
 - If the question is in a non-English language, answer in that same language.]
 
 Never reveal AI provider names.`;
@@ -155,10 +157,17 @@ function ImageSolverPage() {
     ),
     h2: ({ children }: { children?: React.ReactNode }) => {
       const t = String(children).toLowerCase();
+      // "📝 Detected Question" — amber/gold highlight so the question jumps out
+      if (t.includes("📝") || t.includes("detected") || t.includes("extracted")) {
+        return (
+          <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 mt-5 mb-3">
+            <h2 className="font-extrabold text-sm text-amber-900 tracking-wide">{children}</h2>
+          </div>
+        );
+      }
       let cls = "bg-blue-50 border-blue-300 text-blue-900";
-      if (t.includes("📝") || t.includes("extracted")) cls = "bg-slate-50 border-slate-300 text-slate-900";
-      else if (t.includes("🧠") || t.includes("asked")) cls = "bg-violet-50 border-violet-300 text-violet-900";
-      else if (t.includes("✅") || t.includes("answer")) cls = "bg-emerald-50 border-emerald-300 text-emerald-900";
+      if (t.includes("🧠") || t.includes("understanding") || t.includes("asked")) cls = "bg-violet-50 border-violet-300 text-violet-900";
+      else if (t.includes("✅") || t.includes("solution") || t.includes("answer")) cls = "bg-emerald-50 border-emerald-300 text-emerald-900";
       return <div className={`rounded-xl border-l-4 px-3 py-2 mt-5 mb-3 ${cls}`}><h2 className="font-bold text-sm">{children}</h2></div>;
     },
     p: ({ children }: { children?: React.ReactNode }) => <p className="my-3 leading-relaxed">{mapMathChildren(children)}</p>,

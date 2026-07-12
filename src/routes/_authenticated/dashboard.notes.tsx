@@ -423,19 +423,11 @@ function NotesPage() {
     navigate({ to: "/dashboard/quiz" });
   }
 
-  // Renders the note into a hidden in-page print-only container and calls
-  // the browser's native print engine directly on THIS window/tab.
-  //
-  // We deliberately dropped the earlier popup-window approach: opening a
-  // new window via window.open() is unreliable inside Replit's
-  // iframe-proxied preview (and some mobile browsers block/mishandle it),
-  // which is what caused "Download PDF doesn't work" and content only
-  // rendering in a narrow left column. Printing the current document with a
-  // strict "hide everything except #notes-print-root" stylesheet avoids
-  // popups entirely, guarantees full page width, and still uses the
-  // browser's native print engine (no html2canvas — see
-  // .agents/memory/pdf-popup-export.md for why that matters for text quality).
-  function exportPDF() {
+  // Renders the note into a hidden in-page container then:
+  //   • Desktop — uses jsPDF to generate and download the PDF directly (no print dialog).
+  //   • Mobile  — falls back to window.print() which on mobile goes straight to "Save as PDF"
+  //               without a dialog (confirmed working per user report).
+  async function exportPDF() {
     if (!content.trim() && !title.trim()) return toast.error("Nothing to export");
     if (!printRootRef.current) return;
     const safeTitle = title || "Untitled Note";
@@ -454,9 +446,63 @@ function NotesPage() {
       </div>
     `;
 
-    toast.info('Opening the print dialog — choose "Save as PDF" as the destination, then Save to download it.');
-    // Give the browser a tick to lay out the freshly-injected content before printing.
-    window.setTimeout(() => window.print(), 60);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Mobile already saves as PDF directly — keep existing behaviour.
+      toast.info('Opening the print dialog — choose "Save as PDF" as the destination, then Save to download it.');
+      window.setTimeout(() => window.print(), 60);
+      return;
+    }
+
+    // Desktop: generate and download PDF directly using jsPDF (no print dialog).
+    const toastId = "pdf-export";
+    toast.loading("Generating PDF…", { id: toastId });
+    const el = printRootRef.current;
+    const prevStyle = el.getAttribute("style") || "";
+    // Temporarily expose the element offscreen so jsPDF / html2canvas can measure it.
+    el.style.cssText = [
+      "display:block!important",
+      "position:fixed!important",
+      "top:-9999px!important",
+      "left:0!important",
+      "width:794px!important",
+      "padding:48px 56px!important",
+      "box-sizing:border-box!important",
+      "background:#fff!important",
+      "visibility:visible!important",
+      "z-index:-1!important",
+    ].join(";");
+
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+      await new Promise<void>((resolve, reject) => {
+        doc.html(el, {
+          callback: (d) => {
+            try {
+              d.save(`${safeTitle.replace(/[^\w\s-]/g, "").trim() || "note"}.pdf`);
+              toast.dismiss(toastId);
+              toast.success("PDF downloaded!");
+              resolve();
+            } catch (err) { reject(err); }
+          },
+          margin: [40, 40, 40, 40],
+          autoPaging: "text",
+          width: 515,
+          windowWidth: 794,
+          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: "#ffffff" },
+        });
+      });
+    } catch (err) {
+      console.error("jsPDF export failed, falling back to print:", err);
+      toast.dismiss(toastId);
+      toast.info('Opening print dialog — choose "Save as PDF" to download.');
+      window.setTimeout(() => window.print(), 60);
+    } finally {
+      el.style.cssText = prevStyle;
+      el.innerHTML = "";
+    }
   }
 
   async function del(id: string) {

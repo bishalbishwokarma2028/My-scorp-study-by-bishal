@@ -1,0 +1,82 @@
+Fixes and Improvements Required
+
+1. Smart Notes – Export to PDF (Desktop)
+
+Currently, in Smart Notes, when I click Export to PDF on the desktop version, it immediately opens the browser's Print dialog instead of downloading the PDF file. Because of this, the PDF is not downloaded automatically.
+
+On mobile devices, the Export to PDF feature works perfectly without any issues.
+
+Please fix the desktop behavior so that clicking Export to PDF generates and downloads the PDF file directly instead of opening the Print dialog.
+
+---
+
+2. Step-by-Step Solver – Long Question Support
+
+In the Step-by-Step Solver, when the question is very long, it sometimes displays the error:
+
+«"Could not parse Solution – try rephrasing your problem."»
+
+This should never happen.
+
+The solver must be able to handle very long questions without failing and should always generate a complete, accurate, and correct solution.
+
+For Mathematics, Physics, Chemistry, and other numerical problems, the solution should:
+
+- Use simple and easy-to-understand formulas.
+- Explain every step clearly.
+- Follow standard mathematical and scientific rules.
+- Be easy for students of all levels to understand.
+- Never skip important calculation steps.
+
+---
+
+3. Image Solver Improvements
+
+When solving a question from an image:
+
+- Display the detected question at the top.
+- Make the question bold and highlight it with a different color so users can easily distinguish the question from the solution.
+- The current answers are too short. Please generate more detailed, well-explained, and complete answers while keeping them easy to understand.
+
+---
+
+4. Easy-to-Understand Mathematical Explanations Across the App
+
+Whenever mathematical formulas, numerical calculations, scientific formulas, accounting rules, procedures, or problem-solving methods appear in any of the following features:
+
+- Bishal's Assistant
+- Chat with PDF
+- YouTube Summarizer
+- Mathematics
+- Science
+- Summarizer
+- Formula Sheet
+
+always use:
+
+- Simple mathematical symbols.
+- Standard formulas.
+- Clear procedures.
+- Easy-to-understand explanations.
+- Student-friendly formatting.
+
+The goal is to ensure that every student can easily understand the solution regardless of their skill level.
+
+---
+
+5. Most Important Requirement – 100% Accurate Answers
+
+This is the highest priority requirement.
+
+For any:
+
+- Mathematics problem
+- Numerical problem
+- Physics problem
+- Chemistry problem
+- Accounting problem
+- Or any other academic problem
+
+the application must always provide accurate, correct, and reliable answers.
+
+It should never generate false, incorrect, misleading, or inaccurate solutions. Accuracy and correctness should always be prioritized over speed.

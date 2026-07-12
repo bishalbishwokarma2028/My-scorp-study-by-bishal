@@ -6,7 +6,7 @@ import {
   RotateCcw, CheckCircle2, AlertCircle, BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAIJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
@@ -247,18 +247,20 @@ function SolverPage() {
     setLoading(true);
     set({ solution: null, revealed: [] });
     try {
-      const res = await askAI(
+      // askAIJSON automatically retries with a stricter prompt if the first
+      // response is not valid JSON — handles long questions that can cause
+      // truncated or malformed responses.
+      const { data: parsed, provider: prov } = await askAIJSON<Solution>(
         buildPrompt(problem, subject),
         "You are an expert tutor. Return ONLY valid JSON — absolutely no markdown fences or prose outside the JSON.",
-        undefined, true,
+        undefined, true, 4000,
       );
-      set({ provider: res.provider });
+      set({ provider: prov });
       await bump();
-      const parsed = extractJSON<Solution>(res.text);
       if (parsed?.steps?.length) {
         set({ solution: parsed, revealed: Array(parsed.steps.length).fill(false) });
       } else {
-        toast.error("Could not parse solution — try rephrasing your problem");
+        toast.error("Could not generate a solution — please try again");
       }
     } catch {
       toast.error("Failed to solve — please try again");
