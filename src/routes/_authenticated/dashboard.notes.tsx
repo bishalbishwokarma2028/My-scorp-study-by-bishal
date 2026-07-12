@@ -804,7 +804,7 @@ function NotesPage() {
                       ...askMdComponents,
                       strong: ({ children }) => <mark className="bg-yellow-200 text-yellow-900 font-bold rounded px-0.5 not-italic">{mapMathChildren(children)}</mark>,
                     }}
-                  >{content}</ReactMarkdown>
+                  >{convertLatexToPlainMath(content)}</ReactMarkdown>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>

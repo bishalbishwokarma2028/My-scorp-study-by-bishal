@@ -207,22 +207,25 @@ function ImageSolverPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setState({ followupLoading: true, followupInput: "" });
     try {
+      // Capture history before the await so we can extend it afterwards.
+      // (usePageState doesn't support functional setState — must pass a plain object.)
+      const historySnapshot = [...state.chatHistory];
       const res = await analyzeImageServer({
         data: {
           prompt: buildFollowupPrompt(q),
           imageBase64: imgState.image.base64,
           mimeType: imgState.image.mimeType,
-          history: state.chatHistory,
+          history: historySnapshot,
         },
       });
-      setState((prev: typeof state) => ({
+      setState({
         followupLoading: false,
         chatHistory: [
-          ...prev.chatHistory,
-          { role: "user", content: q },
-          { role: "assistant", content: res.text },
+          ...historySnapshot,
+          { role: "user" as const, content: q },
+          { role: "assistant" as const, content: res.text },
         ],
-      }));
+      });
       await bump();
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch {

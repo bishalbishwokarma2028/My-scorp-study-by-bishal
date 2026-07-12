@@ -152,26 +152,59 @@ export function convertLatexToPlainMath(input: string): string {
   s = s.replace(/\$([^$\n]+)\$/g, (_m, inner: string) => inner);
   s = s.replace(/\\left/g, "").replace(/\\right/g, "");
 
-  for (let pass = 0; pass < 4; pass++) {
+  // Strip environment wrappers (\begin{aligned}, \end{matrix}, etc.)
+  s = s.replace(/\\begin\{[^}]*\}/g, "");
+  s = s.replace(/\\end\{[^}]*\}/g, "");
+  // Convert LaTeX alignment markers: &= → =, & → space
+  s = s.replace(/\s*&=/g, " =");
+  s = s.replace(/\s*&\s*/g, " ");
+  // LaTeX newlines \\ → real newlines
+  s = s.replace(/\\\\/g, "\n");
+
+  for (let pass = 0; pass < 5; pass++) {
     const before = s;
     s = replaceBracedCommand(s, "frac", 2, (a) => `(${a[0]}) / (${a[1]})`);
     s = replaceBracedCommand(s, "dfrac", 2, (a) => `(${a[0]}) / (${a[1]})`);
     s = replaceBracedCommand(s, "tfrac", 2, (a) => `(${a[0]}) / (${a[1]})`);
+    s = replaceBracedCommand(s, "cfrac", 2, (a) => `(${a[0]}) / (${a[1]})`);
     s = replaceBracedCommand(s, "sqrt", 1, (a, opt) => (opt ? `${opt}√(${a[0]})` : `√(${a[0]})`));
+    // \underbrace{content}_{label} → content (label)
+    s = replaceBracedCommand(s, "underbrace", 1, (a) => a[0]);
+    s = replaceBracedCommand(s, "overbrace", 1, (a) => a[0]);
+    s = replaceBracedCommand(s, "underset", 2, (a) => a[1]);
+    s = replaceBracedCommand(s, "overset", 2, (a) => a[1]);
     s = replaceBracedCommand(s, "bar", 1, (a) => addCombining(a[0], "\u0305"));
     s = replaceBracedCommand(s, "overline", 1, (a) => addCombining(a[0], "\u0305"));
     s = replaceBracedCommand(s, "hat", 1, (a) => addCombining(a[0], "\u0302"));
     s = replaceBracedCommand(s, "vec", 1, (a) => addCombining(a[0], "\u20d7"));
     s = replaceBracedCommand(s, "dot", 1, (a) => addCombining(a[0], "\u0307"));
-    s = replaceBracedCommand(s, "text", 1, (a) => a[0]);
+    s = replaceBracedCommand(s, "text", 1, (a) => ` ${a[0]} `);
     s = replaceBracedCommand(s, "mathrm", 1, (a) => a[0]);
     s = replaceBracedCommand(s, "mathbf", 1, (a) => a[0]);
     s = replaceBracedCommand(s, "mathit", 1, (a) => a[0]);
+    s = replaceBracedCommand(s, "mathbb", 1, (a) => a[0]);
+    s = replaceBracedCommand(s, "mathcal", 1, (a) => a[0]);
     s = replaceBracedCommand(s, "boldsymbol", 1, (a) => a[0]);
+    s = replaceBracedCommand(s, "color", 2, (a) => a[1]);
+    s = replaceBracedCommand(s, "colorbox", 2, (a) => a[1]);
+    s = replaceBracedCommand(s, "boxed", 1, (a) => `[${a[0]}]`);
+    // Spacing commands with one arg — just return the arg
+    s = replaceBracedCommand(s, "phantom", 1, () => "");
+    s = replaceBracedCommand(s, "hspace", 1, () => " ");
+    s = replaceBracedCommand(s, "vspace", 1, () => "");
     s = s.replace(/\^\{([^{}]*)\}/g, "^($1)");
     s = s.replace(/_\{([^{}]*)\}/g, "_($1)");
     if (s === before) break;
   }
+
+  // Clean up lone spacing / annotation commands with no arguments
+  s = s.replace(/\\nonumber\b/g, "");
+  s = s.replace(/\\label\{[^}]*\}/g, "");
+  s = s.replace(/\\tag\{[^}]*\}/g, "");
+  s = s.replace(/\\notag\b/g, "");
+  s = s.replace(/\\intertext\{[^}]*\}/g, "");
+  s = s.replace(/\\[,;!]/g, " ");
+  s = s.replace(/\\ /g, " ");
 
   // Named symbols/Greek letters: \pi, \Delta, \times, etc.
   s = s.replace(/\\([A-Za-z]+)/g, (_m, name: string) => GREEK_AND_SYMBOLS[name] ?? name);

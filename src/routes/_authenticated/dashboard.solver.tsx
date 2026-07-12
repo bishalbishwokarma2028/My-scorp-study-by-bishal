@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAIJSON } from "@/lib/aiProvider";
+import { convertLatexToPlainMath, renderMathText } from "@/lib/mathText";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
@@ -80,9 +81,9 @@ Return STRICT JSON only (no prose outside JSON, no markdown fences):
       "what": "Clearly state WHAT you are doing in this step (1-2 sentences). Be specific.",
       "why": "Explain WHY this step is necessary — the reasoning and theory behind it (2-3 sentences). Connect to concepts.",
       "how": "Explain HOW to perform this step — detailed method, approach, or procedure (2-4 sentences).",
-      "formula": "The exact formula or equation used (e.g. 'F = ma', 'x = (-b ± √(b²-4ac)) / 2a') or null",
+      "formula": "The exact formula using ONLY plain Unicode — e.g. 'F = ma', 'x = (-b ± √(b²-4ac)) / (2a)', 'H = v₀t - (1/2)gt²'. NEVER use LaTeX.",
       "formula_explanation": "If a formula is used: explain what each variable represents in the context of this problem. Otherwise null.",
-      "calculation": "Show the full numeric substitution and arithmetic (e.g. 'F = 1200 × 2.5 = 3000') or null if no numbers",
+      "calculation": "Show the full numeric substitution and arithmetic using plain Unicode — e.g. 'F = 1200 × 2.5 = 3000 N'. Use × for multiply, ÷ for divide, √ for root, ² for squared. NEVER use \\text{}, \\times, \\frac{}{}, or any LaTeX.",
       "result": "The result of this step with units (e.g. 'a = 2.5 m/s²') or null",
       "common_mistake": "The most common mistake students make in this exact step and how to avoid it, or null"
     }
@@ -98,7 +99,14 @@ REQUIREMENTS:
 - Each step must be LONG and DETAILED. The 'why' field must always explain the physics/math/chemistry theory.
 - Show ALL arithmetic in the 'calculation' field — substitute numbers, simplify step by step.
 - Never skip sub-steps. If simplifying an expression, show each simplification.
-- Use proper mathematical notation in formulas.`;
+- MATHEMATICAL NOTATION — use ONLY plain Unicode and simple conventions. NEVER LaTeX backslash commands:
+  • Fractions: write as (numerator) / (denominator) — e.g. (v₀² × sin²θ) / (2g)
+  • Exponents: Unicode superscripts ², ³, ⁴ or caret — e.g. x² or x^2
+  • Subscripts: Unicode subscripts ₀, ₁, ₂ or underscore — e.g. v₀ or v_0
+  • Square roots: √(expression) — e.g. √(b² - 4ac)
+  • Greek: actual characters — π, θ, α, β, γ, Δ, Σ, μ, λ, ω (NOT \\pi, \\theta, etc.)
+  • Operators: ×, ÷, ±, ≈, ≠, ≤, ≥, ∞, °, ·
+  • FORBIDDEN: \\frac{}{}, \\sqrt{}, \\text{}, \\times, \\left, \\right, \\begin, $...$, &=, \\\\ line breaks`;
 }
 
 const STEP_COLORS = [
@@ -159,28 +167,32 @@ function StepCard({
       {/* What */}
       <div className="space-y-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/50">📌 What we're doing</p>
-        <p className="text-sm leading-relaxed text-foreground/90 font-medium">{step.what}</p>
+        <p className="text-sm leading-relaxed text-foreground/90 font-medium">{renderMathText(convertLatexToPlainMath(step.what))}</p>
       </div>
 
       {/* Why */}
       <div className="rounded-lg bg-white/60 border border-white/80 p-3.5 space-y-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/50">🧠 Why this step</p>
-        <p className="text-sm leading-relaxed text-foreground/80">{step.why}</p>
+        <p className="text-sm leading-relaxed text-foreground/80">{renderMathText(convertLatexToPlainMath(step.why))}</p>
       </div>
 
       {/* How */}
       <div className="space-y-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/50">⚙️ How to do it</p>
-        <p className="text-sm leading-relaxed text-foreground/80">{step.how}</p>
+        <p className="text-sm leading-relaxed text-foreground/80">{renderMathText(convertLatexToPlainMath(step.how))}</p>
       </div>
 
       {/* Formula */}
       {step.formula && (
         <div className="rounded-xl border border-white bg-white/70 p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/50 mb-2">📐 Formula</p>
-          <p className="font-mono text-base font-bold text-foreground">{step.formula}</p>
+          <p className="font-mono text-base font-bold text-foreground leading-relaxed">
+            {renderMathText(convertLatexToPlainMath(step.formula))}
+          </p>
           {step.formula_explanation && (
-            <p className="mt-2 text-xs text-foreground/60 leading-relaxed">{step.formula_explanation}</p>
+            <p className="mt-2 text-xs text-foreground/60 leading-relaxed">
+              {renderMathText(convertLatexToPlainMath(step.formula_explanation))}
+            </p>
           )}
         </div>
       )}
@@ -189,7 +201,9 @@ function StepCard({
       {step.calculation && (
         <div className="rounded-xl bg-slate-900 p-4">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">🔢 Calculation</p>
-          <pre className="whitespace-pre-wrap font-mono text-sm text-emerald-300 leading-relaxed">{step.calculation}</pre>
+          <p className="whitespace-pre-wrap font-mono text-sm text-emerald-300 leading-relaxed">
+            {renderMathText(convertLatexToPlainMath(step.calculation))}
+          </p>
         </div>
       )}
 
@@ -197,7 +211,7 @@ function StepCard({
       {step.result && (
         <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5">
           <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-600" />
-          <p className="text-sm font-bold text-emerald-800">Result: {step.result}</p>
+          <p className="text-sm font-bold text-emerald-800">Result: {renderMathText(convertLatexToPlainMath(step.result))}</p>
         </div>
       )}
 
@@ -207,7 +221,7 @@ function StepCard({
           <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
           <div>
             <p className="text-[10px] font-bold uppercase text-red-600">⚠️ Common Mistake</p>
-            <p className="mt-0.5 text-xs text-red-700 leading-relaxed">{step.common_mistake}</p>
+            <p className="mt-0.5 text-xs text-red-700 leading-relaxed">{renderMathText(convertLatexToPlainMath(step.common_mistake))}</p>
           </div>
         </div>
       )}
