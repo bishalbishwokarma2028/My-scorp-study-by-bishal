@@ -60,7 +60,7 @@ For ALL numerical / mathematical / science questions, use this EXACT structure (
 [Show the full arithmetic/algebra in detail. Every intermediate result on its own line. State units at every step.]
 
 ## ✅ Verification
-[Verify the answer using a different method, unit analysis, or by substituting back. Confirm it is reasonable.]
+[MANDATORY — perform an independent check. Substitute the final answer back into the original equation, use dimensional analysis, or solve using an alternative method. Explicitly state: "Answer verified ✓" or list any correction found.]
 
 > **🎯 Final Answer:** [State the complete final answer with correct units, bold and clear.]
 

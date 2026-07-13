@@ -89,7 +89,8 @@ Return STRICT JSON only (no prose outside JSON, no markdown fences):
     }
   ],
   "final_answer": "Complete, clearly stated final answer with all values and units",
-  "verification": "Show a quick way to verify/check the answer (substitute back, dimensional analysis, etc.) or null",
+  "verification": "MANDATORY — show a complete independent check: substitute the answer back into the original equation, use dimensional analysis, or solve a different way. Confirm the answer is correct. Never null.",
+  "self_check": "After completing all steps, review: (1) Are the formulas correct? (2) Are the numbers substituted correctly? (3) Is the arithmetic right? (4) Are units consistent throughout? State any corrections made, or confirm 'All steps verified — answer is correct.'",
   "key_concept": "The most important underlying concept or principle this problem tests (2-3 sentences)",
   "tip": "One powerful exam tip or shortcut related to this type of problem"
 }
