@@ -266,44 +266,52 @@ function SolverPage() {
     setLoading(true);
     set({ solution: null, revealed: [] });
     try {
-      // askAIJSON automatically retries with a stricter prompt if the first
-      // response is not valid JSON — handles long questions that can cause
-      // truncated or malformed responses.
+      // maxTokens:6000 — matches Cerebras' max output so long multi-step
+      // solutions never get truncated mid-JSON.
+      // askAIJSON retries once with a stricter system prompt if the first
+      // response is not parseable JSON.
       const { data: parsed, provider: prov } = await askAIJSON<Solution>(
         buildPrompt(problem, subject),
         "You are an expert tutor. Return ONLY valid JSON — absolutely no markdown fences or prose outside the JSON.",
-        undefined, true, 4000,
+        undefined, true, 6000,
       );
       set({ provider: prov });
-      await bump();
-      if (parsed?.steps?.length) {
-        // ── Server-side verification pass ───────────────────────────────────
-        // Independently re-solves the same problem using the same model pool
-        // (Cerebras → Groq) as verifyMathSolutionInternal. If the AI's answer
-        // is wrong, final_answer is replaced with the correct one and the
-        // verification note is updated. This ensures Solver, Image Solver, and
-        // Notes Enhance all converge on the same verified answer.
-        try {
-          const vr = await verifyMathServer({
-            data: { problem, proposedAnswer: parsed.final_answer },
-          });
-          if (!vr.correct) {
-            parsed.final_answer = vr.answer;
-            parsed.verification = `✅ Independently verified and corrected: ${vr.briefCheck}`;
-          } else {
-            const base = parsed.verification ? `${parsed.verification}  ` : "";
-            parsed.verification = `${base}✅ Independently verified correct.`;
-          }
-          parsed._serverVerified = true;
-        } catch {
-          // Verification unavailable — display original answer without changes.
-        }
-        set({ solution: parsed, revealed: Array(parsed.steps.length).fill(false) });
-      } else {
-        toast.error("Could not generate a solution — please try again");
+
+      // Bump quota non-blocking — a network hiccup on bump() must never
+      // show a spurious "Failed to solve" error to the student.
+      bump().catch(() => {});
+
+      if (!parsed?.steps?.length) {
+        toast.error(
+          parsed === null
+            ? "Couldn't parse the solution — try rephrasing or breaking it into a shorter question"
+            : "Got an empty solution — please try again",
+        );
+        return;
       }
+
+      // ── Server-side verification pass ─────────────────────────────────────
+      // Independently re-solves the same problem (Cerebras → Groq fallback).
+      // Corrects final_answer if wrong; marks solution as server-verified.
+      try {
+        const vr = await verifyMathServer({
+          data: { problem, proposedAnswer: parsed.final_answer },
+        });
+        if (!vr.correct) {
+          parsed.final_answer = vr.answer;
+          parsed.verification = `✅ Independently verified and corrected: ${vr.briefCheck}`;
+        } else {
+          const base = parsed.verification ? `${parsed.verification}  ` : "";
+          parsed.verification = `${base}✅ Independently verified correct.`;
+        }
+        parsed._serverVerified = true;
+      } catch {
+        // Verification unavailable — display original answer without changes.
+      }
+
+      set({ solution: parsed, revealed: Array(parsed.steps.length).fill(false) });
     } catch {
-      toast.error("Failed to solve — please try again");
+      toast.error("Something went wrong — please try again");
     } finally {
       setLoading(false);
     }

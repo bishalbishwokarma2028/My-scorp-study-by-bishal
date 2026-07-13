@@ -500,20 +500,18 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const history: VisionHistory = data.history ?? [];
-    let responseText: string | null = null;
 
     // Groq first — free tier, no billing required.
     const groqKeys = rotatedKeys("groq-vision", serverConfig.ai.groqKeys);
-    outerGroq:
     for (const key of groqKeys) {
       for (const model of GROQ_VISION_MODELS) {
         const text = await tryGroqVision(data.prompt, data.imageBase64, data.mimeType, key, model, history);
-        if (text) { responseText = text; break outerGroq; }
+        if (text) return { text, provider: "Bishal's Assistant" };
       }
     }
 
     // Fallback — OpenRouter (requires account credits).
-    if (!responseText && serverConfig.ai.openrouterKey) {
+    if (serverConfig.ai.openrouterKey) {
       for (const model of OPENROUTER_VISION_MODELS) {
         const text = await tryOpenRouterVision(
           data.prompt,
@@ -523,41 +521,9 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
           model,
           history,
         );
-        if (text) { responseText = text; break; }
+        if (text) return { text, provider: "Bishal's Assistant" };
       }
     }
 
-    if (!responseText) {
-      return { text: "Could not analyze the image. Please try again.", provider: "Bishal's Assistant" };
-    }
-
-    // ── Math verification pass ────────────────────────────────────────────────
-    // Only verify initial solves (history.length === 0), not follow-up chat turns.
-    // Extracts the "🎯 Final Answer" line and independently re-solves the problem.
-    // If the answer is wrong, the line is replaced with the corrected value.
-    if (history.length === 0) {
-      const finalAnswerMatch = responseText.match(/>\s*\*\*🎯 Final Answer:\*\*\s*(.+)/);
-      if (finalAnswerMatch) {
-        const proposedAnswer = finalAnswerMatch[1].replace(/\*\*/g, "").trim();
-        const vr = await verifyMathSolutionInternal(
-          // Provide the full worked solution as context so the verifier can
-          // re-derive the answer without needing to see the image itself.
-          `User question: ${data.prompt}\n\n--- Full worked solution for context ---\n${responseText.slice(0, 2500)}`,
-          proposedAnswer,
-        );
-        if (vr && !vr.correct) {
-          responseText = responseText.replace(
-            />\s*\*\*🎯 Final Answer:\*\*\s*.+/,
-            `> **🎯 Final Answer:** ${vr.answer}\n\n> *✅ Independently verified — corrected: ${vr.briefCheck}*`,
-          );
-        } else if (vr?.correct) {
-          responseText = responseText.replace(
-            /(>\s*\*\*🎯 Final Answer:\*\*\s*.+)/,
-            `$1\n\n> *✅ Independently verified: ${vr.briefCheck}*`,
-          );
-        }
-      }
-    }
-
-    return { text: responseText, provider: "Bishal's Assistant" };
+    return { text: "Could not analyze the image. Please try again.", provider: "Bishal's Assistant" };
   });
