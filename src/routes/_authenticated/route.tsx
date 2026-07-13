@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, StickyNote, Languages, Calculator, BarChart3,
   LogOut, Menu, X, Bell, Code2, GitCompare, Search, Eye,
   FlaskConical, Sheet, Brain, FileQuestion, Youtube, BookText,
-  Sigma, Microscope, Coins, ScanText,
+  Sigma, Microscope, Coins, ScanText, PenLine,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -40,6 +40,7 @@ const navItems = [
   { to: "/dashboard/visual-explainer", label: "Visual Explainer", icon: Eye },
   { to: "/dashboard/image-gen", label: "Image Gen", icon: ImageIcon },
   { to: "/dashboard/image-solver", label: "Image Solver", icon: ScanText },
+  { to: "/dashboard/whiteboard", label: "Teaching Board", icon: PenLine },
   { to: "/dashboard/notes", label: "Smart Notes", icon: StickyNote },
   { to: "/dashboard/translator", label: "Translator", icon: Languages },
   { to: "/dashboard/formula-sheet", label: "Formula Sheet", icon: Sheet },

@@ -17,6 +17,7 @@ import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin/admin.index'
 import { Route as AuthenticatedDashboardYoutubeRouteImport } from './routes/_authenticated/dashboard.youtube'
+import { Route as AuthenticatedDashboardWhiteboardRouteImport } from './routes/_authenticated/dashboard.whiteboard'
 import { Route as AuthenticatedDashboardVisualExplainerRouteImport } from './routes/_authenticated/dashboard.visual-explainer'
 import { Route as AuthenticatedDashboardTranslatorRouteImport } from './routes/_authenticated/dashboard.translator'
 import { Route as AuthenticatedDashboardSummarizerRouteImport } from './routes/_authenticated/dashboard.summarizer'
@@ -83,6 +84,12 @@ const AuthenticatedDashboardYoutubeRoute =
   AuthenticatedDashboardYoutubeRouteImport.update({
     id: '/dashboard/youtube',
     path: '/dashboard/youtube',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardWhiteboardRoute =
+  AuthenticatedDashboardWhiteboardRouteImport.update({
+    id: '/dashboard/whiteboard',
+    path: '/dashboard/whiteboard',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardVisualExplainerRoute =
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
+  '/dashboard/whiteboard': typeof AuthenticatedDashboardWhiteboardRoute
   '/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
   '/admin/': typeof AdminAdminIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
@@ -310,6 +318,7 @@ export interface FileRoutesByTo {
   '/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
+  '/dashboard/whiteboard': typeof AuthenticatedDashboardWhiteboardRoute
   '/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
   '/admin': typeof AdminAdminIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
@@ -348,6 +357,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/summarizer': typeof AuthenticatedDashboardSummarizerRoute
   '/_authenticated/dashboard/translator': typeof AuthenticatedDashboardTranslatorRoute
   '/_authenticated/dashboard/visual-explainer': typeof AuthenticatedDashboardVisualExplainerRoute
+  '/_authenticated/dashboard/whiteboard': typeof AuthenticatedDashboardWhiteboardRoute
   '/_authenticated/dashboard/youtube': typeof AuthenticatedDashboardYoutubeRoute
   '/_admin/admin/': typeof AdminAdminIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
@@ -385,6 +395,7 @@ export interface FileRouteTypes {
     | '/dashboard/summarizer'
     | '/dashboard/translator'
     | '/dashboard/visual-explainer'
+    | '/dashboard/whiteboard'
     | '/dashboard/youtube'
     | '/admin/'
     | '/dashboard/'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/dashboard/summarizer'
     | '/dashboard/translator'
     | '/dashboard/visual-explainer'
+    | '/dashboard/whiteboard'
     | '/dashboard/youtube'
     | '/admin'
     | '/dashboard'
@@ -457,6 +469,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/summarizer'
     | '/_authenticated/dashboard/translator'
     | '/_authenticated/dashboard/visual-explainer'
+    | '/_authenticated/dashboard/whiteboard'
     | '/_authenticated/dashboard/youtube'
     | '/_admin/admin/'
     | '/_authenticated/dashboard/'
@@ -526,6 +539,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard/youtube'
       fullPath: '/dashboard/youtube'
       preLoaderRoute: typeof AuthenticatedDashboardYoutubeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/whiteboard': {
+      id: '/_authenticated/dashboard/whiteboard'
+      path: '/dashboard/whiteboard'
+      fullPath: '/dashboard/whiteboard'
+      preLoaderRoute: typeof AuthenticatedDashboardWhiteboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard/visual-explainer': {
@@ -764,6 +784,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardSummarizerRoute: typeof AuthenticatedDashboardSummarizerRoute
   AuthenticatedDashboardTranslatorRoute: typeof AuthenticatedDashboardTranslatorRoute
   AuthenticatedDashboardVisualExplainerRoute: typeof AuthenticatedDashboardVisualExplainerRoute
+  AuthenticatedDashboardWhiteboardRoute: typeof AuthenticatedDashboardWhiteboardRoute
   AuthenticatedDashboardYoutubeRoute: typeof AuthenticatedDashboardYoutubeRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
 }
@@ -795,6 +816,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardTranslatorRoute: AuthenticatedDashboardTranslatorRoute,
   AuthenticatedDashboardVisualExplainerRoute:
     AuthenticatedDashboardVisualExplainerRoute,
+  AuthenticatedDashboardWhiteboardRoute: AuthenticatedDashboardWhiteboardRoute,
   AuthenticatedDashboardYoutubeRoute: AuthenticatedDashboardYoutubeRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
 }

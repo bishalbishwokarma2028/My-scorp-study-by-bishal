@@ -1,0 +1,384 @@
+Add "Interactive Whiteboard - Bishal's Teaching Mode " feature .
+
+The Interactive Whiteboard should transform the AI from a text-based chatbot into a visual AI teacher. Instead of displaying long text responses, the AI should teach concepts visually by writing, drawing, highlighting, and explaining step by step on a digital whiteboard, creating an experience similar to learning from a real teacher in a classroom.
+
+---
+
+Objective
+
+The Interactive Whiteboard should make students feel as if a real teacher is teaching them on a smart classroom whiteboard.
+
+The AI should explain concepts using handwriting-style animations, diagrams, equations, graphs, flowcharts, tables, highlights, annotations, and visual demonstrations. Every explanation should be interactive, engaging, easy to understand, and adapted to the student's level.
+
+---
+
+Whiteboard Interface
+
+Create a modern, responsive, full-screen whiteboard with:
+
+- Infinite canvas
+- Smooth zoom in and zoom out
+- Pan in every direction
+- Fullscreen mode
+- Dark mode
+- Light mode
+- Grid mode
+- Blank mode
+- Multi-page whiteboard
+- Auto-fit content
+- Responsive layout
+- Mobile-first design
+- Desktop optimization
+- Touch support
+- Mouse support
+- Stylus/Pen support
+
+---
+
+Professional Toolbar
+
+Include:
+
+- Pen
+- Pencil
+- Highlighter
+- Eraser
+- Selection Tool
+- Text Tool
+- Formula Tool
+- Straight Line
+- Arrow
+- Rectangle
+- Circle
+- Triangle
+- Polygon
+- Color Picker
+- Stroke Width
+- Undo
+- Redo
+- Clear Current Page
+- Add New Page
+- Duplicate Page
+- Previous Page
+- Next Page
+- Laser Pointer
+- Spotlight Tool
+
+---
+
+AI Teaching Mode
+
+Never display the complete answer instantly.
+
+Teach naturally like a real teacher.
+
+For every question:
+
+1. Understand the question.
+2. Explain what the question asks.
+3. Identify the correct concept or formula.
+4. Draw diagrams when needed.
+5. Solve step by step.
+6. Highlight important concepts.
+7. Show the final answer.
+8. Explain why the answer is correct.
+9. Give useful tips or shortcuts when appropriate.
+
+Every explanation should appear gradually with smooth handwriting-style animations.
+
+---
+
+Animation System
+
+Animate everything naturally.
+
+Examples:
+
+- Write text gradually.
+- Draw diagrams stroke by stroke.
+- Draw arrows smoothly.
+- Highlight formulas.
+- Circle final answers.
+- Underline important concepts.
+- Animate graphs.
+- Reveal calculations one step at a time.
+- Pause naturally between steps.
+- Never instantly render the complete solution.
+
+---
+
+Intelligent Visualization
+
+The AI should automatically determine the best teaching method.
+
+Examples:
+
+Mathematics
+
+- Equations
+- Number lines
+- Graphs
+- Geometry
+
+Physics
+
+- Free-body diagrams
+- Motion diagrams
+- Graphs
+
+Chemistry
+
+- Molecules
+- Chemical reactions
+- Laboratory diagrams
+
+Biology
+
+- Cells
+- Organs
+- Labelled diagrams
+- Life cycles
+
+Computer Science
+
+- Flowcharts
+- Algorithms
+- Data structures
+- Code execution visualization
+
+Business & Economics
+
+- Charts
+- Tables
+- Graphs
+
+English Grammar
+
+- Sentence structures
+- Tree diagrams
+- Flowcharts
+
+History
+
+- Timelines
+- Mind maps
+
+Geography
+
+- Maps
+- Climate charts
+
+The AI should automatically choose the most effective visualization for every topic.
+
+---
+
+Unlimited Follow-up Teaching
+
+Users should be able to ask unlimited follow-up questions as long as they have available credits.
+
+Examples:
+
+- Explain again.
+- Explain more simply.
+- Explain in Nepali.
+- Explain in English.
+- Show another method.
+- Draw another diagram.
+- Show visualization.
+- Teach like a beginner.
+- Teach like an expert.
+- Solve using shortcuts.
+- Solve without formulas.
+- Give a real-life example.
+
+The AI must continue teaching on the same whiteboard instead of creating a new one unless the user explicitly requests a new whiteboard.
+
+---
+
+Interactive Learning
+
+Allow users to:
+
+- Draw
+- Write
+- Highlight
+- Erase
+- Move objects
+- Resize objects
+- Add notes
+- Add sticky notes
+- Upload images
+- Upload PDFs
+- Upload screenshots
+- Upload textbook pages
+- Upload handwritten notes
+- Upload questions
+
+The AI should immediately use uploaded content as the teaching context.
+
+---
+
+AI Pointer
+
+During explanations, the AI should visually indicate what it is explaining using:
+
+- Laser Pointer
+- Animated Cursor
+- Highlight Box
+- Arrow Indicator
+- Spotlight Effect
+
+Students should always know the current focus of the explanation.
+
+---
+
+Smart Color System
+
+Automatically use colors:
+
+- Blue → Main explanation
+- Green → Correct answer
+- Red → Mistakes
+- Orange → Warnings
+- Purple → Definitions
+- Yellow → Highlights
+
+Allow users to customize these colors.
+
+---
+
+Automatic Content Detection
+
+Before teaching, automatically detect whether the question requires:
+
+- Equation solving
+- Diagram
+- Graph
+- Flowchart
+- Mind map
+- Timeline
+- Table
+- Comparison chart
+- Tree diagram
+- Scientific illustration
+
+Automatically choose the most suitable teaching method.
+
+---
+
+Session Memory
+
+Automatically remember:
+
+- Current whiteboard page
+- Drawings
+- Animation progress
+- AI explanations
+- Follow-up questions
+- User drawings
+- Notes
+- Bookmarks
+
+Users should be able to reopen previous sessions exactly where they left off.
+
+---
+
+Export Options
+
+Allow users to export:
+
+- PNG
+- JPG
+- SVG
+- PDF
+- Print
+- Share Image
+- Copy Image
+
+---
+
+Performance
+
+Ensure excellent performance by implementing:
+
+- Canvas virtualization
+- Lazy rendering
+- Efficient memory management
+- Smooth animations
+- Fast loading
+- Auto-save
+- Background saving
+- Crash recovery
+- Minimal battery usage
+- No lag
+- No freezing
+- No unnecessary re-rendering
+
+---
+
+Mobile Optimization
+
+Fully optimize for Android, iPhone, tablets, and desktop.
+
+Support:
+
+- Pinch to zoom
+- Two-finger pan
+- Double-tap zoom
+- Long press
+- Stylus support
+- Portrait mode
+- Landscape mode
+- Responsive toolbar
+- Large touch targets
+- Smooth gestures
+
+---
+
+Accessibility
+
+Support:
+
+- Keyboard shortcuts
+- Screen readers
+- High contrast mode
+- Adjustable text size
+- Color-blind-friendly colors
+
+---
+
+Error Handling
+
+Never display technical errors to users.
+
+Instead:
+
+- Retry automatically.
+- Recover sessions automatically.
+- Preserve user drawings.
+- Preserve AI progress.
+- Prevent data loss.
+- Display friendly messages.
+
+---
+
+UI Design
+
+The interface should look modern, premium, clean, and consistent with ScorpStudy.
+
+Use:
+
+- Rounded corners
+- Smooth animations
+- Beautiful transitions
+- Professional typography
+- Clean toolbar
+- Minimal distractions
+- Consistent ScorpStudy branding
+- Responsive layouts
+
+---
+
+Final Requirement
+
+This feature must feel like a real AI-powered digital classroom rather than a chatbot. The AI should think and teach like an experienced teacher, automatically selecting the best visual explanation for every question through diagrams, drawings, equations, graphs, animations, flowcharts, tables, highlights, and step-by-step teaching. The feature must integrate perfectly with the existing ScorpStudy ecosystem, preserve all current functionality, and provide a fast, reliable, polished, and production-ready user experience across all supported devices.
