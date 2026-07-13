@@ -238,12 +238,23 @@ function ImageSolverPage() {
       // Capture history before the await so we can extend it afterwards.
       // (usePageState doesn't support functional setState — must pass a plain object.)
       const historySnapshot = [...state.chatHistory];
+
+      // Trim individual history entries so they never exceed the server-side
+      // Zod limit (60 000 chars). Long initial AI answers are the common case.
+      const MAX_CONTENT = 55000;
+      const safeHistory = historySnapshot.map((m) => ({
+        role: m.role,
+        content: m.content.length > MAX_CONTENT
+          ? m.content.slice(0, MAX_CONTENT) + "\n\n[…response truncated for context…]"
+          : m.content,
+      }));
+
       const res = await analyzeImageServer({
         data: {
           prompt: buildFollowupPrompt(q),
           imageBase64: imgState.image.base64,
           mimeType: imgState.image.mimeType,
-          history: historySnapshot,
+          history: safeHistory,
         },
       });
       setState({

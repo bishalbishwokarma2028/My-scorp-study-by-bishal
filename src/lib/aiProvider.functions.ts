@@ -458,7 +458,7 @@ export const askAIServer = createServerFn({ method: "POST" })
     };
   });
 
-const VisionMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) });
+const VisionMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(60000) });
 
 const VisionInput = z.object({
   prompt: z.string().min(1).max(10000),
