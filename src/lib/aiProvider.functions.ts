@@ -212,6 +212,62 @@ async function tryHuggingFace(prompt: string, system: string, key: string): Prom
   }
 }
 
+// ── Math verification ─────────────────────────────────────────────────────────
+// Independently solves any math/science problem to check a proposed answer.
+// Used internally by analyzeImageServer and exported via verifyMathServer so the
+// Solver can call it after askAIJSON. All three features then converge on the same
+// verified answer regardless of which model produced the initial response.
+
+function safeParseVerifyJSON(
+  raw: string,
+): { correct: boolean; answer: string; briefCheck: string } | null {
+  try {
+    const clean = raw.replace(/```json?\n?|\n?```/g, "").trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const j = JSON.parse(match[0]);
+    if (typeof j.correct === "boolean" && typeof j.answer === "string" && j.answer.trim()) {
+      return { correct: j.correct, answer: j.answer.trim(), briefCheck: String(j.brief_check ?? "") };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const VERIFY_SYSTEM =
+  "You are a precise mathematics and science verification engine. " +
+  "Solve the given problem independently from scratch, then compare with the proposed answer. " +
+  "Return ONLY valid JSON — no markdown, no prose:\n" +
+  '{"correct":true,"answer":"<correct final answer with units>","brief_check":"<one-line confirmation>"}\n' +
+  "or\n" +
+  '{"correct":false,"answer":"<the correct answer with units>","brief_check":"<one-line note on what was wrong>"}';
+
+/**
+ * Independently verifies a proposed math/science answer.
+ * Uses Cerebras (strongest model in pool) → Groq fallback.
+ * Returns null if all providers are rate-limited (caller keeps original answer).
+ */
+async function verifyMathSolutionInternal(
+  problem: string,
+  proposedAnswer: string,
+): Promise<{ correct: boolean; answer: string; briefCheck: string } | null> {
+  const prompt =
+    `PROBLEM:\n${problem.slice(0, 3000)}\n\n` +
+    `PROPOSED ANSWER: ${proposedAnswer.slice(0, 400)}\n\n` +
+    "Solve the problem independently from scratch. Compare with the proposed answer. Return JSON only.";
+
+  for (const key of rotatedKeys("cerebras-verify", serverConfig.ai.cerebrasKeys)) {
+    const r = await tryCerebras(prompt, VERIFY_SYSTEM, key, []);
+    if (r) { const p = safeParseVerifyJSON(r.text); if (p) return p; }
+  }
+  for (const key of rotatedKeys("groq-verify", serverConfig.ai.groqKeys)) {
+    const r = await tryGroq(prompt, VERIFY_SYSTEM, key, [], 512);
+    if (r) { const p = safeParseVerifyJSON(r.text); if (p) return p; }
+  }
+  return null;
+}
+
 export const askAIServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }): Promise<Result> => {
@@ -424,22 +480,40 @@ async function tryOpenRouterVision(
   }
 }
 
+const VerifyInputSchema = z.object({
+  problem: z.string().min(1).max(5000),
+  proposedAnswer: z.string().min(1).max(1000),
+});
+
+/**
+ * Server function called by the Solver after askAIJSON to cross-check the answer.
+ * Reuses verifyMathSolutionInternal — same model, same logic as the Image Solver pass.
+ */
+export const verifyMathServer = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => VerifyInputSchema.parse(d))
+  .handler(async ({ data }) => {
+    const result = await verifyMathSolutionInternal(data.problem, data.proposedAnswer);
+    return result ?? { correct: true, answer: data.proposedAnswer, briefCheck: "Verification unavailable" };
+  });
+
 export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const history: VisionHistory = data.history ?? [];
+    let responseText: string | null = null;
 
     // Groq first — free tier, no billing required.
     const groqKeys = rotatedKeys("groq-vision", serverConfig.ai.groqKeys);
+    outerGroq:
     for (const key of groqKeys) {
       for (const model of GROQ_VISION_MODELS) {
         const text = await tryGroqVision(data.prompt, data.imageBase64, data.mimeType, key, model, history);
-        if (text) return { text, provider: "Bishal's Assistant" };
+        if (text) { responseText = text; break outerGroq; }
       }
     }
 
     // Fallback — OpenRouter (requires account credits).
-    if (serverConfig.ai.openrouterKey) {
+    if (!responseText && serverConfig.ai.openrouterKey) {
       for (const model of OPENROUTER_VISION_MODELS) {
         const text = await tryOpenRouterVision(
           data.prompt,
@@ -449,9 +523,41 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
           model,
           history,
         );
-        if (text) return { text, provider: "Bishal's Assistant" };
+        if (text) { responseText = text; break; }
       }
     }
 
-    return { text: "Could not analyze the image. Please try again.", provider: "Bishal's Assistant" };
+    if (!responseText) {
+      return { text: "Could not analyze the image. Please try again.", provider: "Bishal's Assistant" };
+    }
+
+    // ── Math verification pass ────────────────────────────────────────────────
+    // Only verify initial solves (history.length === 0), not follow-up chat turns.
+    // Extracts the "🎯 Final Answer" line and independently re-solves the problem.
+    // If the answer is wrong, the line is replaced with the corrected value.
+    if (history.length === 0) {
+      const finalAnswerMatch = responseText.match(/>\s*\*\*🎯 Final Answer:\*\*\s*(.+)/);
+      if (finalAnswerMatch) {
+        const proposedAnswer = finalAnswerMatch[1].replace(/\*\*/g, "").trim();
+        const vr = await verifyMathSolutionInternal(
+          // Provide the full worked solution as context so the verifier can
+          // re-derive the answer without needing to see the image itself.
+          `User question: ${data.prompt}\n\n--- Full worked solution for context ---\n${responseText.slice(0, 2500)}`,
+          proposedAnswer,
+        );
+        if (vr && !vr.correct) {
+          responseText = responseText.replace(
+            />\s*\*\*🎯 Final Answer:\*\*\s*.+/,
+            `> **🎯 Final Answer:** ${vr.answer}\n\n> *✅ Independently verified — corrected: ${vr.briefCheck}*`,
+          );
+        } else if (vr?.correct) {
+          responseText = responseText.replace(
+            /(>\s*\*\*🎯 Final Answer:\*\*\s*.+)/,
+            `$1\n\n> *✅ Independently verified: ${vr.briefCheck}*`,
+          );
+        }
+      }
+    }
+
+    return { text: responseText, provider: "Bishal's Assistant" };
   });

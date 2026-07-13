@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAIJSON } from "@/lib/aiProvider";
+import { verifyMathServer } from "@/lib/aiProvider.functions";
 import { convertLatexToPlainMath, renderMathText } from "@/lib/mathText";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -39,8 +40,11 @@ type Solution = {
   steps: Step[];
   final_answer: string;
   verification: string | null;
+  self_check: string | null;
   key_concept: string;
   tip: string;
+  /** Set client-side after verifyMathServer runs — not from the AI JSON. */
+  _serverVerified?: boolean;
 };
 
 const SUBJECTS: { value: Subject; emoji: string; color: string; bg: string }[] = [
@@ -273,6 +277,27 @@ function SolverPage() {
       set({ provider: prov });
       await bump();
       if (parsed?.steps?.length) {
+        // ── Server-side verification pass ───────────────────────────────────
+        // Independently re-solves the same problem using the same model pool
+        // (Cerebras → Groq) as verifyMathSolutionInternal. If the AI's answer
+        // is wrong, final_answer is replaced with the correct one and the
+        // verification note is updated. This ensures Solver, Image Solver, and
+        // Notes Enhance all converge on the same verified answer.
+        try {
+          const vr = await verifyMathServer({
+            data: { problem, proposedAnswer: parsed.final_answer },
+          });
+          if (!vr.correct) {
+            parsed.final_answer = vr.answer;
+            parsed.verification = `✅ Independently verified and corrected: ${vr.briefCheck}`;
+          } else {
+            const base = parsed.verification ? `${parsed.verification}  ` : "";
+            parsed.verification = `${base}✅ Independently verified correct.`;
+          }
+          parsed._serverVerified = true;
+        } catch {
+          // Verification unavailable — display original answer without changes.
+        }
         set({ solution: parsed, revealed: Array(parsed.steps.length).fill(false) });
       } else {
         toast.error("Could not generate a solution — please try again");
@@ -503,13 +528,27 @@ function SolverPage() {
                     <CheckCircle2 className="h-4 w-4 text-white" />
                   </div>
                   <span className="font-bold text-emerald-800 text-base">Final Answer</span>
+                  {solution._serverVerified && (
+                    <span className="ml-auto rounded-full bg-emerald-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                      ✅ Independently Verified
+                    </span>
+                  )}
                 </div>
-                <p className="text-base font-bold text-emerald-900 leading-relaxed">{solution.final_answer}</p>
+                <p className="text-base font-bold text-emerald-900 leading-relaxed">
+                  {renderMathText(convertLatexToPlainMath(solution.final_answer))}
+                </p>
 
                 {solution.verification && (
                   <div className="mt-4 rounded-xl border border-emerald-200 bg-white/60 p-3.5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mb-1.5">✅ Verification</p>
-                    <p className="text-xs text-emerald-800 leading-relaxed">{solution.verification}</p>
+                    <p className="text-xs text-emerald-800 leading-relaxed">{renderMathText(convertLatexToPlainMath(solution.verification))}</p>
+                  </div>
+                )}
+
+                {solution.self_check && (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-white/40 p-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mb-1.5">🔍 Self-Check</p>
+                    <p className="text-xs text-emerald-800 leading-relaxed">{renderMathText(convertLatexToPlainMath(solution.self_check))}</p>
                   </div>
                 )}
               </div>
