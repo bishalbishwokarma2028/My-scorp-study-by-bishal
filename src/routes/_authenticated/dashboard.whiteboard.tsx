@@ -11,8 +11,10 @@ import {
   Maximize2, Minimize2, Grid3x3, Sun, Moon, Send, Download,
   MessageCircle, X, ZoomIn, ZoomOut, Sparkles, CheckCircle2,
   AlertTriangle, Lightbulb, BookOpen, Hash, Highlighter,
-  MoveRight, Triangle, Dot, Layers, PanelRightClose, PanelRightOpen,
-  Minus as MinusIcon, CopyPlus, Copy,
+  MoveRight, Triangle, Dot, PanelRightClose, PanelRightOpen,
+  CopyPlus, Play, Pause, SkipForward, Gauge, Mic, MicOff,
+  Clipboard, RotateCcw, FlaskConical, Sigma, Atom, Dna, Code2,
+  Clock, Globe, BarChart3, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/whiteboard")({
@@ -21,40 +23,29 @@ export const Route = createFileRoute("/_authenticated/dashboard/whiteboard")({
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tool =
-  | "pen" | "pencil" | "highlighter" | "eraser" | "select"
-  | "text" | "line" | "arrow" | "rect" | "circle" | "triangle" | "laser";
+type Tool = "pen" | "pencil" | "highlighter" | "eraser" | "select"
+          | "text" | "line" | "arrow" | "rect" | "circle" | "triangle" | "laser";
 
-type BgMode = "blank" | "grid" | "dots";
-type Theme = "light" | "dark";
+type BgMode  = "blank" | "grid" | "dots";
+type Theme   = "light" | "dark";
+type Speed   = "slow" | "normal" | "fast";
+type AnimPhase = "idle" | "running" | "paused" | "done";
 
 interface Pt { x: number; y: number }
 
 interface DrawEl {
-  id: string;
-  tool: Tool;
-  points: Pt[];
-  color: string;
-  strokeWidth: number;
-  opacity: number;
-  fontSize?: number;
-  text?: string;
-  page: number;
-  // shape bounds (rect/circle/triangle/line/arrow)
+  id: string; tool: Tool; points: Pt[];
+  color: string; strokeWidth: number; opacity: number;
+  fontSize?: number; text?: string; page: number;
   x1?: number; y1?: number; x2?: number; y2?: number;
 }
 
-type TeachType =
-  | "title" | "explain" | "formula" | "step"
-  | "answer" | "tip" | "warning" | "definition" | "separator";
+type TeachType = "title" | "explain" | "formula" | "step"
+               | "answer" | "tip" | "warning" | "definition" | "separator";
 
 interface TeachStep {
-  id: string;
-  type: TeachType;
-  text: string;
-  num?: number;
-  fullText: string;
-  revealed: number; // chars revealed so far
+  id: string; type: TeachType; text: string;
+  num?: number; fullText: string; revealed: number;
 }
 
 interface ConvMsg { role: "user" | "assistant"; content: string }
@@ -62,254 +53,232 @@ interface ConvMsg { role: "user" | "assistant"; content: string }
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const COLORS = {
-  blue:   "#3B82F6",
-  green:  "#22C55E",
-  red:    "#EF4444",
-  orange: "#F97316",
-  purple: "#A855F7",
-  yellow: "#EAB308",
-  black:  "#1E293B",
-  white:  "#F8FAFC",
-  gray:   "#64748B",
+  blue: "#3B82F6", green: "#22C55E", red: "#EF4444",
+  orange: "#F97316", purple: "#A855F7", yellow: "#EAB308",
+  black: "#1E293B", white: "#F8FAFC", gray: "#64748B",
+  pink: "#EC4899", teal: "#14B8A6",
 };
 
 const TYPE_COLOR: Record<TeachType, string> = {
-  title:      COLORS.blue,
-  explain:    COLORS.black,
-  formula:    COLORS.purple,
-  step:       COLORS.blue,
-  answer:     COLORS.green,
-  tip:        COLORS.orange,
-  warning:    COLORS.red,
-  definition: COLORS.purple,
-  separator:  COLORS.gray,
+  title: COLORS.blue, explain: COLORS.black, formula: COLORS.purple,
+  step: COLORS.blue, answer: COLORS.green, tip: COLORS.orange,
+  warning: COLORS.red, definition: COLORS.purple, separator: COLORS.gray,
 };
 
-const TYPE_BG: Record<TeachType, string> = {
-  title:      "bg-blue-50 border-blue-300",
-  explain:    "bg-white border-gray-200",
-  formula:    "bg-purple-50 border-purple-300",
-  step:       "bg-blue-50 border-blue-200",
-  answer:     "bg-green-50 border-green-300",
-  tip:        "bg-orange-50 border-orange-300",
-  warning:    "bg-red-50 border-red-300",
-  definition: "bg-purple-50 border-purple-300",
-  separator:  "bg-transparent border-transparent",
+const DARK_TYPE_BG: Record<TeachType, string> = {
+  title: "bg-blue-900/40 border-blue-600",
+  explain: "bg-slate-800/70 border-slate-600",
+  formula: "bg-purple-900/40 border-purple-600",
+  step: "bg-blue-900/30 border-blue-700",
+  answer: "bg-green-900/40 border-green-600",
+  tip: "bg-orange-900/40 border-orange-600",
+  warning: "bg-red-900/40 border-red-600",
+  definition: "bg-violet-900/40 border-violet-600",
+  separator: "bg-transparent border-transparent",
+};
+const LIGHT_TYPE_BG: Record<TeachType, string> = {
+  title: "bg-blue-50 border-blue-300",
+  explain: "bg-white border-gray-200",
+  formula: "bg-purple-50 border-purple-300",
+  step: "bg-blue-50 border-blue-200",
+  answer: "bg-green-50 border-green-300",
+  tip: "bg-orange-50 border-orange-300",
+  warning: "bg-red-50 border-red-300",
+  definition: "bg-violet-50 border-violet-300",
+  separator: "bg-transparent border-transparent",
 };
 
-const TYPE_ICON: Record<TeachType, React.ReactNode> = {
-  title:      <BookOpen size={15} />,
-  explain:    <MessageCircle size={15} />,
-  formula:    <Hash size={15} />,
-  step:       <Hash size={15} />,
-  answer:     <CheckCircle2 size={15} />,
-  tip:        <Lightbulb size={15} />,
-  warning:    <AlertTriangle size={15} />,
-  definition: <BookOpen size={15} />,
-  separator:  null,
+const TYPE_LABEL: Record<TeachType, string> = {
+  title: "Topic", explain: "Explanation", formula: "Formula",
+  step: "Step", answer: "Answer", tip: "Pro Tip",
+  warning: "Watch Out", definition: "Definition", separator: "",
 };
 
 const PRESET_COLORS = [
   COLORS.black, COLORS.blue, COLORS.green, COLORS.red,
-  COLORS.orange, COLORS.purple, COLORS.yellow, COLORS.white,
+  COLORS.orange, COLORS.purple, COLORS.yellow, COLORS.pink,
+  COLORS.teal, COLORS.gray, "#8B5CF6", COLORS.white,
 ];
-
 const STROKE_WIDTHS = [2, 4, 6, 10, 16];
 
-const CHAR_SPEED_MS = 18; // ms per character in typewriter
+// Speed → ms per character, ms between steps
+const SPEED_CONFIG: Record<Speed, { charMs: number; stepMs: number }> = {
+  slow:   { charMs: 65,  stepMs: 900  },
+  normal: { charMs: 28,  stepMs: 450  },
+  fast:   { charMs: 8,   stepMs: 100  },
+};
+
+const SUBJECTS = [
+  { label: "Maths",    icon: <Sigma size={12} />,       q: "Explain " },
+  { label: "Physics",  icon: <Atom size={12} />,        q: "Explain the physics of " },
+  { label: "Chemistry",icon: <FlaskConical size={12} />, q: "Explain the chemistry of " },
+  { label: "Biology",  icon: <Dna size={12} />,         q: "Explain the biology of " },
+  { label: "CS",       icon: <Code2 size={12} />,       q: "Explain the concept of " },
+  { label: "History",  icon: <Clock size={12} />,       q: "Explain the historical significance of " },
+  { label: "Geography",icon: <Globe size={12} />,       q: "Explain the geography of " },
+  { label: "Economics",icon: <BarChart3 size={12} />,   q: "Explain the economics of " },
+];
+
+const FOLLOWUP_CHIPS = [
+  "Explain more simply",
+  "Give a real-life example",
+  "Show a different method",
+  "What are common mistakes?",
+  "Give me a shortcut",
+  "Summarise in 3 points",
+  "Create a quiz on this",
+  "Go deeper into this topic",
+];
 
 // ─── AI prompt ────────────────────────────────────────────────────────────────
 
-function buildTeachingPrompt(question: string, history: ConvMsg[]): string {
-  const prevContext = history.length > 0
-    ? `\n\nPrevious teaching context (last ${Math.min(history.length, 4)} messages):\n` +
-      history.slice(-4).map(m => `[${m.role}]: ${m.content.slice(0, 400)}`).join("\n")
+function buildTeachingPrompt(q: string, history: ConvMsg[]): string {
+  const ctx = history.length > 0
+    ? "\n\nPrevious context:\n" +
+      history.slice(-4).map(m => `[${m.role}]: ${m.content.slice(0, 500)}`).join("\n")
     : "";
-
   return `You are Bishal's expert AI teacher on an interactive whiteboard. A student asked:
-"${question}"
-${prevContext}
+"${q}"${ctx}
 
-Return ONLY valid JSON (no markdown, no prose) in this exact structure:
+Return ONLY valid JSON (no markdown, no prose outside the JSON) in this exact structure:
 {
-  "topic": "short title for this explanation",
+  "topic": "short topic title",
   "steps": [
-    {"type": "title", "text": "..."},
-    {"type": "explain", "text": "..."},
-    {"type": "formula", "text": "..."},
-    {"type": "step", "num": 1, "text": "..."},
-    {"type": "step", "num": 2, "text": "..."},
-    {"type": "answer", "text": "..."},
-    {"type": "tip", "text": "..."}
+    {"type":"title","text":"..."},
+    {"type":"explain","text":"..."},
+    {"type":"formula","text":"..."},
+    {"type":"step","num":1,"text":"..."},
+    {"type":"step","num":2,"text":"..."},
+    {"type":"answer","text":"..."},
+    {"type":"tip","text":"..."}
   ]
 }
 
-Step types and when to use:
-- "title"      → Topic heading (always first, always include)
-- "explain"    → What the question is asking / concept overview
-- "formula"    → A formula, equation, or rule (use for math/science)
-- "definition" → Define a key term (use purple)
-- "step"       → Numbered solution step (include "num": N)
-- "diagram"    → (type "explain") describe a diagram in text with ASCII art if useful
-- "answer"     → The final answer (always last meaningful step, green box)
-- "tip"        → Shortcut, trick, or memory aid (orange)
-- "warning"    → Common mistake to avoid (red)
-- "separator"  → Visual break (use sparingly, just {"type":"separator","text":""})
+Step type rules:
+- "title"      → Topic heading — always first
+- "explain"    → Overview of what the question is asking
+- "definition" → Define a key term
+- "formula"    → A formula, equation or rule
+- "step"       → Numbered solution steps (include "num": N)
+- "answer"     → Final answer — always green, always last meaningful step
+- "tip"        → Shortcut or memory aid — orange
+- "warning"    → Common mistake to avoid — red
+- "separator"  → Visual divider {"type":"separator","text":""}
 
-Rules:
-- 8 to 16 steps total
-- NEVER use LaTeX: no \\frac, \\sqrt, $...$, or backslashes
-- Use Unicode: ×, ÷, √, ², ³, π, ≈, ±, θ, Δ, →
-- Write fractions as (a)/(b) or a/b
-- Keep each step text SHORT (1-3 sentences max — this is a whiteboard, not a textbook)
-- For follow-up questions, build on the existing context without repeating the full intro
-- Answer in the same language the student used`;
+Requirements:
+- 8 to 16 steps total. Never fewer than 6.
+- SHORT step text — 1-3 sentences max. This is a whiteboard, not a textbook.
+- No LaTeX: no \\frac, \\sqrt, $...$, backslashes
+- Use Unicode: ×, ÷, √, ², ³, π, ≈, ±, θ, Δ, →, °
+- Fractions as (a)/(b). Square roots as √(x)
+- For follow-ups: build on context, don't repeat the whole intro
+- Match the student's language`;
 }
 
-// ─── Parse AI JSON response ───────────────────────────────────────────────────
+// ─── Parse AI response ────────────────────────────────────────────────────────
 
-interface RawStep { type: string; text: string; num?: number }
+interface RawStep  { type: string; text: string; num?: number }
 interface TeachScript { topic: string; steps: RawStep[] }
 
 function parseTeachScript(raw: string): TeachScript | null {
   try {
     const clean = raw.replace(/```json\n?|\n?```/g, "").trim();
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const j = JSON.parse(match[0]);
-    if (!j.steps || !Array.isArray(j.steps)) return null;
+    const m = clean.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const j = JSON.parse(m[0]);
+    if (!Array.isArray(j.steps)) return null;
     return j as TeachScript;
   } catch { return null; }
 }
 
-function scriptToSteps(script: TeachScript): TeachStep[] {
-  return script.steps.map((s, i) => {
-    const type = (
-      ["title","explain","formula","step","answer","tip","warning","definition","separator"]
-        .includes(s.type) ? s.type : "explain"
-    ) as TeachType;
-    return {
-      id: `step-${Date.now()}-${i}`,
-      type,
-      num: s.num,
-      fullText: s.text ?? "",
-      text: "",
-      revealed: 0,
-    };
-  });
+const VALID_TYPES = new Set(["title","explain","formula","step","answer","tip","warning","definition","separator"]);
+
+function scriptToSteps(s: TeachScript): TeachStep[] {
+  return s.steps.map((r, i) => ({
+    id: `s${Date.now()}-${i}`,
+    type: (VALID_TYPES.has(r.type) ? r.type : "explain") as TeachType,
+    num: r.num,
+    fullText: r.text ?? "",
+    text: "",
+    revealed: 0,
+  }));
 }
 
-// ─── Canvas helpers ───────────────────────────────────────────────────────────
+// ─── Canvas drawing helpers ───────────────────────────────────────────────────
 
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
-function drawPath(ctx: CanvasRenderingContext2D, el: DrawEl, zoom: number) {
+function drawPath(ctx: CanvasRenderingContext2D, el: DrawEl) {
   if (el.points.length < 2) return;
   ctx.save();
-  ctx.globalAlpha = el.opacity;
+  ctx.globalAlpha = el.tool === "highlighter" ? 0.35 : el.opacity;
   ctx.strokeStyle = el.color;
-  ctx.lineWidth = el.strokeWidth * zoom;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  if (el.tool === "highlighter") {
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = el.strokeWidth * zoom * 2.5;
-  }
+  ctx.lineWidth   = el.tool === "highlighter" ? el.strokeWidth * 2.5 : el.strokeWidth;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(el.points[0].x, el.points[0].y);
   for (let i = 1; i < el.points.length; i++) {
     const mid = { x: (el.points[i-1].x + el.points[i].x)/2, y: (el.points[i-1].y + el.points[i].y)/2 };
     ctx.quadraticCurveTo(el.points[i-1].x, el.points[i-1].y, mid.x, mid.y);
   }
-  ctx.stroke();
-  ctx.restore();
+  ctx.stroke(); ctx.restore();
 }
 
-function drawShape(ctx: CanvasRenderingContext2D, el: DrawEl, zoom: number) {
+function drawShape(ctx: CanvasRenderingContext2D, el: DrawEl) {
   if (el.x1 === undefined) return;
-  const x1 = el.x1, y1 = el.y1!, x2 = el.x2!, y2 = el.y2!;
+  const { x1, y1=0, x2=0, y2=0 } = el;
   ctx.save();
   ctx.strokeStyle = el.color;
-  ctx.lineWidth = el.strokeWidth * zoom;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+  ctx.lineWidth   = el.strokeWidth;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
   ctx.beginPath();
-
   if (el.tool === "line") {
-    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-    ctx.stroke();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   } else if (el.tool === "arrow") {
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-    const headLen = Math.max(12, el.strokeWidth * zoom * 3);
+    const ang = Math.atan2(y2-y1, x2-x1);
+    const hl  = Math.max(12, el.strokeWidth * 3);
     ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - headLen * Math.cos(angle - 0.4), y2 - headLen * Math.sin(angle - 0.4));
-    ctx.moveTo(x2, y2);
-    ctx.lineTo(x2 - headLen * Math.cos(angle + 0.4), y2 - headLen * Math.sin(angle + 0.4));
+    ctx.moveTo(x2, y2); ctx.lineTo(x2-hl*Math.cos(ang-0.4), y2-hl*Math.sin(ang-0.4));
+    ctx.moveTo(x2, y2); ctx.lineTo(x2-hl*Math.cos(ang+0.4), y2-hl*Math.sin(ang+0.4));
     ctx.stroke();
   } else if (el.tool === "rect") {
-    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    ctx.strokeRect(x1, y1, x2-x1, y2-y1);
   } else if (el.tool === "circle") {
-    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
-    const rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2;
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.ellipse((x1+x2)/2, (y1+y2)/2, Math.abs(x2-x1)/2, Math.abs(y2-y1)/2, 0, 0, Math.PI*2);
     ctx.stroke();
   } else if (el.tool === "triangle") {
-    const mx = (x1 + x2) / 2;
-    ctx.moveTo(mx, y1); ctx.lineTo(x2, y2); ctx.lineTo(x1, y2); ctx.closePath();
+    ctx.moveTo((x1+x2)/2, y1); ctx.lineTo(x2, y2); ctx.lineTo(x1, y2); ctx.closePath();
     ctx.stroke();
   }
   ctx.restore();
 }
 
-function drawText(ctx: CanvasRenderingContext2D, el: DrawEl, zoom: number) {
+function drawText(ctx: CanvasRenderingContext2D, el: DrawEl) {
   if (!el.text || el.x1 === undefined) return;
   ctx.save();
-  const fs = (el.fontSize ?? 18) * zoom;
-  ctx.font = `${fs}px Inter, sans-serif`;
+  ctx.font = `${el.fontSize ?? 18}px Inter, sans-serif`;
   ctx.fillStyle = el.color;
   ctx.fillText(el.text, el.x1, el.y1!);
   ctx.restore();
 }
 
-// ─── Background renderers ─────────────────────────────────────────────────────
-
-function drawBackground(
-  ctx: CanvasRenderingContext2D,
-  W: number, H: number,
-  bg: BgMode,
-  theme: Theme,
-  panX: number, panY: number, zoom: number,
-) {
-  const isDark = theme === "dark";
-  ctx.fillStyle = isDark ? "#0F172A" : "#FFFFFF";
+function drawBackground(ctx: CanvasRenderingContext2D, W: number, H: number,
+  bg: BgMode, dark: boolean, panX: number, panY: number, zoom: number) {
+  ctx.fillStyle = dark ? "#0F172A" : "#FFFFFF";
   ctx.fillRect(0, 0, W, H);
-
   if (bg === "blank") return;
-
-  const spacing = 32 * zoom;
-  const ox = ((panX % spacing) + spacing) % spacing;
-  const oy = ((panY % spacing) + spacing) % spacing;
-  const dotColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
-
+  const sp  = 32 * zoom;
+  const ox  = ((panX % sp) + sp) % sp;
+  const oy  = ((panY % sp) + sp) % sp;
+  const dot = dark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)";
   if (bg === "grid") {
-    ctx.strokeStyle = dotColor;
-    ctx.lineWidth = 0.5;
-    for (let x = ox; x < W; x += spacing) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = oy; y < H; y += spacing) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
-  } else if (bg === "dots") {
-    ctx.fillStyle = dotColor;
-    for (let x = ox; x < W; x += spacing) {
-      for (let y = oy; y < H; y += spacing) {
-        ctx.beginPath();
-        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    ctx.strokeStyle = dot; ctx.lineWidth = 0.5;
+    for (let x = ox; x < W; x += sp) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = oy; y < H; y += sp) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  } else {
+    ctx.fillStyle = dot;
+    for (let x = ox; x < W; x += sp)
+      for (let y = oy; y < H; y += sp) { ctx.beginPath(); ctx.arc(x,y,1.2,0,Math.PI*2); ctx.fill(); }
   }
 }
 
@@ -319,69 +288,96 @@ function WhiteboardPage() {
   const { user } = Route.useRouteContext();
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
-  // ── Canvas refs ────────────────────────────────────────────────────────────
-  const bgRef   = useRef<HTMLCanvasElement>(null);
-  const drawRef = useRef<HTMLCanvasElement>(null);
+  // ── Canvas refs ──────────────────────────────────────────────────────────
+  const bgRef        = useRef<HTMLCanvasElement>(null);
+  const drawRef      = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const teachScrollRef = useRef<HTMLDivElement>(null);
-
-  // ── Drawing state (not in React state for perf — refs) ─────────────────────
-  const elementsRef = useRef<DrawEl[][]>([[]]); // per-page arrays
-  const currentPathRef = useRef<DrawEl | null>(null);
-  const shapeStartRef = useRef<Pt | null>(null);
-  const isDrawingRef = useRef(false);
-  const undoStackRef = useRef<DrawEl[][][]>([]);
-  const redoStackRef = useRef<DrawEl[][][]>([]);
-  const laserPosRef = useRef<Pt | null>(null);
+  const stepsEndRef  = useRef<HTMLDivElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
-  const textPosRef = useRef<Pt | null>(null);
+  const questionRef  = useRef<HTMLTextAreaElement>(null);
 
-  // ── React state ────────────────────────────────────────────────────────────
-  const [tool, setTool] = useState<Tool>("pen");
-  const [color, setColor] = useState(COLORS.black);
+  // ── Drawing state (refs for perf) ────────────────────────────────────────
+  const elemRef      = useRef<DrawEl[][]>([[]]); // per-page element arrays
+  const curPathRef   = useRef<DrawEl | null>(null);
+  const shapeStartRef= useRef<Pt | null>(null);
+  const isDrawRef    = useRef(false);
+  const undoRef      = useRef<DrawEl[][][]>([]);
+  const redoRef      = useRef<DrawEl[][][]>([]);
+  const laserPosRef  = useRef<Pt | null>(null);
+  const textPosRef   = useRef<Pt | null>(null);
+  const spaceHeldRef = useRef(false);
+  const panningRef   = useRef(false);
+  const panStartRef  = useRef<Pt>({ x: 0, y: 0 });
+  const panOriRef    = useRef<Pt>({ x: 0, y: 0 });
+  const pinchRef     = useRef<number | null>(null);
+
+  // ── Animation engine (all refs — no React re-renders for timing logic) ───
+  const animRef = useRef({
+    pending:  [] as TeachStep[],
+    shown:    [] as TeachStep[],
+    stepIdx:  0,
+    charIdx:  0,
+    phase:    "idle" as "idle" | "typing" | "step-pause" | "done",
+    pauseMs:  0,
+    lastTs:   0,
+    paused:   false,
+    speed:    "normal" as Speed,
+  });
+  const rafRef = useRef(0);
+
+  // ── React state ──────────────────────────────────────────────────────────
+  const [tool, setTool]               = useState<Tool>("pen");
+  const [color, setColor]             = useState(COLORS.black);
   const [strokeWidth, setStrokeWidth] = useState(3);
-  const [bg, setBg] = useState<BgMode>("grid");
-  const [theme, setTheme] = useState<Theme>("light");
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState<Pt>({ x: 0, y: 0 });
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const [bg, setBg]                   = useState<BgMode>("grid");
+  const [theme, setTheme]             = useState<Theme>("light");
+  const [zoom, setZoom]               = useState(1);
+  const [pan, setPan]                 = useState<Pt>({ x: 0, y: 0 });
+  const [page, setPage]               = useState(0);
+  const [totalPages, setTotalPages]   = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showAI, setShowAI] = useState(true);
+  const [showAI, setShowAI]           = useState(true);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showSubjects, setShowSubjects] = useState(false);
 
   // AI state
-  const [question, setQuestion] = useState("");
-  const [teaching, setTeaching] = useState(false);
-  const [teachSteps, setTeachSteps] = useState<TeachStep[]>([]);
+  const [question, setQuestion]       = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [animPhase, setAnimPhase]     = useState<AnimPhase>("idle");
+  const [visibleSteps, setVisibleSteps] = useState<TeachStep[]>([]);
+  const [totalSteps, setTotalSteps]   = useState(0);
+  const [speed, setSpeed]             = useState<Speed>("normal");
   const [chatHistory, setChatHistory] = useState<ConvMsg[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
-  const [textDraft, setTextDraft] = useState("");
+  const [textDraft, setTextDraft]     = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const speechRef = useRef<SpeechRecognition | null>(null);
 
-  // Viewport panning
-  const panningRef = useRef(false);
-  const panStartRef = useRef<Pt>({ x: 0, y: 0 });
-  const panOriginRef = useRef<Pt>({ x: 0, y: 0 });
+  const isDark = theme === "dark";
 
-  // ── Coordinate conversion ──────────────────────────────────────────────────
-  const toWorld = useCallback((screenX: number, screenY: number): Pt => ({
-    x: (screenX - pan.x) / zoom,
-    y: (screenY - pan.y) / zoom,
-  }), [pan, zoom]);
+  // ── Viewport conversion ──────────────────────────────────────────────────
+  const panRef = useRef(pan);
+  const zoomRef = useRef(zoom);
+  useEffect(() => { panRef.current = pan; }, [pan]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+
+  const toWorld = useCallback((sx: number, sy: number): Pt => ({
+    x: (sx - panRef.current.x) / zoomRef.current,
+    y: (sy - panRef.current.y) / zoomRef.current,
+  }), []);
 
   const toScreen = useCallback((wx: number, wy: number): Pt => ({
-    x: wx * zoom + pan.x,
-    y: wy * zoom + pan.y,
-  }), [pan, zoom]);
+    x: wx * zoomRef.current + panRef.current.x,
+    y: wy * zoomRef.current + panRef.current.y,
+  }), []);
 
-  // ── Canvas sizing ──────────────────────────────────────────────────────────
+  // ── Canvas resize ────────────────────────────────────────────────────────
   function resizeCanvases() {
     const el = containerRef.current;
     if (!el) return;
     const W = el.clientWidth, H = el.clientHeight;
-    [bgRef, drawRef].forEach(ref => {
-      if (ref.current) { ref.current.width = W; ref.current.height = H; }
-    });
+    [bgRef, drawRef].forEach(r => { if (r.current) { r.current.width = W; r.current.height = H; } });
+    redrawCanvas();
   }
 
   useLayoutEffect(() => {
@@ -389,281 +385,208 @@ function WhiteboardPage() {
     const obs = new ResizeObserver(resizeCanvases);
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAI]);
 
-  // ── Full redraw ────────────────────────────────────────────────────────────
-  const redraw = useCallback(() => {
-    const bg2 = bgRef.current, draw = drawRef.current;
-    if (!bg2 || !draw) return;
-    const W = bg2.width, H = bg2.height;
-    const bgCtx = bg2.getContext("2d")!;
-    const drawCtx = draw.getContext("2d")!;
+  // ── Full canvas redraw ───────────────────────────────────────────────────
+  const pageRef  = useRef(page);
+  const toolRef  = useRef(tool);
+  useEffect(() => { pageRef.current = page; }, [page]);
+  useEffect(() => { toolRef.current = tool; }, [tool]);
 
-    // Background
-    drawBackground(bgCtx, W, H, bg, theme, pan.x, pan.y, zoom);
+  const redrawCanvas = useCallback(() => {
+    const bgC = bgRef.current, drC = drawRef.current;
+    if (!bgC || !drC) return;
+    const W = bgC.width, H = bgC.height;
+    const bgCtx = bgC.getContext("2d")!, drCtx = drC.getContext("2d")!;
+    const p = panRef.current, z = zoomRef.current;
 
-    // Drawings
-    drawCtx.clearRect(0, 0, W, H);
-    drawCtx.save();
-    drawCtx.translate(pan.x, pan.y);
-    drawCtx.scale(zoom, zoom);
+    drawBackground(bgCtx, W, H, bg, isDark, p.x, p.y, z);
 
-    const pageEls = elementsRef.current[page] ?? [];
-    for (const el of pageEls) {
-      if (["pen","pencil","highlighter","eraser"].includes(el.tool)) {
-        const ctx2 = drawCtx;
-        if (el.tool === "eraser") {
-          ctx2.save();
-          ctx2.globalCompositeOperation = "destination-out";
-          drawPath(ctx2, el, 1);
-          ctx2.restore();
-        } else {
-          drawPath(ctx2, el, 1);
-        }
+    drCtx.clearRect(0, 0, W, H);
+    drCtx.save();
+    drCtx.translate(p.x, p.y);
+    drCtx.scale(z, z);
+
+    for (const el of (elemRef.current[pageRef.current] ?? [])) {
+      if (["pen","pencil","highlighter"].includes(el.tool)) {
+        drawPath(drCtx, el);
+      } else if (el.tool === "eraser") {
+        drCtx.save();
+        drCtx.globalCompositeOperation = "destination-out";
+        drawPath(drCtx, el);
+        drCtx.restore();
       } else if (el.tool === "text") {
-        drawText(drawCtx, el, 1);
+        drawText(drCtx, el);
       } else {
-        drawShape(drawCtx, el, 1);
+        drawShape(drCtx, el);
       }
     }
 
     // Laser pointer
-    if (laserPosRef.current && tool === "laser") {
-      const lp = laserPosRef.current;
-      const wx = (lp.x - pan.x) / zoom, wy = (lp.y - pan.y) / zoom;
-      drawCtx.save();
-      drawCtx.beginPath();
-      drawCtx.arc(wx, wy, 8, 0, Math.PI * 2);
-      drawCtx.fillStyle = "rgba(239,68,68,0.85)";
-      drawCtx.fill();
-      drawCtx.strokeStyle = "rgba(255,255,255,0.9)";
-      drawCtx.lineWidth = 2;
-      drawCtx.stroke();
-      // Trail
-      drawCtx.beginPath();
-      drawCtx.arc(wx, wy, 14, 0, Math.PI * 2);
-      drawCtx.strokeStyle = "rgba(239,68,68,0.35)";
-      drawCtx.lineWidth = 3;
-      drawCtx.stroke();
-      drawCtx.restore();
+    if (laserPosRef.current && toolRef.current === "laser") {
+      const { x, y } = laserPosRef.current;
+      const wx = (x - p.x)/z, wy = (y - p.y)/z;
+      drCtx.save();
+      drCtx.beginPath(); drCtx.arc(wx, wy, 8, 0, Math.PI*2);
+      drCtx.fillStyle = "rgba(239,68,68,0.9)"; drCtx.fill();
+      drCtx.strokeStyle = "rgba(255,255,255,0.95)"; drCtx.lineWidth = 2; drCtx.stroke();
+      drCtx.beginPath(); drCtx.arc(wx, wy, 16, 0, Math.PI*2);
+      drCtx.strokeStyle = "rgba(239,68,68,0.3)"; drCtx.lineWidth = 3; drCtx.stroke();
+      drCtx.restore();
     }
 
-    drawCtx.restore();
-  }, [bg, theme, zoom, pan, page, tool]);
+    drCtx.restore();
+  }, [bg, isDark]);
 
-  useEffect(() => { redraw(); }, [redraw]);
+  useEffect(() => { redrawCanvas(); }, [redrawCanvas, pan, zoom, page]);
 
-  // ── Undo / Redo ────────────────────────────────────────────────────────────
+  // ── Undo / Redo ──────────────────────────────────────────────────────────
   function snapshot() {
-    undoStackRef.current.push(elementsRef.current.map(p => [...p]));
-    redoStackRef.current = [];
+    undoRef.current.push(elemRef.current.map(p => [...p]));
+    redoRef.current = [];
   }
-
   function undo() {
-    const snap = undoStackRef.current.pop();
-    if (!snap) return;
-    redoStackRef.current.push(elementsRef.current.map(p => [...p]));
-    elementsRef.current = snap;
-    redraw();
+    const s = undoRef.current.pop(); if (!s) return;
+    redoRef.current.push(elemRef.current.map(p => [...p]));
+    elemRef.current = s; redrawCanvas();
   }
-
   function redo() {
-    const snap = redoStackRef.current.pop();
-    if (!snap) return;
-    undoStackRef.current.push(elementsRef.current.map(p => [...p]));
-    elementsRef.current = snap;
-    redraw();
+    const s = redoRef.current.pop(); if (!s) return;
+    undoRef.current.push(elemRef.current.map(p => [...p]));
+    elemRef.current = s; redrawCanvas();
   }
 
-  // ── Page helpers ───────────────────────────────────────────────────────────
-  function addPage() {
-    elementsRef.current.push([]);
-    const np = totalPages + 1;
-    setTotalPages(np);
-    setPage(np - 1);
+  // ── Page helpers ─────────────────────────────────────────────────────────
+  function addPage()  { elemRef.current.push([]); setTotalPages(t=>t+1); setPage(totalPages); }
+  function dupPage()  {
+    const copy = (elemRef.current[page]??[]).map(e=>({...e,id:uid(),page:totalPages}));
+    elemRef.current.push(copy); setTotalPages(t=>t+1); setPage(totalPages);
   }
-
-  function dupPage() {
-    const copy = [...(elementsRef.current[page] ?? [])].map(e => ({ ...e, id: uid(), page: totalPages }));
-    elementsRef.current.push(copy);
-    const np = totalPages + 1;
-    setTotalPages(np);
-    setPage(np - 1);
-  }
-
   function clearPage() {
     if (!window.confirm("Clear this page?")) return;
-    snapshot();
-    elementsRef.current[page] = [];
-    redraw();
+    snapshot(); elemRef.current[page]=[]; redrawCanvas();
   }
 
-  // ── Mouse / Touch helpers ──────────────────────────────────────────────────
-  function getEventPos(e: React.MouseEvent | React.TouchEvent): Pt {
-    const rect = drawRef.current!.getBoundingClientRect();
+  // ── Event position helpers ───────────────────────────────────────────────
+  function getPos(e: React.MouseEvent | React.TouchEvent): Pt {
+    const r = drawRef.current!.getBoundingClientRect();
     if ("touches" in e) {
       const t = e.touches[0];
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      return { x: t.clientX - r.left, y: t.clientY - r.top };
     }
-    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
+    const m = e as React.MouseEvent;
+    return { x: m.clientX - r.left, y: m.clientY - r.top };
   }
 
-  // ── Pointer down ──────────────────────────────────────────────────────────
+  // ── Pointer handlers ─────────────────────────────────────────────────────
   function onPointerDown(e: React.MouseEvent | React.TouchEvent) {
-    const pos = getEventPos(e);
-    const isMiddle = "button" in e && e.button === 1;
-    const isSpace = spaceHeldRef.current;
-
-    if (isMiddle || isSpace || tool === "select") {
+    const pos = getPos(e);
+    const mid = "button" in e && (e as React.MouseEvent).button === 1;
+    if (mid || spaceHeldRef.current || tool === "select") {
       panningRef.current = true;
       panStartRef.current = pos;
-      panOriginRef.current = { ...pan };
+      panOriRef.current = { ...panRef.current };
       return;
     }
-
     if (tool === "text") {
-      const w = toWorld(pos.x, pos.y);
-      textPosRef.current = w;
-      setShowTextInput(true);
-      setTextDraft("");
+      textPosRef.current = toWorld(pos.x, pos.y);
+      setShowTextInput(true); setTextDraft("");
       setTimeout(() => textInputRef.current?.focus(), 50);
       return;
     }
+    if (tool === "laser") { laserPosRef.current = pos; redrawCanvas(); return; }
 
-    if (tool === "laser") {
-      laserPosRef.current = pos;
-      redraw();
-      return;
-    }
-
-    isDrawingRef.current = true;
+    isDrawRef.current = true;
     const w = toWorld(pos.x, pos.y);
-
     if (["pen","pencil","highlighter","eraser"].includes(tool)) {
       const el: DrawEl = {
         id: uid(), tool, points: [w], color,
-        strokeWidth: tool === "eraser" ? strokeWidth * 3 : strokeWidth,
+        strokeWidth: tool === "eraser" ? strokeWidth * 4 : strokeWidth,
         opacity: 1, page,
       };
-      snapshot();
-      currentPathRef.current = el;
-      elementsRef.current[page] = [...(elementsRef.current[page] ?? []), el];
+      snapshot(); curPathRef.current = el;
+      elemRef.current[page] = [...(elemRef.current[page]??[]), el];
     } else {
       shapeStartRef.current = w;
     }
-    redraw();
+    redrawCanvas();
   }
 
-  // ── Pointer move ──────────────────────────────────────────────────────────
   function onPointerMove(e: React.MouseEvent | React.TouchEvent) {
-    const pos = getEventPos(e);
-
+    const pos = getPos(e);
     if (panningRef.current) {
-      const dx = pos.x - panStartRef.current.x;
-      const dy = pos.y - panStartRef.current.y;
-      setPan({ x: panOriginRef.current.x + dx, y: panOriginRef.current.y + dy });
+      const dx = pos.x - panStartRef.current.x, dy = pos.y - panStartRef.current.y;
+      setPan({ x: panOriRef.current.x + dx, y: panOriRef.current.y + dy });
       return;
     }
-
-    if (tool === "laser") {
-      laserPosRef.current = pos;
-      redraw();
-      return;
-    }
-
-    if (!isDrawingRef.current) return;
+    if (tool === "laser") { laserPosRef.current = pos; redrawCanvas(); return; }
+    if (!isDrawRef.current) return;
     const w = toWorld(pos.x, pos.y);
-
-    if (currentPathRef.current) {
-      currentPathRef.current.points.push(w);
-      elementsRef.current[page][elementsRef.current[page].length - 1] = { ...currentPathRef.current };
-      redraw();
+    if (curPathRef.current) {
+      curPathRef.current.points.push(w);
+      elemRef.current[page][elemRef.current[page].length - 1] = { ...curPathRef.current };
+      redrawCanvas();
     } else if (shapeStartRef.current) {
-      redraw();
-      // preview shape
+      redrawCanvas();
       const ctx = drawRef.current?.getContext("2d");
       if (!ctx) return;
-      ctx.save();
-      ctx.translate(pan.x, pan.y);
-      ctx.scale(zoom, zoom);
-      const preview: DrawEl = {
-        id: "preview", tool, points: [],
-        color, strokeWidth, opacity: 1, page,
-        x1: shapeStartRef.current.x, y1: shapeStartRef.current.y,
-        x2: w.x, y2: w.y,
-      };
-      drawShape(ctx, preview, 1);
+      ctx.save(); ctx.translate(panRef.current.x, panRef.current.y); ctx.scale(zoomRef.current, zoomRef.current);
+      drawShape(ctx, {
+        id:"prev", tool, points:[], color, strokeWidth, opacity:1, page,
+        x1: shapeStartRef.current.x, y1: shapeStartRef.current.y, x2: w.x, y2: w.y,
+      });
       ctx.restore();
     }
   }
 
-  // ── Pointer up ────────────────────────────────────────────────────────────
   function onPointerUp(e: React.MouseEvent | React.TouchEvent) {
     if (panningRef.current) { panningRef.current = false; return; }
-    if (!isDrawingRef.current) return;
-    isDrawingRef.current = false;
-
-    const pos = getEventPos(e);
-    const w = toWorld(pos.x, pos.y);
-
+    if (!isDrawRef.current) return;
+    isDrawRef.current = false;
+    const pos = getPos(e), w = toWorld(pos.x, pos.y);
     if (shapeStartRef.current) {
-      const start = shapeStartRef.current;
-      if (Math.abs(w.x - start.x) < 3 && Math.abs(w.y - start.y) < 3) {
-        shapeStartRef.current = null;
-        redraw();
-        return;
+      const s = shapeStartRef.current;
+      if (Math.abs(w.x-s.x) > 3 || Math.abs(w.y-s.y) > 3) {
+        snapshot();
+        elemRef.current[page] = [...(elemRef.current[page]??[]),{
+          id:uid(), tool, points:[], color, strokeWidth, opacity:1, page,
+          x1:s.x, y1:s.y, x2:w.x, y2:w.y,
+        }];
       }
-      const el: DrawEl = {
-        id: uid(), tool, points: [],
-        color, strokeWidth, opacity: 1, page,
-        x1: start.x, y1: start.y, x2: w.x, y2: w.y,
-      };
-      snapshot();
-      elementsRef.current[page] = [...(elementsRef.current[page] ?? []), el];
       shapeStartRef.current = null;
     }
-    currentPathRef.current = null;
-    redraw();
+    curPathRef.current = null;
+    redrawCanvas();
   }
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
-  const spaceHeldRef = useRef(false);
+  // ── Touch pinch-zoom ─────────────────────────────────────────────────────
+  function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) { pinchRef.current = null; }
+    else onPointerDown(e);
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const d  = Math.sqrt(dx*dx + dy*dy);
+      if (pinchRef.current !== null) setZoom(z => Math.max(0.2, Math.min(5, z * d / pinchRef.current!)));
+      pinchRef.current = d;
+    } else onPointerMove(e);
+  }
+  function onTouchEnd(e: React.TouchEvent) { pinchRef.current = null; onPointerUp(e); }
 
+  // ── Wheel zoom ───────────────────────────────────────────────────────────
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === " ") { e.preventDefault(); spaceHeldRef.current = e.type === "keydown"; }
-      if (e.type !== "keydown") return;
-      if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-      if (e.key === "p") setTool("pen");
-      if (e.key === "h") setTool("highlighter");
-      if (e.key === "e") setTool("eraser");
-      if (e.key === "t") setTool("text");
-      if (e.key === "l") setTool("laser");
-    }
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("keyup", onKey);
-    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKey); };
-  }, []);
-
-  // ── Zoom ─────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    const el = containerRef.current; if (!el) return;
     function onWheel(e: WheelEvent) {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        const rect = el!.getBoundingClientRect();
-        const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-        setZoom(z => {
-          const nz = Math.max(0.2, Math.min(5, z * delta));
-          setPan(p => ({
-            x: cx - (cx - p.x) * (nz / z),
-            y: cy - (cy - p.y) * (nz / z),
-          }));
-          return nz;
-        });
+        const d = e.deltaY > 0 ? 0.9 : 1.1;
+        const r = el!.getBoundingClientRect();
+        const cx = e.clientX - r.left, cy = e.clientY - r.top;
+        setZoom(z => { const nz = Math.max(0.2, Math.min(5, z*d));
+          setPan(p => ({ x: cx-(cx-p.x)*(nz/z), y: cy-(cy-p.y)*(nz/z) })); return nz; });
       } else {
         setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
       }
@@ -672,33 +595,26 @@ function WhiteboardPage() {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // ── Touch pinch zoom ───────────────────────────────────────────────────────
-  const lastPinchRef = useRef<number | null>(null);
-  function onTouchStart(e: React.TouchEvent) {
-    if (e.touches.length === 2) lastPinchRef.current = null;
-    else onPointerDown(e);
-  }
-  function onTouchMove(e: React.TouchEvent) {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (lastPinchRef.current !== null) {
-        const delta = dist / lastPinchRef.current;
-        setZoom(z => Math.max(0.2, Math.min(5, z * delta)));
-      }
-      lastPinchRef.current = dist;
-    } else { onPointerMove(e); }
-  }
-  function onTouchEnd(e: React.TouchEvent) {
-    lastPinchRef.current = null;
-    onPointerUp(e);
-  }
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === " ") { e.preventDefault(); spaceHeldRef.current = e.type === "keydown"; }
+      if (e.type !== "keydown") return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      if (ctrl && e.key === "y") { e.preventDefault(); redo(); }
+      const map: Record<string, Tool> = { p:"pen", h:"highlighter", e:"eraser", t:"text", l:"laser", v:"select" };
+      if (map[e.key] && !ctrl) setTool(map[e.key]);
+    }
+    window.addEventListener("keydown", onKey); window.addEventListener("keyup", onKey);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKey); };
+  }, []);
 
   // ── Fullscreen ────────────────────────────────────────────────────────────
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
-      containerRef.current?.parentElement?.requestFullscreen();
+      document.documentElement.requestFullscreen();
       setIsFullscreen(true);
     } else {
       document.exitFullscreen();
@@ -708,112 +624,170 @@ function WhiteboardPage() {
 
   // ── Export PNG ────────────────────────────────────────────────────────────
   async function exportPNG() {
-    const wrap = containerRef.current;
-    if (!wrap) return;
     try {
+      toast.info("Preparing export…");
       const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(wrap, { useCORS: true, backgroundColor: theme === "dark" ? "#0F172A" : "#FFFFFF" });
-      const a = document.createElement("a");
-      a.download = "whiteboard.png";
-      a.href = canvas.toDataURL("image/png");
-      a.click();
-    } catch { toast.error("Export failed — please try again"); }
+      const el = containerRef.current;
+      if (!el) return;
+      const c = await html2canvas(el, { useCORS: true, backgroundColor: isDark ? "#0F172A" : "#FFFFFF" });
+      const a = document.createElement("a"); a.download = "whiteboard.png";
+      a.href = c.toDataURL("image/png"); a.click();
+      toast.success("Exported!");
+    } catch { toast.error("Export failed"); }
   }
 
-  // ── Text commit ───────────────────────────────────────────────────────────
+  // ── Text tool commit ──────────────────────────────────────────────────────
   function commitText() {
     if (!textDraft.trim() || !textPosRef.current) { setShowTextInput(false); return; }
-    const el: DrawEl = {
-      id: uid(), tool: "text", points: [], color, strokeWidth, opacity: 1, page,
-      text: textDraft, fontSize: strokeWidth < 4 ? 16 : strokeWidth < 8 ? 22 : 30,
-      x1: textPosRef.current.x, y1: textPosRef.current.y,
-    };
     snapshot();
-    elementsRef.current[page] = [...(elementsRef.current[page] ?? []), el];
-    setShowTextInput(false);
-    setTextDraft("");
-    redraw();
+    elemRef.current[page] = [...(elemRef.current[page]??[]), {
+      id: uid(), tool: "text", points: [], color, strokeWidth, opacity: 1, page,
+      text: textDraft,
+      fontSize: strokeWidth < 4 ? 16 : strokeWidth < 8 ? 22 : 32,
+      x1: textPosRef.current.x, y1: textPosRef.current.y,
+    }];
+    setShowTextInput(false); setTextDraft(""); redrawCanvas();
   }
 
-  // ── AI Teaching ────────────────────────────────────────────────────────────
-  const typeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // ── RAF animation engine ──────────────────────────────────────────────────
+  function runAnimLoop(ts: number) {
+    const a = animRef.current;
+    if (a.phase === "idle" || a.phase === "done") return;
+    if (a.paused) { rafRef.current = requestAnimationFrame(runAnimLoop); return; }
 
-  function animateSteps(steps: TeachStep[]) {
-    setTeachSteps(steps);
-    let stepIdx = 0;
-    let charIdx = 0;
+    const dt = Math.min(ts - a.lastTs, 150);
+    a.lastTs = ts;
+    const cfg = SPEED_CONFIG[a.speed];
 
-    function tick() {
-      setTeachSteps(prev => {
-        const next = [...prev];
-        const step = next[stepIdx];
-        if (!step) return prev;
-        if (step.type === "separator") {
-          step.revealed = 1;
-          step.text = "";
-          stepIdx++;
-          charIdx = 0;
-          return next;
+    if (a.phase === "step-pause") {
+      a.pauseMs -= dt;
+      if (a.pauseMs <= 0) {
+        a.stepIdx++;
+        if (a.stepIdx >= a.pending.length) {
+          a.phase = "done";
+          setAnimPhase("done");
+          return;
         }
-        if (charIdx < step.fullText.length) {
-          charIdx++;
-          step.revealed = charIdx;
-          step.text = step.fullText.slice(0, charIdx);
+        const next = { ...a.pending[a.stepIdx], text: "", revealed: 0 };
+        a.shown = [...a.shown, next];
+        setVisibleSteps([...a.shown]);
+        a.charIdx = 0;
+        if (next.type === "separator") {
+          a.shown[a.shown.length - 1] = { ...next, revealed: 1, text: "" };
+          setVisibleSteps([...a.shown]);
+          a.phase = "step-pause"; a.pauseMs = 80;
         } else {
-          stepIdx++;
-          charIdx = 0;
-          if (stepIdx >= next.length) {
-            if (typeTimerRef.current) clearInterval(typeTimerRef.current);
-          }
+          a.phase = "typing"; a.pauseMs = cfg.charMs;
         }
-        return next;
-      });
-      setTimeout(() => {
-        teachScrollRef.current?.scrollTo({ top: 9999, behavior: "smooth" });
-      }, 0);
+      }
+    } else if (a.phase === "typing") {
+      a.pauseMs -= dt;
+      if (a.pauseMs <= 0) {
+        const full = a.pending[a.stepIdx].fullText;
+        if (a.charIdx < full.length) {
+          a.charIdx++;
+          const last = a.shown.length - 1;
+          a.shown[last] = { ...a.shown[last], text: full.slice(0, a.charIdx), revealed: a.charIdx };
+          setVisibleSteps([...a.shown]);
+          a.pauseMs = cfg.charMs;
+          // Auto-scroll as text reveals
+          stepsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        } else {
+          a.phase = "step-pause"; a.pauseMs = cfg.stepMs;
+        }
+      }
     }
 
-    if (typeTimerRef.current) clearInterval(typeTimerRef.current);
-    typeTimerRef.current = setInterval(tick, CHAR_SPEED_MS);
+    rafRef.current = requestAnimationFrame(runAnimLoop);
   }
 
-  async function teach() {
-    const q = question.trim();
-    if (!q) return toast.error("Ask a question first");
-    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setTeaching(true);
-    setTeachSteps([]);
-    if (typeTimerRef.current) clearInterval(typeTimerRef.current);
+  function startAnimation(steps: TeachStep[]) {
+    cancelAnimationFrame(rafRef.current);
+    const a = animRef.current;
+    a.pending  = steps;
+    a.shown    = [];
+    a.stepIdx  = 0;
+    a.charIdx  = 0;
+    a.paused   = false;
+    a.lastTs   = performance.now();
+
+    // Add first step immediately
+    const first = { ...steps[0], text: "", revealed: 0 };
+    a.shown = [first];
+    a.phase = first.type === "separator" ? "step-pause" : "typing";
+    a.pauseMs = 0;
+
+    setVisibleSteps([first]);
+    setTotalSteps(steps.length);
+    setAnimPhase("running");
+
+    rafRef.current = requestAnimationFrame(runAnimLoop);
+  }
+
+  function pauseResume() {
+    const a = animRef.current;
+    a.paused = !a.paused;
+    setAnimPhase(a.paused ? "paused" : "running");
+    if (!a.paused) {
+      a.lastTs = performance.now();
+      rafRef.current = requestAnimationFrame(runAnimLoop);
+    }
+  }
+
+  function skipAnimation() {
+    cancelAnimationFrame(rafRef.current);
+    const a = animRef.current;
+    const all = a.pending.map(s => ({ ...s, text: s.fullText, revealed: s.fullText.length }));
+    a.shown = all; a.phase = "done";
+    setVisibleSteps(all);
+    setAnimPhase("done");
+  }
+
+  function changeSpeed(s: Speed) {
+    setSpeed(s);
+    animRef.current.speed = s;
+  }
+
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+
+  // ── AI teach function ─────────────────────────────────────────────────────
+  async function teach(q?: string) {
+    const text = (q ?? question).trim();
+    if (!text) { toast.error("Please ask a question first"); return; }
+    if (quota && quota.remaining <= 0) { toast.error(QUOTA_MESSAGE); return; }
+
+    setLoading(true);
+    setVisibleSteps([]);
+    setAnimPhase("idle");
+    cancelAnimationFrame(rafRef.current);
 
     try {
-      const safeHistory = chatHistory.slice(-6).map(m => ({
-        role: m.role,
-        content: m.content.slice(0, 600),
-      }));
+      const safe = chatHistory.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 500) }));
       const res = await askAIServer({
         data: {
-          prompt: buildTeachingPrompt(q, safeHistory),
+          prompt: buildTeachingPrompt(text, safe),
           preferCerebras: true,
-          systemPrompt: "You are an expert AI teacher on an interactive whiteboard. Always return ONLY valid JSON as instructed. Never add prose or markdown wrappers.",
+          systemPrompt: "You are an expert AI teacher on an interactive whiteboard. Return ONLY valid JSON as instructed — no prose, no markdown wrappers.",
         },
       });
 
       const script = parseTeachScript(res.text);
-      if (!script) throw new Error("Could not parse teaching script");
+      if (!script || !script.steps.length) throw new Error("Bad script");
 
       const steps = scriptToSteps(script);
-      setChatHistory(prev => [
-        ...prev,
-        { role: "user", content: q },
+      setChatHistory(p => [...p,
+        { role: "user",      content: text },
         { role: "assistant", content: res.text },
       ]);
       setQuestion("");
-      animateSteps(steps);
+      animRef.current.speed = speed;
+      startAnimation(steps);
       await bump();
-    } catch (err) {
+    } catch {
       toast.error("Teaching failed — please try again");
+      setAnimPhase("idle");
     } finally {
-      setTeaching(false);
+      setLoading(false);
     }
   }
 
@@ -821,309 +795,407 @@ function WhiteboardPage() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); teach(); }
   }
 
-  useEffect(() => () => { if (typeTimerRef.current) clearInterval(typeTimerRef.current); }, []);
-
-  // ── Reset board ────────────────────────────────────────────────────────────
-  function newBoard() {
-    if (!window.confirm("Start a new board? This clears all pages.")) return;
-    elementsRef.current = [[]];
-    setPage(0);
-    setTotalPages(1);
-    setTeachSteps([]);
-    setChatHistory([]);
-    redraw();
+  // ── Copy teaching text ───────────────────────────────────────────────────
+  function copyTeaching() {
+    const text = visibleSteps
+      .filter(s => s.type !== "separator")
+      .map(s => `[${TYPE_LABEL[s.type]}${s.num ? " " + s.num : ""}] ${s.fullText}`)
+      .join("\n\n");
+    navigator.clipboard.writeText(text).then(() => toast.success("Copied to clipboard!"));
   }
 
-  // ── Cursor style ──────────────────────────────────────────────────────────
-  const cursorStyle = tool === "eraser" ? "cursor-cell"
-    : tool === "text" ? "cursor-text"
-    : tool === "select" ? "cursor-move"
-    : tool === "laser" ? "cursor-crosshair"
-    : "cursor-crosshair";
+  // ── Voice input ──────────────────────────────────────────────────────────
+  function toggleVoice() {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { toast.error("Voice not supported in this browser"); return; }
+    if (isListening) {
+      speechRef.current?.stop(); setIsListening(false); return;
+    }
+    const r: SpeechRecognition = new SR();
+    r.continuous = false; r.interimResults = false; r.lang = "en-US";
+    r.onresult = (ev: SpeechRecognitionEvent) => {
+      const t = ev.results[0][0].transcript;
+      setQuestion(t);
+      setIsListening(false);
+    };
+    r.onerror = () => { setIsListening(false); toast.error("Voice recognition failed"); };
+    r.onend   = () => setIsListening(false);
+    speechRef.current = r; r.start(); setIsListening(true);
+  }
+
+  // ── New board ────────────────────────────────────────────────────────────
+  function newBoard() {
+    if (!window.confirm("Clear all pages and start fresh?")) return;
+    cancelAnimationFrame(rafRef.current);
+    elemRef.current = [[]]; setPage(0); setTotalPages(1);
+    setVisibleSteps([]); setChatHistory([]); setAnimPhase("idle");
+    redrawCanvas();
+  }
+
+  // ── Cursor style ─────────────────────────────────────────────────────────
+  const cursorMap: Record<Tool, string> = {
+    pen:"cursor-crosshair", pencil:"cursor-crosshair", highlighter:"cursor-crosshair",
+    eraser:"cursor-cell", select:"cursor-move", text:"cursor-text",
+    line:"cursor-crosshair", arrow:"cursor-crosshair", rect:"cursor-crosshair",
+    circle:"cursor-crosshair", triangle:"cursor-crosshair", laser:"cursor-crosshair",
+  };
+
+  const currentStepIdx = animRef.current.shown.length - 1;
 
   // ─── Render ──────────────────────────────────────────────────────────────
-  const isDark = theme === "dark";
-
   return (
-    <div className={`flex h-full flex-col ${isDark ? "bg-slate-900" : "bg-white"}`}>
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <div className={`flex shrink-0 items-center justify-between border-b px-3 py-1.5 ${isDark ? "border-slate-700 bg-slate-900" : "border-gray-200 bg-white"}`}>
-        {/* Left: tool identity + quota */}
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
-            ✏️ Teaching Board
-          </span>
-          <span className={`rounded px-2 py-0.5 text-xs ${isDark ? "bg-slate-700 text-slate-300" : "bg-slate-100 text-slate-500"}`}>
-            Page {page + 1} / {totalPages}
+    <div className={`flex h-full flex-col overflow-hidden ${isDark ? "bg-slate-950" : "bg-white"}`}>
+
+      {/* ── Top bar ─────────────────────────────────────────────────────── */}
+      <div className={`flex shrink-0 items-center justify-between border-b px-2 py-1 ${isDark ? "border-slate-700 bg-slate-900" : "border-gray-200 bg-white"}`}>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-sm font-bold ${isDark?"text-white":"text-slate-800"}`}>✏️ Teaching Board</span>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${isDark?"bg-slate-700 text-slate-400":"bg-slate-100 text-slate-400"}`}>
+            pg {page+1}/{totalPages}
           </span>
           {!quotaLoading && <QuotaBadge quota={quota} />}
         </div>
-
-        {/* Right: utility buttons */}
-        <div className="flex items-center gap-1">
-          <TopBtn onClick={() => setBg(b => b === "blank" ? "grid" : b === "grid" ? "dots" : "blank")} title="Background">
-            <Grid3x3 size={15} />
-          </TopBtn>
-          <TopBtn onClick={() => setTheme(t => t === "light" ? "dark" : "light")} title="Theme">
-            {isDark ? <Sun size={15} /> : <Moon size={15} />}
-          </TopBtn>
-          <TopBtn onClick={() => setZoom(z => Math.min(5, z * 1.25))} title="Zoom in"><ZoomIn size={15} /></TopBtn>
-          <TopBtn onClick={() => setZoom(z => Math.max(0.2, z / 1.25))} title="Zoom out"><ZoomOut size={15} /></TopBtn>
-          <TopBtn onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} title="Reset view">
-            <span className="text-xs font-mono">{Math.round(zoom * 100)}%</span>
-          </TopBtn>
-          <TopBtn onClick={exportPNG} title="Export PNG"><Download size={15} /></TopBtn>
-          <TopBtn onClick={newBoard} title="New board"><Trash2 size={15} /></TopBtn>
-          <TopBtn onClick={toggleFullscreen} title="Fullscreen">
-            {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-          </TopBtn>
-          <TopBtn onClick={() => setShowAI(s => !s)} title="AI panel">
-            {showAI ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-          </TopBtn>
+        <div className="flex items-center gap-0.5">
+          {(["blank","grid","dots"] as BgMode[]).map(m => (
+            <TBtn key={m} active={bg===m} onClick={()=>setBg(m)} title={m} isDark={isDark}>
+              {m==="grid"?<Grid3x3 size={13}/>:m==="dots"?<Dot size={13}/>:<Minus size={13}/>}
+            </TBtn>
+          ))}
+          <TBtn onClick={()=>setTheme(t=>t==="light"?"dark":"light")} title="Theme" isDark={isDark}>
+            {isDark?<Sun size={13}/>:<Moon size={13}/>}
+          </TBtn>
+          <TBtn onClick={()=>setZoom(z=>Math.min(5,z*1.25))} title="Zoom in" isDark={isDark}><ZoomIn size={13}/></TBtn>
+          <TBtn onClick={()=>setZoom(z=>Math.max(0.2,z/1.25))} title="Zoom out" isDark={isDark}><ZoomOut size={13}/></TBtn>
+          <button onClick={()=>{setZoom(1);setPan({x:0,y:0});}}
+            className={`rounded px-1.5 py-1 font-mono text-[10px] transition-colors ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-400 hover:bg-gray-100"}`}>
+            {Math.round(zoom*100)}%
+          </button>
+          <TBtn onClick={exportPNG} title="Export PNG" isDark={isDark}><Download size={13}/></TBtn>
+          <TBtn onClick={newBoard}  title="New board"  isDark={isDark}><RotateCcw size={13}/></TBtn>
+          <TBtn onClick={toggleFullscreen} title="Fullscreen" isDark={isDark}>
+            {isFullscreen?<Minimize2 size={13}/>:<Maximize2 size={13}/>}
+          </TBtn>
+          <TBtn onClick={()=>setShowAI(s=>!s)} title="Toggle AI panel" isDark={isDark}>
+            {showAI?<PanelRightClose size={13}/>:<PanelRightOpen size={13}/>}
+          </TBtn>
         </div>
       </div>
 
-      {/* ── Body: toolbar + canvas + AI panel ──────────────────────────── */}
+      {/* ── Body ────────────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1">
 
         {/* Left toolbar */}
-        <aside className={`flex shrink-0 flex-col gap-1 border-r px-1 py-2 ${isDark ? "border-slate-700 bg-slate-900" : "border-gray-200 bg-gray-50"}`}>
-          {/* Tools */}
+        <aside className={`flex shrink-0 flex-col gap-0.5 border-r px-0.5 py-1.5 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-gray-50"}`}>
           {([
-            ["pen",         <Pen size={16} />,          "Pen (P)"],
-            ["pencil",      <Pen size={14} className="opacity-60" />, "Pencil"],
-            ["highlighter", <Highlighter size={16} />,  "Highlighter (H)"],
-            ["eraser",      <Eraser size={16} />,       "Eraser (E)"],
-            ["select",      <MousePointer2 size={16} />, "Select"],
-            ["text",        <Type size={16} />,          "Text (T)"],
-            ["line",        <Minus size={16} />,         "Line"],
-            ["arrow",       <MoveRight size={16} />,     "Arrow"],
-            ["rect",        <Square size={16} />,        "Rectangle"],
-            ["circle",      <Circle size={16} />,        "Circle"],
-            ["triangle",    <Triangle size={16} />,      "Triangle"],
-            ["laser",       <Dot size={18} className="text-red-500" />, "Laser (L)"],
-          ] as [Tool, React.ReactNode, string][]).map(([t, icon, label]) => (
-            <ToolBtn key={t} active={tool === t} onClick={() => setTool(t)} title={label} isDark={isDark}>
+            ["pen",         <Pen size={15}/>,                   "Pen (P)"],
+            ["pencil",      <Pen size={13} className="opacity-50"/>, "Pencil"],
+            ["highlighter", <Highlighter size={15}/>,           "Highlighter (H)"],
+            ["eraser",      <Eraser size={15}/>,                "Eraser (E)"],
+            ["select",      <MousePointer2 size={15}/>,         "Select (V)"],
+            ["text",        <Type size={15}/>,                  "Text (T)"],
+            ["line",        <Minus size={15}/>,                 "Line"],
+            ["arrow",       <MoveRight size={15}/>,             "Arrow"],
+            ["rect",        <Square size={15}/>,                "Rectangle"],
+            ["circle",      <Circle size={15}/>,                "Circle"],
+            ["triangle",    <Triangle size={15}/>,              "Triangle"],
+            ["laser",       <Dot size={17} className="text-red-500"/>, "Laser (L)"],
+          ] as [Tool, React.ReactNode, string][]).map(([t, icon, lbl]) => (
+            <ToolBtn key={t} active={tool===t} onClick={()=>setTool(t)} title={lbl} isDark={isDark}>
               {icon}
             </ToolBtn>
           ))}
 
-          <div className={`my-1 h-px ${isDark ? "bg-slate-700" : "bg-gray-200"}`} />
+          <div className={`my-0.5 h-px mx-1 ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+          <ToolBtn active={false} onClick={undo}      title="Undo (Ctrl+Z)"       isDark={isDark}><Undo2 size={14}/></ToolBtn>
+          <ToolBtn active={false} onClick={redo}      title="Redo (Ctrl+Y)"       isDark={isDark}><Redo2 size={14}/></ToolBtn>
+          <ToolBtn active={false} onClick={clearPage} title="Clear page"          isDark={isDark}><Trash2 size={14}/></ToolBtn>
 
-          {/* Undo / Redo */}
-          <ToolBtn active={false} onClick={undo} title="Undo (Ctrl+Z)" isDark={isDark}><Undo2 size={16} /></ToolBtn>
-          <ToolBtn active={false} onClick={redo} title="Redo (Ctrl+Shift+Z)" isDark={isDark}><Redo2 size={16} /></ToolBtn>
-          <ToolBtn active={false} onClick={clearPage} title="Clear page" isDark={isDark}><Trash2 size={16} /></ToolBtn>
-
-          <div className={`my-1 h-px ${isDark ? "bg-slate-700" : "bg-gray-200"}`} />
-
-          {/* Stroke widths */}
+          <div className={`my-0.5 h-px mx-1 ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
           {STROKE_WIDTHS.map(w => (
-            <button
-              key={w}
-              onClick={() => setStrokeWidth(w)}
-              title={`Stroke ${w}px`}
-              className={`flex h-8 w-8 items-center justify-center rounded transition-colors ${strokeWidth === w ? (isDark ? "bg-blue-600" : "bg-blue-100") : (isDark ? "hover:bg-slate-700" : "hover:bg-gray-100")}`}
-            >
-              <div
-                className="rounded-full"
-                style={{ width: Math.max(4, w * 1.4), height: Math.max(4, w * 1.4), background: color }}
-              />
+            <button key={w} onClick={()=>setStrokeWidth(w)} title={`${w}px`}
+              className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${strokeWidth===w?(isDark?"bg-indigo-700":"bg-indigo-100"):(isDark?"hover:bg-slate-700":"hover:bg-gray-100")}`}>
+              <div className="rounded-full" style={{width:Math.max(3,w*1.2),height:Math.max(3,w*1.2),background:color}}/>
             </button>
           ))}
 
-          <div className={`my-1 h-px ${isDark ? "bg-slate-700" : "bg-gray-200"}`} />
-
-          {/* Color swatch */}
+          <div className={`my-0.5 h-px mx-1 ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+          {/* Color grid */}
           <div className="relative">
-            <button
-              onClick={() => setShowColorPicker(s => !s)}
-              className="flex h-8 w-8 items-center justify-center rounded border-2 border-white shadow transition-transform hover:scale-110"
-              style={{ background: color }}
-              title="Color picker"
-            />
+            <button onClick={()=>setShowColorPicker(s=>!s)}
+              className="mx-0.5 h-7 w-7 rounded border-2 border-white/80 shadow transition-transform hover:scale-110"
+              style={{background:color}} title="Colors"/>
             {showColorPicker && (
-              <div className={`absolute left-10 top-0 z-50 rounded-lg border p-2 shadow-xl ${isDark ? "border-slate-600 bg-slate-800" : "border-gray-200 bg-white"}`}>
-                <div className="grid grid-cols-4 gap-1">
-                  {PRESET_COLORS.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => { setColor(c); setShowColorPicker(false); }}
-                      className={`h-7 w-7 rounded border-2 transition-transform hover:scale-110 ${color === c ? "border-blue-500 scale-110" : "border-transparent"}`}
-                      style={{ background: c }}
-                    />
+              <div className={`absolute left-9 top-0 z-50 rounded-xl border p-2 shadow-2xl ${isDark?"border-slate-600 bg-slate-800":"border-gray-200 bg-white"}`}>
+                <p className={`mb-1.5 text-[9px] font-bold uppercase tracking-widest ${isDark?"text-slate-500":"text-slate-400"}`}>Smart Colors</p>
+                <div className="mb-2 grid grid-cols-4 gap-1">
+                  {[
+                    [COLORS.blue,   "Explanation"],
+                    [COLORS.green,  "Correct"],
+                    [COLORS.red,    "Mistake"],
+                    [COLORS.orange, "Warning"],
+                    [COLORS.purple, "Definition"],
+                    [COLORS.yellow, "Highlight"],
+                    [COLORS.black,  "Default"],
+                    [COLORS.gray,   "Note"],
+                  ].map(([c,lbl]) => (
+                    <button key={c} onClick={()=>{setColor(c);setShowColorPicker(false);}}
+                      title={lbl as string}
+                      className={`h-6 w-6 rounded border-2 transition-transform hover:scale-110 ${color===c?"border-indigo-500 scale-110":"border-white/50"}`}
+                      style={{background:c as string}}/>
                   ))}
                 </div>
-                <input
-                  type="color" value={color}
-                  onChange={e => setColor(e.target.value)}
-                  className="mt-2 h-7 w-full cursor-pointer rounded"
-                />
+                <div className="grid grid-cols-6 gap-1">
+                  {PRESET_COLORS.map(c => (
+                    <button key={c} onClick={()=>{setColor(c);setShowColorPicker(false);}}
+                      className={`h-5 w-5 rounded border transition-transform hover:scale-110 ${color===c?"border-indigo-500 scale-110":"border-white/20"}`}
+                      style={{background:c}}/>
+                  ))}
+                </div>
+                <input type="color" value={color} onChange={e=>setColor(e.target.value)}
+                  className="mt-2 h-6 w-full cursor-pointer rounded"/>
               </div>
             )}
           </div>
 
-          <div className={`my-1 h-px ${isDark ? "bg-slate-700" : "bg-gray-200"}`} />
-
-          {/* Page controls */}
-          <ToolBtn active={false} onClick={() => setPage(p => Math.max(0, p - 1))} title="Previous page" isDark={isDark}><ChevronLeft size={16} /></ToolBtn>
-          <ToolBtn active={false} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} title="Next page" isDark={isDark}><ChevronRight size={16} /></ToolBtn>
-          <ToolBtn active={false} onClick={addPage} title="Add page" isDark={isDark}><Plus size={16} /></ToolBtn>
-          <ToolBtn active={false} onClick={dupPage} title="Duplicate page" isDark={isDark}><CopyPlus size={16} /></ToolBtn>
+          <div className={`my-0.5 h-px mx-1 ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+          <ToolBtn active={false} onClick={()=>setPage(p=>Math.max(0,p-1))}     title="Prev page"  isDark={isDark}><ChevronLeft size={14}/></ToolBtn>
+          <ToolBtn active={false} onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))} title="Next page" isDark={isDark}><ChevronRight size={14}/></ToolBtn>
+          <ToolBtn active={false} onClick={addPage}  title="Add page"  isDark={isDark}><Plus size={14}/></ToolBtn>
+          <ToolBtn active={false} onClick={dupPage}  title="Dup page"  isDark={isDark}><CopyPlus size={14}/></ToolBtn>
         </aside>
 
-        {/* Canvas area */}
-        <div
-          ref={containerRef}
-          className={`relative flex-1 overflow-hidden ${cursorStyle}`}
-          style={{ touchAction: "none" }}
-        >
-          {/* bg canvas */}
-          <canvas ref={bgRef} className="absolute inset-0 pointer-events-none" />
-          {/* draw canvas */}
-          <canvas
-            ref={drawRef}
-            className="absolute inset-0"
-            onMouseDown={onPointerDown}
-            onMouseMove={onPointerMove}
-            onMouseUp={onPointerUp}
-            onMouseLeave={() => { if (tool === "laser") { laserPosRef.current = null; redraw(); } }}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            onContextMenu={e => e.preventDefault()}
-          />
+        {/* Canvas */}
+        <div ref={containerRef} className={`relative flex-1 overflow-hidden ${cursorMap[tool]}`} style={{touchAction:"none"}}>
+          <canvas ref={bgRef}   className="absolute inset-0 pointer-events-none"/>
+          <canvas ref={drawRef} className="absolute inset-0"
+            onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
+            onMouseLeave={()=>{if(tool==="laser"){laserPosRef.current=null;redrawCanvas();}}}
+            onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+            onContextMenu={e=>e.preventDefault()}/>
 
           {/* Text input overlay */}
-          {showTextInput && textPosRef.current && (() => {
-            const sc = toScreen(textPosRef.current.x, textPosRef.current.y);
+          {showTextInput && textPosRef.current && (()=>{
+            const sc = toScreen(textPosRef.current!.x, textPosRef.current!.y);
             return (
-              <input
-                ref={textInputRef}
-                value={textDraft}
-                onChange={e => setTextDraft(e.target.value)}
+              <input ref={textInputRef} value={textDraft}
+                onChange={e=>setTextDraft(e.target.value)}
                 onBlur={commitText}
-                onKeyDown={e => { if (e.key === "Enter") commitText(); if (e.key === "Escape") setShowTextInput(false); }}
-                className={`absolute z-20 border-b-2 border-blue-500 bg-transparent px-1 outline-none ${isDark ? "text-white" : "text-slate-900"}`}
-                style={{
-                  left: sc.x, top: sc.y,
-                  fontSize: `${(strokeWidth < 4 ? 16 : strokeWidth < 8 ? 22 : 30) * zoom}px`,
-                  color,
-                  minWidth: 120,
-                }}
-                placeholder="Type here…"
-              />
+                onKeyDown={e=>{if(e.key==="Enter")commitText();if(e.key==="Escape")setShowTextInput(false);}}
+                className={`absolute z-20 min-w-32 border-b-2 border-indigo-500 bg-transparent px-1 outline-none ${isDark?"text-white":"text-slate-900"}`}
+                style={{left:sc.x,top:sc.y,fontSize:`${(strokeWidth<4?16:strokeWidth<8?22:32)*zoom}px`,color}}
+                placeholder="Type…"/>
             );
           })()}
 
-          {/* AI Teaching overlay (scrollable, inside canvas area) */}
-          {teachSteps.length > 0 && (
-            <div
-              ref={teachScrollRef}
-              className="absolute right-4 top-4 bottom-4 z-10 w-72 overflow-y-auto rounded-xl shadow-2xl"
-              style={{ background: isDark ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}
-            >
-              <div className="flex flex-col gap-2 p-3">
-                {teachSteps.map(step => (
-                  <TeachCard key={step.id} step={step} isDark={isDark} />
-                ))}
-              </div>
+          {/* HUD */}
+          <div className={`absolute bottom-2 left-2 flex items-center gap-2 rounded-lg px-2 py-1 text-[10px] ${isDark?"bg-slate-800/80 text-slate-500":"bg-white/80 text-slate-400"} backdrop-blur`}>
+            <span>{Math.round(zoom*100)}%</span>
+            <span>·</span>
+            <span>Pg {page+1}/{totalPages}</span>
+            {animPhase==="running" && <><span>·</span><span className="animate-pulse text-indigo-400">Teaching…</span></>}
+          </div>
+
+          {/* Empty state hint */}
+          {(elemRef.current[page]??[]).length === 0 && visibleSteps.length === 0 && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 opacity-25">
+              <Pen size={48} className={isDark?"text-slate-500":"text-slate-300"}/>
+              <p className={`text-sm ${isDark?"text-slate-500":"text-slate-300"}`}>Start drawing, or ask the AI to teach</p>
             </div>
           )}
-
-          {/* Zoom indicator */}
-          <div className={`absolute bottom-3 left-3 rounded px-2 py-1 text-xs ${isDark ? "bg-slate-800/80 text-slate-400" : "bg-white/80 text-slate-400"}`}>
-            {Math.round(zoom * 100)}% · Page {page + 1}/{totalPages}
-          </div>
         </div>
 
-        {/* AI panel */}
+        {/* ── AI Teaching Panel ────────────────────────────────────────── */}
         {showAI && (
-          <aside className={`flex w-80 shrink-0 flex-col border-l ${isDark ? "border-slate-700 bg-slate-900" : "border-gray-200 bg-gray-50"}`}>
-            {/* Header */}
-            <div className={`flex items-center justify-between border-b px-3 py-2 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+          <aside className={`flex w-[340px] shrink-0 flex-col border-l ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}
+            style={{height:"100%"}}>
+
+            {/* Panel header */}
+            <div className={`flex shrink-0 items-center justify-between border-b px-3 py-2 ${isDark?"border-slate-700":"border-gray-200"}`}>
               <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-indigo-500" />
-                <span className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>AI Teaching Mode</span>
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600">
+                  <Sparkles size={12} className="text-white"/>
+                </div>
+                <span className={`text-sm font-bold ${isDark?"text-white":"text-slate-800"}`}>AI Teaching Mode</span>
               </div>
-              {chatHistory.length > 0 && (
-                <button
-                  onClick={() => { setTeachSteps([]); setChatHistory([]); }}
-                  className="text-xs text-slate-400 hover:text-red-400"
-                  title="Clear session"
-                >
-                  Clear
-                </button>
+              <div className="flex items-center gap-1">
+                {/* Speed selector */}
+                {(["slow","normal","fast"] as Speed[]).map(s => (
+                  <button key={s} onClick={()=>changeSpeed(s)}
+                    className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors ${speed===s?(isDark?"bg-indigo-600 text-white":"bg-indigo-600 text-white"):(isDark?"text-slate-500 hover:text-slate-300":"text-slate-400 hover:text-slate-600")}`}>
+                    {s==="slow"?"🐢":s==="fast"?"⚡":"●"} {s}
+                  </button>
+                ))}
+                {visibleSteps.length > 0 && (
+                  <button onClick={()=>{setVisibleSteps([]);setAnimPhase("idle");cancelAnimationFrame(rafRef.current);}}
+                    title="Clear teaching" className={`ml-1 rounded p-1 transition-colors ${isDark?"text-slate-500 hover:text-red-400":"text-slate-400 hover:text-red-500"}`}>
+                    <X size={12}/>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Subject quick-select */}
+            <div className={`shrink-0 border-b ${isDark?"border-slate-700":"border-gray-100"}`}>
+              <button onClick={()=>setShowSubjects(s=>!s)}
+                className={`flex w-full items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide transition-colors ${isDark?"text-slate-500 hover:text-slate-300":"text-slate-400 hover:text-slate-600"}`}>
+                <span>Quick Subject</span>
+                {showSubjects?<ChevronUp size={10}/>:<ChevronDown size={10}/>}
+              </button>
+              {showSubjects && (
+                <div className="flex flex-wrap gap-1 px-2 pb-2">
+                  {SUBJECTS.map(s => (
+                    <button key={s.label}
+                      onClick={()=>{setQuestion(s.q);setShowSubjects(false);questionRef.current?.focus();}}
+                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${isDark?"bg-slate-700 text-slate-300 hover:bg-slate-600":"bg-white border border-gray-200 text-slate-600 hover:bg-gray-100"}`}>
+                      {s.icon}{s.label}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Session messages */}
-            <div className="flex-1 overflow-y-auto p-3">
-              {chatHistory.length === 0 && (
-                <div className={`rounded-xl border p-4 text-center ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-100 bg-white"}`}>
-                  <Sparkles size={32} className="mx-auto mb-2 text-indigo-400" />
-                  <p className={`text-sm font-medium ${isDark ? "text-white" : "text-slate-700"}`}>Bishal's Teaching Mode</p>
-                  <p className={`mt-1 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                    Ask any question and I'll teach it step by step on the whiteboard — with explanations, formulas, and visual breakdowns.
-                  </p>
-                  <div className="mt-3 flex flex-col gap-1.5">
-                    {["Explain Newton's Second Law", "Solve: 2x + 5 = 13", "What is photosynthesis?", "Explain supply and demand"].map(q => (
-                      <button
-                        key={q}
-                        onClick={() => { setQuestion(q); }}
-                        className={`rounded-lg px-3 py-1.5 text-left text-xs transition-colors ${isDark ? "bg-slate-700 text-slate-300 hover:bg-slate-600" : "bg-gray-100 text-slate-600 hover:bg-gray-200"}`}
-                      >
-                        {q}
-                      </button>
-                    ))}
+            {/* Progress bar (shown while animating) */}
+            {(animPhase==="running"||animPhase==="paused") && totalSteps > 0 && (
+              <div className={`shrink-0 border-b px-3 py-2 ${isDark?"border-slate-700":"border-gray-100"}`}>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className={`text-[10px] font-medium ${isDark?"text-slate-400":"text-slate-500"}`}>
+                    Step {Math.min(visibleSteps.length, totalSteps)} of {totalSteps}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={pauseResume}
+                      className={`flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${isDark?"bg-slate-700 text-slate-300 hover:bg-slate-600":"bg-white border border-gray-200 text-slate-600 hover:bg-gray-100"}`}>
+                      {animPhase==="paused"?<><Play size={9}/>Resume</>:<><Pause size={9}/>Pause</>}
+                    </button>
+                    <button onClick={skipAnimation}
+                      className={`flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${isDark?"bg-slate-700 text-slate-300 hover:bg-slate-600":"bg-white border border-gray-200 text-slate-600 hover:bg-gray-100"}`}>
+                      <SkipForward size={9}/>Skip
+                    </button>
                   </div>
                 </div>
-              )}
+                <div className={`h-1.5 w-full overflow-hidden rounded-full ${isDark?"bg-slate-700":"bg-gray-200"}`}>
+                  <div className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+                    style={{width:`${Math.round((visibleSteps.length/totalSteps)*100)}%`}}/>
+                </div>
+              </div>
+            )}
 
-              {chatHistory.filter((_, i) => i % 2 === 0).map((msg, i) => (
-                <div key={i} className="mb-3">
-                  <div className="mb-1 flex items-center gap-1.5">
-                    <div className="h-5 w-5 rounded-full bg-indigo-100 flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-indigo-600">You</span>
+            {/* Teaching steps — scrollable, takes all remaining space */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-2 p-2.5">
+                {visibleSteps.length === 0 && !loading && (
+                  <div className={`rounded-xl border p-4 text-center ${isDark?"border-slate-700 bg-slate-800":"border-gray-100 bg-white"}`}>
+                    <div className="mb-2 flex justify-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
+                        <Sparkles size={20} className="text-indigo-600"/>
+                      </div>
                     </div>
-                    <span className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{msg.content.slice(0, 60)}{msg.content.length > 60 ? "…" : ""}</span>
+                    <p className={`text-sm font-semibold ${isDark?"text-white":"text-slate-700"}`}>Bishal's Teaching Mode</p>
+                    <p className={`mt-1 text-[11px] leading-relaxed ${isDark?"text-slate-400":"text-slate-500"}`}>
+                      Ask any question below. The AI will teach it step by step — like a real teacher writing on a whiteboard.
+                    </p>
+                    <div className="mt-3 flex flex-col gap-1.5">
+                      {[
+                        "Explain Newton's Second Law of Motion",
+                        "Solve: 3x² - 12 = 0",
+                        "What is photosynthesis?",
+                        "Explain supply and demand",
+                        "How does DNA replication work?",
+                      ].map(q => (
+                        <button key={q} onClick={()=>{setQuestion(q);questionRef.current?.focus();}}
+                          className={`rounded-lg px-3 py-1.5 text-left text-[11px] leading-snug transition-colors ${isDark?"bg-slate-700/70 text-slate-300 hover:bg-slate-700":"bg-gray-50 border border-gray-200 text-slate-600 hover:bg-gray-100"}`}>
+                          {q}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className={`rounded-lg px-3 py-2 text-xs ${isDark ? "bg-indigo-900/40 text-indigo-200" : "bg-indigo-50 text-indigo-700"}`}>
-                    ✅ Teaching displayed on board
-                  </div>
-                </div>
-              ))}
+                )}
 
-              {teaching && (
-                <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${isDark ? "bg-slate-800 text-slate-300" : "bg-white text-slate-600"}`}>
-                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
-                  Preparing lesson…
-                </div>
-              )}
+                {loading && (
+                  <div className={`flex flex-col items-center gap-3 rounded-xl border p-6 ${isDark?"border-slate-700 bg-slate-800":"border-gray-100 bg-white"}`}>
+                    <div className="relative flex h-10 w-10 items-center justify-center">
+                      <div className="absolute h-10 w-10 animate-ping rounded-full bg-indigo-300 opacity-30"/>
+                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"/>
+                    </div>
+                    <div className="text-center">
+                      <p className={`text-sm font-medium ${isDark?"text-slate-300":"text-slate-700"}`}>Preparing your lesson…</p>
+                      <p className={`mt-0.5 text-[10px] ${isDark?"text-slate-500":"text-slate-400"}`}>AI is thinking like a teacher</p>
+                    </div>
+                  </div>
+                )}
+
+                {visibleSteps.map((step, i) => (
+                  <TeachCard key={step.id} step={step} isDark={isDark}
+                    isActive={i === currentStepIdx && animPhase === "running"}/>
+                ))}
+
+                {/* Follow-up chips after teaching is done */}
+                {animPhase === "done" && visibleSteps.length > 0 && (
+                  <div className={`rounded-xl border p-2.5 ${isDark?"border-slate-700 bg-slate-800":"border-gray-100 bg-white"}`}>
+                    <p className={`mb-2 text-[9px] font-bold uppercase tracking-widest ${isDark?"text-slate-500":"text-slate-400"}`}>
+                      Continue learning
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FOLLOWUP_CHIPS.map(chip => (
+                        <button key={chip} onClick={()=>teach(chip)}
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors ${isDark?"bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800":"bg-indigo-50 text-indigo-700 hover:bg-indigo-100"}`}>
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={`mt-2 flex items-center justify-between border-t pt-2 ${isDark?"border-slate-700":"border-gray-100"}`}>
+                      <span className={`text-[9px] ${isDark?"text-slate-600":"text-slate-300"}`}>
+                        {visibleSteps.filter(s=>s.type!=="separator").length} steps · {chatHistory.length/2 | 0} questions asked
+                      </span>
+                      <button onClick={copyTeaching}
+                        className={`flex items-center gap-1 rounded px-2 py-0.5 text-[10px] transition-colors ${isDark?"text-slate-400 hover:text-slate-200":"text-slate-400 hover:text-slate-700"}`}>
+                        <Clipboard size={10}/> Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={stepsEndRef}/>
+              </div>
             </div>
 
-            {/* Input */}
-            <div className={`border-t p-3 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-              <div className={`flex gap-2 rounded-xl border ${isDark ? "border-slate-600 bg-slate-800" : "border-gray-200 bg-white"}`}>
+            {/* ── Input — always visible at bottom ─────────────────────── */}
+            <div className={`shrink-0 border-t p-2.5 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-white"}`}>
+              {/* Chat history summary (last question only) */}
+              {chatHistory.length > 0 && animPhase !== "running" && animPhase !== "paused" && (
+                <div className={`mb-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] ${isDark?"bg-slate-800 text-slate-400":"bg-gray-50 text-slate-500"}`}>
+                  <MessageCircle size={10}/>
+                  <span className="truncate">
+                    Last: {chatHistory.filter(m=>m.role==="user").at(-1)?.content.slice(0,50)}…
+                  </span>
+                  <button onClick={()=>{setVisibleSteps([]);setChatHistory([]);setAnimPhase("idle");}}
+                    className="ml-auto shrink-0 hover:text-red-400"><X size={9}/></button>
+                </div>
+              )}
+
+              <div className={`flex items-end gap-1.5 rounded-xl border p-1 ${isDark?"border-slate-600 bg-slate-800 focus-within:border-indigo-500":"border-gray-200 bg-white focus-within:border-indigo-400"} transition-colors`}>
                 <textarea
+                  ref={questionRef}
                   value={question}
-                  onChange={e => setQuestion(e.target.value)}
+                  onChange={e=>setQuestion(e.target.value)}
                   onKeyDown={handleQuestionKey}
-                  placeholder={chatHistory.length > 0 ? "Ask a follow-up…" : "Ask anything to teach…"}
+                  placeholder={chatHistory.length>0 ? "Ask a follow-up…" : "Ask anything to teach on this board…"}
                   rows={2}
-                  className={`flex-1 resize-none rounded-xl bg-transparent px-3 py-2 text-sm outline-none ${isDark ? "text-white placeholder:text-slate-500" : "text-slate-800 placeholder:text-slate-400"}`}
-                  disabled={teaching}
+                  disabled={loading || animPhase==="running"}
+                  className={`min-h-0 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none ${isDark?"text-white placeholder:text-slate-500":"text-slate-800 placeholder:text-slate-400"}`}
                 />
-                <button
-                  onClick={teach}
-                  disabled={teaching || !question.trim()}
-                  className="m-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
-                >
-                  <Send size={14} />
-                </button>
+                <div className="flex shrink-0 flex-col gap-1 pr-0.5 pb-0.5">
+                  <button onClick={toggleVoice} title="Voice input"
+                    className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${isListening?"bg-red-500 text-white animate-pulse":"text-slate-400 hover:bg-gray-100 hover:text-slate-700"}`}>
+                    {isListening?<MicOff size={13}/>:<Mic size={13}/>}
+                  </button>
+                  <button onClick={()=>teach()} disabled={loading||!question.trim()||animPhase==="running"}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:opacity-40">
+                    <Send size={13}/>
+                  </button>
+                </div>
               </div>
-              <p className={`mt-1.5 text-center text-[10px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                Enter to teach · Shift+Enter for newline
+              <p className={`mt-1 text-center text-[9px] ${isDark?"text-slate-600":"text-slate-300"}`}>
+                Enter to teach · Shift+Enter for newline · {speed==="slow"?"🐢 Slow":speed==="fast"?"⚡ Fast":"● Normal"} speed
               </p>
             </div>
           </aside>
@@ -1135,75 +1207,79 @@ function WhiteboardPage() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function TopBtn({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title?: string }) {
+function TBtn({ children, onClick, title, isDark, active }: {
+  children: React.ReactNode; onClick: () => void;
+  title?: string; isDark: boolean; active?: boolean;
+}) {
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-gray-100 hover:text-slate-800"
-    >
+    <button onClick={onClick} title={title}
+      className={`flex h-6 w-6 items-center justify-center rounded transition-colors ${
+        active
+          ? (isDark?"bg-indigo-600 text-white":"bg-indigo-100 text-indigo-700")
+          : (isDark?"text-slate-400 hover:bg-slate-700 hover:text-slate-200":"text-slate-400 hover:bg-gray-100 hover:text-slate-700")
+      }`}>
       {children}
     </button>
   );
 }
 
 function ToolBtn({ children, active, onClick, title, isDark }: {
-  children: React.ReactNode; active: boolean; onClick: () => void; title?: string; isDark: boolean;
+  children: React.ReactNode; active: boolean;
+  onClick: () => void; title?: string; isDark: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`flex h-8 w-8 items-center justify-center rounded transition-colors ${
+    <button onClick={onClick} title={title}
+      className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
         active
-          ? "bg-indigo-600 text-white shadow"
-          : isDark
-            ? "text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-            : "text-slate-500 hover:bg-gray-200 hover:text-slate-800"
-      }`}
-    >
+          ? "bg-indigo-600 text-white shadow-sm"
+          : (isDark?"text-slate-400 hover:bg-slate-700 hover:text-slate-200":"text-slate-500 hover:bg-gray-200 hover:text-slate-800")
+      }`}>
       {children}
     </button>
   );
 }
 
-function TeachCard({ step, isDark }: { step: TeachStep; isDark: boolean }) {
-  if (step.type === "separator") {
-    return <div className="my-1 border-t border-dashed border-gray-300 opacity-40" />;
-  }
+function TeachCard({ step, isDark, isActive }: { step: TeachStep; isDark: boolean; isActive: boolean }) {
+  if (step.type === "separator") return <div className={`my-0.5 border-t border-dashed ${isDark?"border-slate-700":"border-gray-200"}`}/>;
 
   const colorHex = TYPE_COLOR[step.type];
-  const bg = isDark
-    ? step.type === "answer" ? "bg-green-900/30 border-green-700"
-    : step.type === "warning" ? "bg-red-900/30 border-red-700"
-    : step.type === "tip" ? "bg-orange-900/30 border-orange-700"
-    : step.type === "formula" ? "bg-purple-900/30 border-purple-700"
-    : step.type === "title" ? "bg-blue-900/30 border-blue-700"
-    : "bg-slate-800/60 border-slate-700"
-    : TYPE_BG[step.type];
+  const bgCls    = isDark ? DARK_TYPE_BG[step.type] : LIGHT_TYPE_BG[step.type];
+  const isTitle  = step.type === "title";
+  const isFormula= step.type === "formula";
+  const label    = step.type === "step" && step.num ? `Step ${step.num}` : TYPE_LABEL[step.type];
 
-  const isTitle = step.type === "title";
-  const isFormula = step.type === "formula";
+  const iconMap: Record<TeachType, React.ReactNode> = {
+    title:      <BookOpen size={11}/>,
+    explain:    <MessageCircle size={11}/>,
+    formula:    <Hash size={11}/>,
+    step:       <Hash size={11}/>,
+    answer:     <CheckCircle2 size={11}/>,
+    tip:        <Lightbulb size={11}/>,
+    warning:    <AlertTriangle size={11}/>,
+    definition: <BookOpen size={11}/>,
+    separator:  null,
+  };
 
   return (
-    <div
-      className={`rounded-lg border px-3 py-2 ${bg} ${step.revealed === 0 ? "opacity-0" : "opacity-100"} transition-opacity duration-200`}
-    >
-      {/* Header */}
-      <div className="mb-1 flex items-center gap-1.5" style={{ color: colorHex }}>
-        {TYPE_ICON[step.type]}
-        <span className="text-[10px] font-bold uppercase tracking-wider">
-          {step.type === "step" && step.num ? `Step ${step.num}` : step.type}
-        </span>
+    <div className={`
+      rounded-lg border px-2.5 py-2 transition-all duration-300
+      ${bgCls}
+      ${isActive ? "ring-2 ring-indigo-400 ring-offset-1 shadow-md" : ""}
+      ${step.revealed === 0 ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}
+    `}
+    style={{ transition: "opacity 0.25s, transform 0.25s" }}>
+      <div className="mb-1 flex items-center gap-1" style={{ color: colorHex }}>
+        {iconMap[step.type]}
+        <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+        {isActive && (
+          <span className="ml-auto h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500"/>
+        )}
       </div>
-      {/* Content */}
-      <p
-        className={`leading-snug ${isDark ? "text-slate-200" : "text-slate-800"} ${isTitle ? "text-sm font-bold" : isFormula ? "font-mono text-sm" : "text-xs"}`}
-        style={isFormula ? { color: colorHex } : undefined}
-      >
+      <p className={`leading-relaxed ${isDark?"text-slate-200":"text-slate-800"} ${isTitle?"text-sm font-bold":isFormula?"font-mono text-sm font-semibold":"text-xs"}`}
+        style={isFormula ? { color: colorHex } : undefined}>
         {step.text}
-        {step.revealed < step.fullText.length && (
-          <span className="ml-0.5 inline-block h-3 w-0.5 animate-pulse bg-current align-middle" />
+        {isActive && step.revealed < step.fullText.length && (
+          <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle"/>
         )}
       </p>
     </div>
