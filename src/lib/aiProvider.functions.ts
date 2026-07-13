@@ -212,6 +212,109 @@ async function tryHuggingFace(prompt: string, system: string, key: string): Prom
   }
 }
 
+// ── Dedicated step-by-step math solver ───────────────────────────────────────
+// Keeps the JSON schema in the SYSTEM context and sends only the problem as the
+// USER message. This frees the full 6 000-token output budget for the solution
+// instead of wasting input tokens on a schema description embedded in the prompt.
+// Cerebras 120B first → Groq fallback (same key pools, separate rotation pointers).
+
+const SOLVE_SYSTEM = `You are a world-class mathematics and science tutor. Solve the given problem with maximum detail and return ONLY a valid JSON object — no markdown fences, no prose before or after the JSON.
+
+Required JSON schema:
+{
+  "problem_type": "specific type, e.g. Quadratic Equation, Projectile Motion, Bond Valuation",
+  "subject": "Math|Physics|Chemistry|Biology|Economics|Other",
+  "difficulty": "Easy|Medium|Hard",
+  "given": ["each given value as a string, e.g. Mass m = 1200 kg"],
+  "find": ["what we need to find, e.g. Acceleration a = ?"],
+  "steps": [
+    {
+      "title": "action-oriented step title, 4-8 words",
+      "what": "WHAT you are doing in this step (1-2 sentences, specific)",
+      "why": "WHY this step is necessary — theory and reasoning (2-3 sentences)",
+      "how": "HOW to perform this step — detailed method (2-4 sentences)",
+      "formula": "formula using plain Unicode only — e.g. F = ma, x = (-b ± √(b²-4ac)) / (2a). null if no formula.",
+      "formula_explanation": "explain each variable in context of this problem. null if no formula.",
+      "calculation": "full numeric substitution and arithmetic — e.g. F = 1200 × 2.5 = 3000 N. null if no calculation.",
+      "result": "result with units, e.g. a = 2.5 m/s². null if no numeric result.",
+      "common_mistake": "most common mistake in this step and how to avoid it. null if none."
+    }
+  ],
+  "final_answer": "complete final answer with all values and units",
+  "verification": "independent check — substitute back, dimensional analysis, or alternate method. Never null.",
+  "self_check": "review (1) formulas correct? (2) values substituted correctly? (3) arithmetic right? (4) units consistent? State corrections or confirm all steps verified.",
+  "key_concept": "most important concept this problem tests (2-3 sentences)",
+  "tip": "one powerful exam tip or shortcut for this problem type"
+}
+
+REQUIREMENTS:
+- Include 6 to 12 steps. Never fewer than 6.
+- Every step must be DETAILED with full theory in 'why'.
+- Show ALL arithmetic in 'calculation' — substitute numbers, simplify step by step.
+- MATH NOTATION — plain Unicode ONLY. NEVER LaTeX backslash commands:
+  Fractions: (a) / (b) | Exponents: x² or x^2 | Roots: √(expr) | Greek: π θ α β γ Δ Σ μ λ ω
+  Operators: × ÷ ± ≈ ≠ ≤ ≥ ∞ ° · | FORBIDDEN: \\frac \\sqrt \\text \\times \\left \\right $...$ &= \\\\`;
+
+/** Greedy JSON extractor — salvages valid JSON even from partially fenced responses. */
+function extractSolveJSON(text: string): Record<string, unknown> | null {
+  try {
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const candidate = (fenced ? fenced[1] : text).trim();
+    const start = candidate.search(/\{/);
+    if (start === -1) return null;
+    const sliced = candidate.slice(start);
+    for (let end = sliced.length; end > 0; end--) {
+      try {
+        const parsed = JSON.parse(sliced.slice(0, end));
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch { /* keep shrinking */ }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const SolveInputSchema = z.object({
+  problem: z.string().min(1).max(20000),
+  subject: z.string().min(1).max(50),
+});
+
+/**
+ * Dedicated solver used by the Step-by-Step Solver feature.
+ * Cerebras 120B → Groq fallback. Retries once on unparseable JSON.
+ * Returns { data: Solution, provider } or { data: null, provider: "none" }.
+ */
+export const solveMathServer = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => SolveInputSchema.parse(d))
+  .handler(async ({ data }) => {
+    const userMsg = `Subject: ${data.subject}\n\nProblem: ${data.problem}`;
+
+    // Two attempts per provider so a one-off JSON slip gets a retry.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      // Cerebras 120B — highest quality for multi-step JSON
+      for (const key of rotatedKeys("cerebras-solve", serverConfig.ai.cerebrasKeys)) {
+        const r = await tryCerebras(userMsg, SOLVE_SYSTEM, key, []);
+        if (r) {
+          const parsed = extractSolveJSON(r.text);
+          if (parsed) return { data: parsed, provider: r.provider };
+        }
+      }
+      // Groq fallback — handles shorter/simpler problems well
+      for (const key of rotatedKeys("groq-solve", serverConfig.ai.groqKeys)) {
+        const r = await tryGroq(userMsg, SOLVE_SYSTEM, key, [], 6000);
+        if (r) {
+          const parsed = extractSolveJSON(r.text);
+          if (parsed) return { data: parsed, provider: r.provider };
+        }
+      }
+    }
+
+    return { data: null as Record<string, unknown> | null, provider: "none" };
+  });
+
 // ── Math verification ─────────────────────────────────────────────────────────
 // Independently solves any math/science problem to check a proposed answer.
 // Used internally by analyzeImageServer and exported via verifyMathServer so the

@@ -497,6 +497,15 @@ function NotesPage() {
         logging: false,
         width: CAPTURE_W,
         windowWidth: CAPTURE_W,
+        // html2canvas v1 can't parse oklch() — Tailwind v4's default color format.
+        // Strip all external sheets and any inline <style> containing oklch before
+        // capture. Our print-root styles use plain hex values, so they survive.
+        onclone: (_: unknown, clonedDoc: Document) => {
+          clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach(l => l.remove());
+          clonedDoc.querySelectorAll('style').forEach(s => {
+            if (s.textContent?.includes('oklch')) s.textContent = '';
+          });
+        },
       });
 
       // Restore element (inline style gone → CSS `display:none` takes effect again)

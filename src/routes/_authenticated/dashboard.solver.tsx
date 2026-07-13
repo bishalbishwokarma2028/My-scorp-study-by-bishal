@@ -6,8 +6,7 @@ import {
   RotateCcw, CheckCircle2, AlertCircle, BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
-import { askAIJSON } from "@/lib/aiProvider";
-import { verifyMathServer } from "@/lib/aiProvider.functions";
+import { solveMathServer, verifyMathServer } from "@/lib/aiProvider.functions";
 import { convertLatexToPlainMath, renderMathText } from "@/lib/mathText";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -266,15 +265,13 @@ function SolverPage() {
     setLoading(true);
     set({ solution: null, revealed: [] });
     try {
-      // maxTokens:6000 — matches Cerebras' max output so long multi-step
-      // solutions never get truncated mid-JSON.
-      // askAIJSON retries once with a stricter system prompt if the first
-      // response is not parseable JSON.
-      const { data: parsed, provider: prov } = await askAIJSON<Solution>(
-        buildPrompt(problem, subject),
-        "You are an expert tutor. Return ONLY valid JSON — absolutely no markdown fences or prose outside the JSON.",
-        undefined, true, 6000,
-      );
+      // solveMathServer (Cerebras 120B → Groq fallback) puts the full JSON schema
+      // in the system context, leaving the entire 6 000-token output budget for
+      // the solution. Two retries per provider for resilience.
+      const { data: rawData, provider: prov } = await solveMathServer({
+        data: { problem, subject },
+      });
+      const parsed = rawData as Solution | null;
       set({ provider: prov });
 
       // Bump quota non-blocking — a network hiccup on bump() must never
