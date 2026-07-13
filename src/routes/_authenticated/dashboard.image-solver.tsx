@@ -22,103 +22,78 @@ type ConvMsg = { role: "user" | "assistant"; content: string };
 function buildPrompt(instructions: string): string {
   const userInstructions = instructions.trim()
     ? `The user gave these specific instructions — follow them exactly:\n"${instructions.trim()}"`
-    : `No specific instructions — answer whatever question, problem, or task the image shows.`;
+    : "";
 
-  return `You are a world-class expert tutor, OCR engine, and problem-solving assistant. The attached image may contain handwritten or printed text, a diagram, a worksheet, an exam question, or a problem in ANY language or script.
-
-═══════════════════════════════════════
-STEP 1 — READ & EXTRACT
-═══════════════════════════════════════
-Read every piece of visible text from the image exactly as written. Preserve the original language, all numbers, units, and labels. Do not skip or paraphrase.
+  return `You are a world-class expert tutor, OCR engine, and problem-solving assistant. The attached image may contain handwritten or printed text, a diagram, a worksheet, an exam paper, or any number of questions in ANY language or script.
 
 ═══════════════════════════════════════
-STEP 2 — DISPLAY THE QUESTION (MANDATORY FIRST OUTPUT)
+PHASE 1 — SCAN THE ENTIRE IMAGE
 ═══════════════════════════════════════
-The VERY FIRST thing you output must be the detected question in this EXACT blockquote format — copy the question word-for-word from the image:
-
-> 🔍 **DETECTED QUESTION FROM IMAGE:**
-> [Copy the complete, exact question text here — every word, every part, every sub-question. If multi-part (a, b, c…), include ALL parts.]
-
+Before writing anything, carefully scan the ENTIRE image from top to bottom and left to right.
+Count EVERY distinct question, sub-question, or problem visible in the image. Do not miss any.
+${userInstructions ? `\nUser instructions: ${userInstructions}\n` : ""}
 ═══════════════════════════════════════
-STEP 3 — ANSWER
+PHASE 2 — OUTPUT FORMAT (MANDATORY — FOLLOW EXACTLY)
 ═══════════════════════════════════════
-${userInstructions}
 
-ABSOLUTE LENGTH REQUIREMENT — THIS IS NON-NEGOTIABLE:
-Your response MUST be extremely long, comprehensive, and detailed. Treat every question as if you are writing a full textbook chapter section:
-• Simple / short question → minimum 600 words. Introduce the concept from first principles, state all relevant formulas with full derivations, show every single arithmetic step, give a real-world example, verify the answer two different ways.
-• Medium question → minimum 1 200 words. Cover background theory, all formulas, full worked solution with every sub-step shown, alternative method, verification, common mistakes, and a key-points summary.
-• Long / multi-part question → minimum 2 000 words. Each part gets its own full section with heading, theory, full working, and conclusion. Then a comprehensive overall summary.
-• Advanced / university-level → minimum 2 500 words. Full textbook-level treatment: concept introduction, derivation, worked solution, alternative approaches, real-world applications, verification, and exam strategy.
+For EACH question found, output the following block in this exact order:
 
-NEVER give a short answer. NEVER say "the answer is X" without extensive working. If you think the question is simple, you are required to expand it with deeper explanation and examples.
+## 📌 Question [N]
 
-═══════════════════════════════════════
-STRUCTURE FOR MATH / SCIENCE / NUMERICAL QUESTIONS
-═══════════════════════════════════════
-Use ALL of these sections (every single one, no skipping):
+> 📋 **Question [N] from Image:**
+> [Copy the EXACT question text word-for-word as it appears in the image — every word, number, unit, and sub-part. Never paraphrase.]
 
-## 📊 Given Data
-List every piece of information from the problem as individual bullet points. Include variable names, values, and units. If data is implicit (e.g. g = 9.8 m/s² for Earth), state it explicitly here.
+[Full detailed answer for this question — see answering rules below]
 
-## 🎯 What We Need to Find
-State exactly what quantity or quantities must be determined. For multi-part questions, list each part separately.
+---
 
-## 📐 Relevant Formulas & Equations
-Write out EVERY formula that will be used. For each formula:
-- State it in symbolic form (e.g. F = ma)
-- Define every variable (e.g. F = net force in Newtons, m = mass in kg, a = acceleration in m/s²)
-- Explain WHY this formula applies to this specific problem
-- If the formula requires rearranging, show the algebraic rearrangement step by step
+(Repeat the block above for Question 2, Question 3, … until ALL questions are answered.)
 
-## 💡 Core Concept & Theory
-Write a minimum of 4–6 sentences explaining the underlying physics, mathematics, or scientific principle being tested. Explain it as if teaching a student who has never seen this topic before. Use analogies where helpful.
-
-## 🔢 Step-by-Step Solution
-Number EVERY step. For each step:
-1. State what you are about to do and why
-2. Write the formula being applied
-3. Substitute values (show every substitution explicitly)
-4. Simplify step by step — every intermediate result on its own line
-5. State the partial result with units
-
-Never combine steps. If a step has two parts, split it into two steps.
-
-## 🧮 Full Arithmetic & Algebra Workings
-Expand ALL arithmetic in complete detail. Show every multiplication, division, addition, and subtraction. Do not skip any step — write out each operation separately even if it seems obvious. Include units at every line.
-
-## 🔄 Alternative Method / Cross-Check
-Solve the problem using a completely different approach (different formula, graphical method, energy method, vector method, etc.). This confirms your answer and teaches the student a second technique.
-
-## ✅ Verification
-MANDATORY. Perform a rigorous independent check:
-- Substitute the final answer back into the original equation
-- Verify units are dimensionally consistent (dimensional analysis)
-- Check if the magnitude and sign of the answer are physically reasonable
-- Explicitly conclude: "Answer verified ✓" or state any correction made.
-
-> **🎯 Final Answer:** [Complete final answer with ALL values, correct units, significant figures. Make it unmistakable.]
-
-## ⚠️ Common Mistakes & How to Avoid Them
-List 3–5 specific mistakes students commonly make on this type of problem. For each mistake: describe what goes wrong and how to avoid it.
-
-## 📖 Summary & Key Takeaways
-Write 4–6 bullet points summarising the most important concepts, formulas, and reasoning used. A student should be able to read only this section and understand the core of the solution.
-
-## 🌟 Real-World Application
-Describe in 3–5 sentences where this concept appears in real life, engineering, science, or everyday situations. Make it engaging and relevant.
-
-## 📝 Exam Strategy & Tips
-Give 2–4 specific tips for answering this type of question in an exam: what to write first, how to organise the working, common traps to watch for, how to check the answer quickly.
+CRITICAL RULES:
+- Number questions starting from 1: Question 1, Question 2, Question 3, …
+- NEVER skip any question from the image.
+- NEVER combine multiple questions into one answer block.
+- Leave the --- separator between every question for clean visual spacing.
+- If the image has only ONE question, still use the ## 📌 Question 1 heading and blockquote format.
 
 ═══════════════════════════════════════
-STRUCTURE FOR NON-NUMERICAL QUESTIONS (essays, definitions, history, languages, comprehension)
+PHASE 3 — ANSWERING RULES
 ═══════════════════════════════════════
-## 🧠 Understanding the Problem
-## 📚 Background & Context
-## ✅ Complete Detailed Answer
-## 💡 Key Points to Remember
-## 🌟 Broader Significance
+
+FOCUS RULE — MOST IMPORTANT:
+Answer EXACTLY what each question asks. Do not add unrelated topics, tangential facts, or unnecessary padding. Every sentence in your answer must directly serve the question being solved.
+
+LENGTH RULE — scale to the question:
+- Short/definition question → 150–300 words. Direct answer, key concept, one example.
+- Medium calculation/explanation → 400–700 words. Full working shown step by step.
+- Long/multi-part question → 700–1200 words per part. Each sub-part fully worked.
+- Advanced/university-level → 1000–2000 words. Full derivation, worked solution, verification.
+
+Do NOT pad answers with content the question does not require. If the question asks "define X", define it — do not write textbook chapters on it unless the question asks for that depth.
+
+FOR MATH / SCIENCE / NUMERICAL QUESTIONS use these sections as needed:
+
+### 📊 Given Data
+List every value, variable, and unit from the problem.
+
+### 📐 Formula & Method
+State the formula(s) to be used. Define each variable. Explain briefly why this formula applies.
+
+### 🔢 Step-by-Step Solution
+Number every step. Show every substitution, every arithmetic operation on its own line. Include units at each step.
+
+### ✅ Answer
+> **🎯 Final Answer:** [value with correct units and significant figures]
+
+FOR NON-NUMERICAL / ESSAY / DEFINITION QUESTIONS use:
+
+### 🧠 Answer
+Provide a clear, structured, complete response. Use bullet points or numbered lists where they help. Include relevant examples if the question asks for them.
+
+### 💡 Key Points
+3–5 bullet points summarising the most important ideas.
+
+> **✅ Summary:** [one-sentence conclusion]
 
 ═══════════════════════════════════════
 FORMATTING RULES — STRICTLY ENFORCED
@@ -127,22 +102,22 @@ FORMATTING RULES — STRICTLY ENFORCED
 - Fractions: (numerator) / (denominator) — e.g. (v₀ × sin θ) / (2g)
 - Exponents: x² or x^n | Square roots: √(expression)
 - Subscripts: v₀, t_max, h_max (Unicode preferred)
-- NEVER LaTeX: not \\frac, \\sqrt, \\text, \\times, \\left, \\right, $...$, or any backslash command
+- NEVER use LaTeX: no \\frac, \\sqrt, \\text, \\times, \\left, \\right, $...$, or any backslash command
 - **Bold** every key term, formula name, unit, and final answer value
-- Use numbered lists for steps, bullet lists for data/facts
-- Tables for comparing values or listing data sets
+- Use numbered lists for steps; bullet lists for data and facts
+- Tables for comparing values or listing datasets
 - Answer in the same language as the question if non-English
 
-ACCURACY IS THE HIGHEST PRIORITY. Verify every single calculation before writing it. Never fabricate a number. If genuinely uncertain, say so explicitly.
+ACCURACY IS THE HIGHEST PRIORITY. Verify every calculation before writing it. Never fabricate a number.
 Never reveal AI provider names.`;
 }
 
 function buildFollowupPrompt(question: string): string {
-  return `Continue answering the student's follow-up question below. You can see the original image and all previous conversation turns above.
+  return `The student has a follow-up question about the image and the previous answers. Answer it directly and completely.
 
-ACCURACY IS THE HIGHEST PRIORITY. Your answer MUST be long, detailed, and comprehensive — minimum 400 words. Do not give a brief reply. Explain the concept fully, show all working, include examples, and verify any calculations.
+FOCUS: Answer exactly what is being asked — nothing more, nothing less. Scale the length to the complexity of the question (short question → concise answer; calculation → full working).
 
-Use the same formatting rules as before — Unicode math symbols, no LaTeX backslash commands, **bold** key terms, numbered steps for all calculations, sectioned with ## headings.
+Use the same formatting rules: Unicode math symbols (no LaTeX backslash commands), **bold** key terms, numbered steps for calculations, ## section headings where needed.
 
 Follow-up question: ${question}`;
 }
@@ -312,6 +287,17 @@ function ImageSolverPage() {
     ),
     h2: ({ children }: { children?: React.ReactNode }) => {
       const t = String(children).toLowerCase();
+      // ── Numbered question header (📌 Question N) — rendered as a bold banner ──
+      if (t.includes("📌") || /question\s+\d+/i.test(String(children))) {
+        return (
+          <div className="mt-10 mb-4 rounded-2xl overflow-hidden shadow-md border border-indigo-200">
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3.5 flex items-center gap-3">
+              <span className="text-2xl">📌</span>
+              <h2 className="font-black text-base text-white tracking-wide">{String(children).replace("📌", "").trim()}</h2>
+            </div>
+          </div>
+        );
+      }
       if (t.includes("📊") || t.includes("given")) return <div className="rounded-xl border-l-4 border-blue-400 bg-blue-50 px-3 py-2 mt-5 mb-3"><h2 className="font-bold text-sm text-blue-900">{children}</h2></div>;
       if (t.includes("🎯") || t.includes("required") || t.includes("find")) return <div className="rounded-xl border-l-4 border-violet-400 bg-violet-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-violet-900">{children}</h2></div>;
       if (t.includes("📐") || t.includes("formula") || t.includes("equation")) return <div className="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-indigo-900">{children}</h2></div>;
@@ -328,46 +314,62 @@ function ImageSolverPage() {
       if (t.includes("📚") || t.includes("broader") || t.includes("significance")) return <div className="rounded-xl border-l-4 border-rose-400 bg-rose-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-rose-900">{children}</h2></div>;
       return <div className="rounded-xl border-l-4 border-slate-300 bg-slate-50 px-3 py-2 mt-4 mb-2"><h2 className="font-bold text-sm text-slate-800">{children}</h2></div>;
     },
-    h3: ({ children }: { children?: React.ReactNode }) => (
-      <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 px-3 py-2 mt-4 mb-2">
-        <h3 className="font-extrabold text-sm text-amber-900">{mapMathChildren(children)}</h3>
-      </div>
-    ),
+    h3: ({ children }: { children?: React.ReactNode }) => {
+      const t = String(children).toLowerCase();
+      if (t.includes("📊") || t.includes("given")) return <div className="rounded-lg border-l-4 border-blue-400 bg-blue-50 px-3 py-2 mt-4 mb-2"><h3 className="font-bold text-sm text-blue-900">{mapMathChildren(children)}</h3></div>;
+      if (t.includes("📐") || t.includes("formula") || t.includes("method")) return <div className="rounded-lg border-l-4 border-indigo-400 bg-indigo-50 px-3 py-2 mt-4 mb-2"><h3 className="font-bold text-sm text-indigo-900">{mapMathChildren(children)}</h3></div>;
+      if (t.includes("🔢") || t.includes("step") || t.includes("solution")) return <div className="rounded-lg border-l-4 border-orange-400 bg-orange-50 px-3 py-2 mt-4 mb-2"><h3 className="font-bold text-sm text-orange-900">{mapMathChildren(children)}</h3></div>;
+      if (t.includes("✅") || t.includes("answer")) return <div className="rounded-lg border-l-4 border-emerald-400 bg-emerald-50 px-3 py-2 mt-4 mb-2"><h3 className="font-bold text-sm text-emerald-900">{mapMathChildren(children)}</h3></div>;
+      if (t.includes("💡") || t.includes("key point") || t.includes("concept")) return <div className="rounded-lg border-l-4 border-yellow-400 bg-yellow-50 px-3 py-2 mt-4 mb-2"><h3 className="font-bold text-sm text-yellow-900">{mapMathChildren(children)}</h3></div>;
+      if (t.includes("🧠") || t.includes("answer")) return <div className="rounded-lg border-l-4 border-purple-400 bg-purple-50 px-3 py-2 mt-4 mb-2"><h3 className="font-bold text-sm text-purple-900">{mapMathChildren(children)}</h3></div>;
+      return (
+        <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 px-3 py-2 mt-4 mb-2">
+          <h3 className="font-extrabold text-sm text-amber-900">{mapMathChildren(children)}</h3>
+        </div>
+      );
+    },
     h4: ({ children }: { children?: React.ReactNode }) => (
       <h4 className="font-bold text-sm text-violet-800 mt-3 mb-1 px-2 py-1 bg-violet-50 rounded border-l-2 border-violet-400">{mapMathChildren(children)}</h4>
+    ),
+    hr: () => (
+      <div className="my-8 flex items-center gap-3">
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
+        <span className="text-indigo-300 text-lg">✦</span>
+        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
+      </div>
     ),
     blockquote: ({ children }: { children?: React.ReactNode }) => {
       const raw = getText(children);
 
-      // ── Detected-question blockquote (🔍) ─────────────────────────────────
-      // The prompt instructs the AI to always begin with:
-      //   > 🔍 **DETECTED QUESTION FROM IMAGE:**
-      //   > [question text]
-      // We render this as a large, prominent amber hero card.
-      if (raw.includes("🔍") || raw.toLowerCase().includes("detected question")) {
-        // Strip the "DETECTED QUESTION FROM IMAGE:" label line for cleaner display
+      // ── Per-question extracted text (📋) ──────────────────────────────────
+      if (raw.includes("📋") || raw.toLowerCase().includes("question") && raw.toLowerCase().includes("from image")) {
         return (
-          <div className="my-6 rounded-2xl border-[3px] border-amber-400 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 shadow-lg ring-4 ring-amber-100 overflow-hidden">
-            {/* Banner header */}
-            <div className="flex items-center gap-3 bg-amber-400 px-5 py-3">
-              <span className="text-2xl">📋</span>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.15em] text-amber-950">Question from Image</p>
-                <p className="text-[10px] font-semibold text-amber-800 mt-0.5">Detected &amp; extracted by AI — this is what is being solved</p>
-              </div>
+          <div className="my-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden shadow-sm">
+            <div className="flex items-center gap-2 bg-amber-300 px-4 py-2">
+              <span className="text-base">📋</span>
+              <p className="text-xs font-black uppercase tracking-widest text-amber-950">Question from Image</p>
             </div>
-            {/* Question text body */}
-            <div className="px-5 py-4 text-[15px] font-bold leading-relaxed text-amber-950 [&_strong]:bg-amber-200 [&_strong]:text-amber-900 [&_strong]:px-0.5 [&_strong]:rounded [&_p]:my-1.5">
+            <div className="px-4 py-3 text-[14px] font-semibold leading-relaxed text-amber-950 [&_strong]:bg-amber-200 [&_strong]:text-amber-900 [&_strong]:px-0.5 [&_strong]:rounded [&_p]:my-1">
               {children}
             </div>
           </div>
         );
       }
 
-      // ── Final Answer blockquote (🎯) ────────────────────────────────────────
+      // ── Final Answer / Summary blockquote (🎯 / ✅) ─────────────────────
+      const isAnswer = raw.includes("🎯") || raw.includes("✅") || raw.toLowerCase().includes("final answer") || raw.toLowerCase().includes("summary");
+      if (isAnswer) {
+        return (
+          <div className="my-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 shadow-sm">
+            <div className="text-sm font-semibold text-emerald-800 leading-relaxed">{children}</div>
+          </div>
+        );
+      }
+
+      // ── Generic blockquote ───────────────────────────────────────────────
       return (
-        <div className="my-4 rounded-2xl border-2 border-emerald-400 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 shadow-sm">
-          <div className="text-sm font-semibold text-emerald-800 leading-relaxed">{children}</div>
+        <div className="my-3 rounded-xl border-l-4 border-slate-300 bg-slate-50 px-4 py-3">
+          <div className="text-sm text-slate-700 leading-relaxed">{children}</div>
         </div>
       );
     },

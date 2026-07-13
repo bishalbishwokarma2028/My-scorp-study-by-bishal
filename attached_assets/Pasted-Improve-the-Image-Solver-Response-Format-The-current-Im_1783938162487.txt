@@ -1,0 +1,62 @@
+Improve the Image Solver Response Format
+
+The current Image Solver response format is not good enough and needs significant improvement.
+
+1. Answer Only What the Question Asks
+
+- The Image Solver should answer exactly what the question asks.
+- Do not generate unrelated, unnecessary, or unusual information.
+- Focus on the actual question and provide a direct, accurate, and complete answer.
+
+2. Handle Multiple Questions Properly
+
+Many uploaded images contain 8–10 or even more questions. The Image Solver must detect every question automatically.
+
+For each question:
+
+- Display the question first.
+- Highlight it with a different accent color.
+- Make the question bold and clearly separated.
+- Number every question correctly (Question 1, Question 2, Question 3, etc.).
+
+3. Give a Detailed Answer for Every Question
+
+For each detected question:
+
+- Provide a long, detailed, well-structured answer.
+- Explain the concept when necessary.
+- Include formulas, calculations, definitions, or examples only if the question requires them.
+- Never skip any question from the image.
+
+4. Improve Readability
+
+After finishing the answer to one question:
+
+- Leave 2–3 blank lines before starting the next question.
+- This spacing should make the output clean, attractive, and easy to read.
+
+5. Attractive Formatting
+
+Use a consistent and visually appealing layout:
+
+- Bold headings
+- Highlighted question titles
+- Bullet points or numbered steps where appropriate
+- Proper spacing
+- Mathematical formulas and symbols should render clearly and be easy to understand.
+
+6. Do Not Summarize
+
+Do not give a short summary when the image contains multiple questions.
+Instead, answer every question individually in detail.
+
+7. Accuracy First
+
+Before generating the response:
+
+- Carefully analyze the entire image.
+- Detect all visible questions.
+- Ensure no question is missed.
+- Answer each question directly according to what is asked—nothing more and nothing less.
+
+The final output should look professional, organized, attractive, easy to read, and student-friendly.
