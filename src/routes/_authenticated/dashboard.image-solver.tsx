@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, isValidElement } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2, ImagePlus, ClipboardPaste, X, ScanText, Sparkles, Send, MessageCircle } from "lucide-react";
@@ -301,7 +301,7 @@ function ImageSolverPage() {
   function getText(node: React.ReactNode): string {
     if (typeof node === "string" || typeof node === "number") return String(node);
     if (Array.isArray(node)) return node.map(getText).join("");
-    if (React.isValidElement(node))
+    if (isValidElement(node))
       return getText((node.props as { children?: React.ReactNode }).children);
     return "";
   }
