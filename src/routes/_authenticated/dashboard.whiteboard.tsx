@@ -121,8 +121,10 @@ const PRESET_COLORS = [
 const STROKE_WIDTHS = [2, 4, 6, 10, 16];
 
 // Speed → ms per character, ms between steps
+// Only "slow" is exposed in the UI; its value sits between the old slow and
+// old normal so it feels comfortable — not too sluggish, not too rushed.
 const SPEED_CONFIG: Record<Speed, { charMs: number; stepMs: number }> = {
-  slow:   { charMs: 65,  stepMs: 900  },
+  slow:   { charMs: 38,  stepMs: 600  },
   normal: { charMs: 28,  stepMs: 450  },
   fast:   { charMs: 8,   stepMs: 100  },
 };
@@ -665,7 +667,7 @@ function WhiteboardPage() {
     pauseMs:  0,
     lastTs:   0,
     paused:   false,
-    speed:    "normal" as Speed,
+    speed:    "slow" as Speed,
   });
   const rafRef = useRef(0);
 
@@ -690,7 +692,7 @@ function WhiteboardPage() {
   const [animPhase, setAnimPhase]     = useState<AnimPhase>("idle");
   const [visibleSteps, setVisibleSteps] = useState<TeachStep[]>([]);
   const [totalSteps, setTotalSteps]   = useState(0);
-  const [speed, setSpeed]             = useState<Speed>("normal");
+  const [speed, setSpeed]             = useState<Speed>("slow");
   const [chatHistory, setChatHistory] = useState<ConvMsg[]>([]);
   const [showTextInput, setShowTextInput] = useState(false);
   const [textDraft, setTextDraft]     = useState("");
@@ -853,11 +855,11 @@ function WhiteboardPage() {
     const partial = step.fullText.slice(0, charIdx);
     if (!partial) return;
 
-    // Compute label (same logic as writeStepToCanvas) so live text lands at correct Y.
-    // Title steps get extra top padding — must mirror writeStepToCanvas exactly.
-    const lbl = step.type === "step" && step.num
+    // Compute label — title steps show NO label (the heading speaks for itself).
+    // Title steps still get extra top padding for breathing room.
+    const lbl = !isTtl && (step.type === "step" && step.num
       ? `▸  Step ${step.num}`
-      : step.type !== "explain" ? `▸  ${TYPE_LABEL[step.type]}` : "";
+      : step.type !== "explain" ? `▸  ${TYPE_LABEL[step.type]}` : "");
     const titlePad = isTtl ? 18 : 0;
     if (lbl) {
       const lid = uid();
@@ -1010,16 +1012,16 @@ function WhiteboardPage() {
       return;
     }
 
-    // Label row — bigger, bold, more spacing (skip for plain "explain" steps).
-    // For the TITLE step, add top padding so "▸ Topic" isn't flush against the
-    // top of the canvas or the previous step.
-    const lbl = step.type === "step" && step.num
+    // Label row — bigger, bold, more spacing (skip for "explain" and "title" steps).
+    // Title steps show NO label — the heading text itself is sufficient.
+    // Title steps still get extra top padding for breathing room.
+    const lbl = !isTtl && (step.type === "step" && step.num
       ? `▸  Step ${step.num}`
       : step.type !== "explain"
         ? `▸  ${TYPE_LABEL[step.type]}`
-        : "";
+        : "");
 
-    if (isTtl) pos.y += 18; // extra breathing room above the "Topic" label
+    if (isTtl) pos.y += 18; // breathing room before the title heading
 
     if (lbl) {
       const labelId = uid();
@@ -1783,10 +1785,10 @@ function WhiteboardPage() {
                   <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600">
                     <Sparkles size={12} className="text-white"/>
                   </div>
-                  <span className={`text-sm font-bold ${isDark?"text-white":"text-slate-800"}`}>AI Teaching Mode</span>
+                  <span className={`text-sm font-bold ${isDark?"text-white":"text-slate-800"}`}>Bishal's Teaching Mode</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  {(["slow","normal","fast"] as Speed[]).map(s => (
+                  {(["slow"] as Speed[]).map(s => (
                     <button key={s} onClick={()=>changeSpeed(s)}
                       className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors ${speed===s?"bg-indigo-600 text-white":(isDark?"text-slate-500 hover:text-slate-300":"text-slate-400 hover:text-slate-600")}`}>
                       {s==="slow"?"🐢":s==="fast"?"⚡":"●"} {s}
