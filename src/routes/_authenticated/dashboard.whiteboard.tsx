@@ -41,7 +41,7 @@ interface DrawEl {
 }
 
 type TeachType = "title" | "explain" | "formula" | "step"
-               | "answer" | "tip" | "warning" | "definition" | "separator" | "diagram";
+               | "answer" | "tip" | "warning" | "definition" | "separator" | "diagram" | "table";
 
 interface TeachStep {
   id: string; type: TeachType; text: string;
@@ -76,7 +76,7 @@ const TYPE_COLOR: Record<TeachType, string> = {
   title: COLORS.blue, explain: COLORS.black, formula: "#C0392B",
   step: COLORS.blue, answer: COLORS.green, tip: COLORS.orange,
   warning: COLORS.red, definition: COLORS.purple, separator: COLORS.gray,
-  diagram: COLORS.teal,
+  diagram: COLORS.teal, table: "#7C3AED",
 };
 
 const DARK_TYPE_BG: Record<TeachType, string> = {
@@ -90,6 +90,7 @@ const DARK_TYPE_BG: Record<TeachType, string> = {
   definition: "bg-violet-900/40 border-violet-600",
   separator: "bg-transparent border-transparent",
   diagram: "bg-teal-900/40 border-teal-600",
+  table: "bg-violet-900/40 border-violet-600",
 };
 const LIGHT_TYPE_BG: Record<TeachType, string> = {
   title: "bg-blue-50 border-blue-300",
@@ -102,12 +103,14 @@ const LIGHT_TYPE_BG: Record<TeachType, string> = {
   definition: "bg-violet-50 border-violet-300",
   separator: "bg-transparent border-transparent",
   diagram: "bg-teal-50 border-teal-300",
+  table: "bg-violet-50 border-violet-300",
 };
 
 const TYPE_LABEL: Record<TeachType, string> = {
   title: "Topic", explain: "Explanation", formula: "Formula",
   step: "Step", answer: "Answer", tip: "Pro Tip",
   warning: "Watch Out", definition: "Definition", separator: "", diagram: "Diagram",
+  table: "Comparison Table",
 };
 
 const PRESET_COLORS = [
@@ -153,8 +156,27 @@ function buildTeachingPrompt(q: string, history: ConvMsg[]): string {
     ? "\n\nPrevious context:\n" +
       history.slice(-4).map(m => `[${m.role}]: ${m.content.slice(0, 500)}`).join("\n")
     : "";
+
+  // Detect question intent to guide AI format selection
+  const ql = q.toLowerCase();
+  const isComparison = /\b(differ|difference|compare|vs\.?|versus|contrast|between .* and|which is better|pros.{0,10}cons)\b/.test(ql);
+  const isVisual = /\b(triangle|circle|wave|force|graph|axes|coordinate|sine|cosine|dna|helix|bar chart|histogram|geometry|trigonometry|physics|projectile|vector|frequency|amplitude)\b/.test(ql);
+
+  const comparisonHint = isComparison
+    ? `\n\nIMPORTANT: The student is asking for a COMPARISON. You MUST include exactly one "table" step that shows the comparison in two columns. Do NOT skip the table.`
+    : "";
+  const visualHint = isVisual
+    ? `\n\nThe topic is visual — consider whether a diagram genuinely helps understanding. If so, include ONE appropriate diagram step.`
+    : `\n\nThe topic is NOT visual — do NOT include any diagram steps.`;
+
   return `You are Bishal's expert AI teacher writing on an interactive whiteboard. A student asked:
-"${q}"${ctx}
+"${q}"${ctx}${comparisonHint}${visualHint}
+
+FIRST, silently analyse the question:
+1. Is it a comparison/difference question? → Use a "table" step.
+2. Is it a visual/geometric/physics topic? → Use ONE relevant "diagram" step.
+3. Is it algebra, history, language, or any non-visual topic? → NO diagram steps at all.
+4. Does it have a worked solution? → Use numbered "step" steps.
 
 Return ONLY valid JSON (no markdown, no prose outside the JSON) in this exact structure:
 {
@@ -164,6 +186,7 @@ Return ONLY valid JSON (no markdown, no prose outside the JSON) in this exact st
     {"type":"explain","text":"..."},
     {"type":"definition","text":"..."},
     {"type":"diagram","text":"right-triangle:a,b,c"},
+    {"type":"table","text":"Feature|Description\\nRow1Col1|Row1Col2\\nRow2Col1|Row2Col2"},
     {"type":"formula","text":"..."},
     {"type":"step","num":1,"text":"..."},
     {"type":"answer","text":"..."},
@@ -175,42 +198,46 @@ Step type rules:
 - "title"      → Topic heading — always the very first step. Make it descriptive.
 - "explain"    → Deep explanation of the concept. Write 3-5 sentences like a real teacher. Cover the WHY not just the WHAT. Be thorough.
 - "definition" → Define a key term in full detail. Include origin, meaning, and context. 2-4 sentences.
-- "formula"    → A formula, equation or rule. Always show the full derivation context, not just the formula.
-- "step"       → Numbered solution steps (include "num": N). Each step must be 2-4 sentences with reasoning. Do NOT just state the action — explain WHY you are doing it.
-- "answer"     → Final answer with full verification. Explain what the answer means in context. Always last meaningful step.
-- "tip"        → Shortcut, memory aid, or real-world connection — 2-3 sentences. Orange.
-- "warning"    → Common mistake to avoid with explanation of WHY it is wrong — 2-3 sentences. Red.
-- "diagram"    → Draw a subject-appropriate visual diagram. ONLY include a diagram step when the topic genuinely needs one to be understood. Many topics (algebra, history, grammar, literature) do NOT need diagrams — omit them entirely for those. Only use when it adds real value:
+- "formula"    → A formula, equation or rule. Show derivation context, not just the bare formula.
+- "step"       → Numbered solution steps (include "num": N). Each step must be 2-4 sentences with reasoning. Explain WHY, not just WHAT.
+- "answer"     → Final answer with full verification. Explain what the answer means in context. Always the last meaningful step.
+- "tip"        → Shortcut, memory aid, or real-world connection — 2-3 sentences.
+- "warning"    → Common mistake to avoid with explanation of WHY it is wrong — 2-3 sentences.
+- "table"      → A two-column comparison or reference table. Use ONLY for: comparison questions, difference questions, pros/cons, properties lists, or "X vs Y" questions. Format: pipe-separated columns, backslash-n between rows. First row = bold headers. Example: "Property|Value\\nColor|Red\\nSize|Large". Maximum 8 rows. Do NOT use table for worked solutions or simple explanations.
+- "diagram"    → Draw a subject-appropriate visual. STRICT RULES — only include when the visual DIRECTLY illustrates the concept being taught:
     • Geometry / trigonometry → right-triangle, circle, axes, number-line
-    • Physics → force-diagram, wave, axes
-    • Biology → dna
-    • Statistics / data → bar-chart
+    • Physics (forces, motion) → force-diagram, axes
     • Waves / oscillations → wave
-    The text value must be exactly one of:
-    right-triangle:a,b,c   (right-angle triangle with side labels)
-    axes:x,y               (coordinate axes with axis labels)
-    number-line:-5,5       (number line from -5 to 5)
-    circle:r               (circle with radius label)
-    force-diagram:F,mg,N   (force arrows with labels)
-    bar-chart:A,B,C        (bar chart with category labels)
-    dna:double-helix       (DNA double helix)
-    wave:sine              (sine wave with amplitude/time axes)
-    If no diagram type fits, do NOT include a diagram step at all.
+    • Biology (genetics) → dna
+    • Statistics / data sets → bar-chart
+    • Graphing functions → axes
+    The text value must be EXACTLY one of (copy precisely):
+      right-triangle:a,b,c   → right-angle triangle labeled a, b, c (hypotenuse)
+      axes:x,y               → coordinate plane with labeled axes
+      number-line:-5,5       → number line (replace -5,5 with actual range)
+      circle:r               → circle with radius r labeled
+      force-diagram:F,mg,N   → free-body force arrows (replace labels with actual forces)
+      bar-chart:A,B,C        → bar chart (replace A,B,C with actual category names)
+      dna:double-helix       → DNA double helix
+      wave:sine              → sine wave with axes
+    FORBIDDEN: Do NOT use diagram for algebra, calculus (non-graphing), chemistry equations, history, language, grammar, literature, definitions, or any non-visual concept. ONE diagram maximum per response.
 - "separator"  → Visual divider between major sections: {"type":"separator","text":""}
 
 Requirements:
 - 15 to 25 steps total. NEVER fewer than 12. This is a full lesson, not a summary.
-- Include a "diagram" step ONLY if the subject is visual (geometry, physics, biology, graphing). Skip entirely for non-visual topics.
+- For comparison questions: include a "table" step — this is mandatory.
+- For visual topics: include AT MOST ONE "diagram" step. Place it AFTER the explanation, BEFORE the worked steps.
+- For non-visual topics (algebra, history, grammar, etc.): ZERO diagram steps.
 - Include AT LEAST 2 "separator" steps to divide sections.
 - Explain like an enthusiastic teacher who loves the subject. Be detailed, thorough, and educational.
-- Start with title, then explain the big picture, then definitions, then diagrams, then formulas, then worked steps, then answer, then tips and warnings.
-- Each "explain" step must be 3-5 sentences minimum — really teach the concept deeply.
+- Structure: title → explain big picture → definitions → [diagram if visual] → [table if comparison] → formulas → worked steps → answer → tips → warnings.
+- Each "explain" must be 3-5 sentences minimum — really teach the concept deeply.
 - Each "step" must show ALL working with full reasoning — 2-4 sentences per step.
 - No LaTeX: no \\frac, \\sqrt, $...$, backslashes
 - Use Unicode: ×, ÷, √, ², ³, π, ≈, ±, θ, Δ, →, °, ∞, ∑, ∫, ≤, ≥, ≠
 - Fractions as (a)/(b). Square roots as √(x). Exponents as xⁿ.
-- For follow-ups: build on context, go deeper, don't repeat the whole intro
-- Match the student's language and level`;
+- For follow-ups: build on context, go deeper, don't repeat the whole intro.
+- Match the student's language and level.`;
 }
 
 // ─── Parse AI response ────────────────────────────────────────────────────────
@@ -523,6 +550,81 @@ function drawDiagramOnCanvas(
   return usedH;
 }
 
+// ─── Table renderer ───────────────────────────────────────────────────────────
+
+function drawTableOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  ox: number, oy: number,
+  color: string,
+): number /* height used */ {
+  const rows = text.split("\\n").map(r => r.split("|").map(c => c.trim())).filter(r => r.length >= 2);
+  if (rows.length === 0) return 0;
+
+  ctx.save();
+  ctx.font = `400 13px ${HW_FAMILY}`;
+
+  const cols = Math.max(...rows.map(r => r.length));
+  const colW = 130;
+  const rowH = 26;
+  const tableW = cols * colW;
+  const headerColor = color;
+
+  rows.forEach((row, ri) => {
+    const y = oy + ri * rowH;
+    const isHeader = ri === 0;
+
+    // Row background
+    if (isHeader) {
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = headerColor;
+      ctx.fillRect(ox, y, tableW, rowH);
+      ctx.globalAlpha = 1;
+    } else if (ri % 2 === 0) {
+      ctx.globalAlpha = 0.04;
+      ctx.fillStyle = "#000";
+      ctx.fillRect(ox, y, tableW, rowH);
+      ctx.globalAlpha = 1;
+    }
+
+    // Cell borders
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isHeader ? 1.8 : 1;
+    ctx.globalAlpha = isHeader ? 0.8 : 0.35;
+    ctx.strokeRect(ox, y, tableW, rowH);
+    ctx.globalAlpha = 1;
+
+    // Cell text
+    row.forEach((cell, ci) => {
+      ctx.fillStyle = color;
+      ctx.font = isHeader
+        ? `700 13px ${HW_FAMILY}`
+        : `400 13px ${HW_FAMILY}`;
+      // Vertical separator between columns
+      if (ci > 0) {
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(ox + ci * colW, y);
+        ctx.lineTo(ox + ci * colW, y + rowH);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // Clip text to cell width
+      ctx.save();
+      ctx.rect(ox + ci * colW + 4, y, colW - 8, rowH);
+      ctx.clip();
+      ctx.fillStyle = color;
+      ctx.font = isHeader ? `700 13px ${HW_FAMILY}` : `400 13px ${HW_FAMILY}`;
+      ctx.fillText(cell, ox + ci * colW + 6, y + rowH * 0.68);
+      ctx.restore();
+    });
+  });
+
+  ctx.restore();
+  return rows.length * rowH + 12;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 function WhiteboardPage() {
@@ -678,7 +780,12 @@ function WhiteboardPage() {
       } else if (el.tool === "text") {
         drawText(drCtx, el);
       } else if (el.tool === "diagram") {
-        drawDiagramOnCanvas(drCtx, el.text ?? "", el.x1 ?? 0, el.y1 ?? 0, el.color);
+        const txt = el.text ?? "";
+        if (txt.startsWith("__table__")) {
+          drawTableOnCanvas(drCtx, txt.slice("__table__".length), el.x1 ?? 0, el.y1 ?? 0, el.color);
+        } else {
+          drawDiagramOnCanvas(drCtx, txt, el.x1 ?? 0, el.y1 ?? 0, el.color);
+        }
       } else {
         drawShape(drCtx, el);
       }
@@ -720,7 +827,7 @@ function WhiteboardPage() {
 
   // ── Live (in-progress) canvas writing — called every word boundary ───────
   const writeLiveToCanvas = useCallback((step: TeachStep, charIdx: number) => {
-    if (!drawOnCanvasRef.current || step.type === "separator" || step.type === "diagram") return;
+    if (!drawOnCanvasRef.current || step.type === "separator" || step.type === "diagram" || step.type === "table") return;
     const canvas = drawRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -822,6 +929,41 @@ function WhiteboardPage() {
       liveElemIdsRef.current = new Set();
     }
 
+    // ── Table step ────────────────────────────────────────────────────────
+    if (step.type === "table") {
+      const lblId = uid();
+      aiElemIdsRef.current.add(lblId);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: lblId, tool: "text", points: [], color: clr,
+        strokeWidth: 1, opacity: 1, page: pg,
+        text: "▸  Comparison Table", fontSize: 13, x1: pos.x, y1: pos.y,
+      }];
+      pos.y += 24;
+
+      const tblId = uid();
+      aiElemIdsRef.current.add(tblId);
+      const tmpCanvas = document.createElement("canvas");
+      tmpCanvas.width = 900; tmpCanvas.height = 600;
+      const tmpCtx = tmpCanvas.getContext("2d")!;
+      const tblH = drawTableOnCanvas(tmpCtx, step.fullText, 0, 0, clr);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: tblId, tool: "diagram" as Tool, points: [], color: clr,
+        strokeWidth: 2, opacity: 1, page: pg,
+        text: "__table__" + step.fullText, fontSize: 1, x1: pos.x, y1: pos.y,
+      }];
+      pos.y += tblH + 24;
+
+      const hx = (pos.x + 100) * zoomRef.current + panRef.current.x;
+      const hy = pos.y * zoomRef.current + panRef.current.y;
+      setHandScreenPos({ x: hx, y: hy });
+      setHandState("writing");
+      if (pos.y * zoomRef.current + panRef.current.y > canvas.height - 140) {
+        setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
+      }
+      redrawCanvas();
+      return;
+    }
+
     // ── Diagram step — store in elemRef so it persists across redraws ────
     if (isDiag) {
       // Section label "── Diagram ──"
@@ -908,10 +1050,13 @@ function WhiteboardPage() {
       const boxId = uid();
       aiElemIdsRef.current.add(boxId);
       const boxTop = pos.y - lines.length * lineH - 6;
+      // Measure actual max line width to avoid over-wide box
+      ctx.font = hwFont(fontSize, false);
+      const actualFmlW = Math.max(...lines.map(ln => ctx.measureText(ln).width / zoomRef.current));
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
         id: boxId, tool: "rect", points: [], color: clr,
         strokeWidth: 1.8, opacity: 0.5, page: pg,
-        x1: pos.x - 8, y1: boxTop, x2: pos.x + maxW * 0.6, y2: pos.y + 4,
+        x1: pos.x - 8, y1: boxTop, x2: pos.x + actualFmlW + 16, y2: pos.y + 4,
       }];
       pos.y += 12;
     } else {
@@ -1831,9 +1976,9 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
 // so the pen tip lands exactly at the writing coordinate on screen.
 // The hand body extends upward from the tip, which is the natural writing posture.
 
-const HAND_W       = 130;          // display width in px
-const HAND_TIP_X   = 60;           // tip x-offset inside displayed image
-const HAND_TIP_Y   = 176;          // tip y-offset inside displayed image
+const HAND_W       = 80;           // display width in px (smaller = less text coverage)
+const HAND_TIP_X   = 37;           // tip x-offset inside displayed image (scaled from 60)
+const HAND_TIP_Y   = 108;          // tip y-offset inside displayed image (scaled from 176)
 
 function TeacherHand({
   pos, state,
@@ -1922,6 +2067,39 @@ function TeacherHand({
   );
 }
 
+function SidebarTable({ text, colorHex, isDark }: { text: string; colorHex: string; isDark: boolean }) {
+  const rows = text.split("\\n").map(r => r.split("|").map(c => c.trim())).filter(r => r.length >= 2);
+  if (rows.length === 0) return null;
+  return (
+    <div className="overflow-x-auto rounded-lg border" style={{ borderColor: colorHex + "55" }}>
+      <table className="w-full text-[10px] border-collapse">
+        <thead>
+          <tr style={{ background: colorHex + "22" }}>
+            {rows[0].map((cell, ci) => (
+              <th key={ci} className="px-2 py-1.5 text-left font-bold border-b"
+                style={{ borderColor: colorHex + "44", color: colorHex }}>
+                {cell}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(1).map((row, ri) => (
+            <tr key={ri} className={ri % 2 === 0 ? (isDark ? "bg-white/5" : "bg-black/[0.02]") : ""}>
+              {row.map((cell, ci) => (
+                <td key={ci} className={`px-2 py-1.5 border-t ${isDark?"text-slate-200":"text-slate-700"}`}
+                  style={{ borderColor: colorHex + "22" }}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function TeachCard({ step, isDark, isActive }: { step: TeachStep; isDark: boolean; isActive: boolean }) {
   if (step.type === "separator") return <div className={`my-0.5 border-t border-dashed ${isDark?"border-slate-700":"border-gray-200"}`}/>;
 
@@ -1929,7 +2107,9 @@ function TeachCard({ step, isDark, isActive }: { step: TeachStep; isDark: boolea
   const bgCls    = isDark ? DARK_TYPE_BG[step.type] : LIGHT_TYPE_BG[step.type];
   const isTitle  = step.type === "title";
   const isFormula= step.type === "formula";
+  const isTable  = step.type === "table";
   const label    = step.type === "step" && step.num ? `Step ${step.num}` : TYPE_LABEL[step.type];
+  const isComplete = step.revealed >= step.fullText.length && step.fullText.length > 0;
 
   const iconMap: Record<TeachType, React.ReactNode> = {
     title:      <BookOpen size={11}/>,
@@ -1942,6 +2122,7 @@ function TeachCard({ step, isDark, isActive }: { step: TeachStep; isDark: boolea
     definition: <BookOpen size={11}/>,
     separator:  null,
     diagram:    <FlaskConical size={11}/>,
+    table:      <BarChart3 size={11}/>,
   };
 
   return (
@@ -1959,13 +2140,22 @@ function TeachCard({ step, isDark, isActive }: { step: TeachStep; isDark: boolea
           <span className="ml-auto h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500"/>
         )}
       </div>
-      <p className={`leading-relaxed ${isDark?"text-slate-200":"text-slate-800"} ${isTitle?"text-sm font-bold":isFormula?"font-mono text-sm font-semibold":"text-xs"}`}
-        style={isFormula ? { color: colorHex } : undefined}>
-        {step.text}
-        {isActive && step.revealed < step.fullText.length && (
+      {isTable && isComplete ? (
+        <SidebarTable text={step.fullText} colorHex={colorHex} isDark={isDark} />
+      ) : isTable ? (
+        <div className={`flex items-center gap-1.5 text-[10px] ${isDark?"text-slate-400":"text-slate-500"}`}>
+          <span className="animate-pulse">Building table…</span>
           <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle"/>
-        )}
-      </p>
+        </div>
+      ) : (
+        <p className={`leading-relaxed ${isDark?"text-slate-200":"text-slate-800"} ${isTitle?"text-sm font-bold":isFormula?"font-mono text-sm font-semibold":"text-xs"}`}
+          style={isFormula ? { color: colorHex } : undefined}>
+          {step.text}
+          {isActive && step.revealed < step.fullText.length && (
+            <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-current align-middle"/>
+          )}
+        </p>
+      )}
     </div>
   );
 }
