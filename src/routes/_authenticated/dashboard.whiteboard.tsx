@@ -256,7 +256,7 @@ function parseTeachScript(raw: string): TeachScript | null {
   } catch { return null; }
 }
 
-const VALID_TYPES = new Set(["title","explain","formula","step","answer","tip","warning","definition","separator","diagram"]);
+const VALID_TYPES = new Set(["title","explain","formula","step","answer","tip","warning","definition","separator","diagram","table"]);
 
 function scriptToSteps(s: TeachScript): TeachStep[] {
   return s.steps.map((r, i) => ({
@@ -327,8 +327,8 @@ function hwFont(size: number, bold = false) {
 function drawText(ctx: CanvasRenderingContext2D, el: DrawEl) {
   if (!el.text || el.x1 === undefined) return;
   ctx.save();
-  // AI-generated text uses Patrick Hand handwriting font (detected by font sizes 13/16/20/28)
-  const isHW = el.fontSize && [13, 16, 20, 28].includes(el.fontSize);
+  // AI-generated text uses Patrick Hand handwriting font (detected by font sizes 13/18/22/32)
+  const isHW = el.fontSize && [13, 18, 22, 32].includes(el.fontSize);
   ctx.font = isHW
     ? hwFont(el.fontSize!, el.strokeWidth >= 3)
     : `${el.fontSize ?? 18}px Inter, sans-serif`;
@@ -838,7 +838,7 @@ function WhiteboardPage() {
     const clr      = TYPE_COLOR[step.type];
     const isTtl    = step.type === "title";
     const isFml    = step.type === "formula";
-    const fontSize = isTtl ? 28 : isFml ? 20 : 16;
+    const fontSize = isTtl ? 32 : isFml ? 22 : 18;
     const lineH    = fontSize * 1.6;
     const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
 
@@ -884,14 +884,15 @@ function WhiteboardPage() {
       lastLineY = y;
     });
 
-    // Hand follows the end of the last typed character on canvas.
-    // Y is placed just below the baseline of the current line so the hand
-    // body (which extends downward from the tip) never covers the text above.
+    // Hand follows the end of the last typed character horizontally,
+    // but sits ONE full line BELOW the current text line so the body
+    // (which extends downward from the tip in the flipped image) never
+    // covers any written text.
     const lastLine = lines[lines.length - 1] ?? "";
     ctx.font = hwFont(fontSize, isTtl);
     const lastLineW = ctx.measureText(lastLine).width / zoomRef.current;
     const handWX = pos.x + Math.min(lastLineW + 4, maxW - 10);
-    const handWY = lastLineY + fontSize + 2; // tip lands just below text baseline
+    const handWY = lastLineY + lineH; // one full line below current text
     const hx = handWX * zoomRef.current + panRef.current.x;
     const hy = handWY * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
@@ -918,7 +919,7 @@ function WhiteboardPage() {
     const isTtl   = step.type === "title";
     const isFml   = step.type === "formula";
     const isDiag  = step.type === "diagram";
-    const fontSize = isTtl ? 28 : isFml ? 20 : 16;
+    const fontSize = isTtl ? 32 : isFml ? 22 : 18;
     const lineH    = fontSize * 1.6;
     const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
 
@@ -1036,7 +1037,7 @@ function WhiteboardPage() {
       pos.y += lineH;
     }
 
-    // Underline after title
+    // Underline after title; no box for formula (it caused oversized rectangles)
     if (isTtl) {
       const sepId = uid();
       aiElemIdsRef.current.add(sepId);
@@ -1046,19 +1047,6 @@ function WhiteboardPage() {
         x1: pos.x, y1: pos.y + 2, x2: pos.x + maxW * 0.7, y2: pos.y + 2,
       }];
       pos.y += 16;
-    } else if (isFml) {
-      const boxId = uid();
-      aiElemIdsRef.current.add(boxId);
-      const boxTop = pos.y - lines.length * lineH - 6;
-      // Measure actual max line width to avoid over-wide box
-      ctx.font = hwFont(fontSize, false);
-      const actualFmlW = Math.max(...lines.map(ln => ctx.measureText(ln).width / zoomRef.current));
-      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
-        id: boxId, tool: "rect", points: [], color: clr,
-        strokeWidth: 1.8, opacity: 0.5, page: pg,
-        x1: pos.x - 8, y1: boxTop, x2: pos.x + actualFmlW + 16, y2: pos.y + 4,
-      }];
-      pos.y += 12;
     } else {
       pos.y += 10;
     }
@@ -1067,10 +1055,10 @@ function WhiteboardPage() {
       setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
     }
 
-    // pos.y is already advanced past all written lines — tip goes right here,
-    // so the hand body (below the tip) is fully below the written content.
+    // Hand goes one lineH below the last written line so the (downward) body
+    // does not cover any previously written text.
     const hx = (pos.x + Math.min(maxW * 0.5, 180)) * zoomRef.current + panRef.current.x;
-    const hy = pos.y * zoomRef.current + panRef.current.y;
+    const hy = (pos.y + lineH * 0.4) * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
     setHandState("writing");
 
@@ -1213,20 +1201,59 @@ function WhiteboardPage() {
   }
 
   // ── Touch pinch-zoom ─────────────────────────────────────────────────────
+  // Two-finger centre-of-mass tracking for combined pinch+pan
+  const twoFingerPanRef = useRef<Pt | null>(null);
+
   function onTouchStart(e: React.TouchEvent) {
-    if (e.touches.length === 2) { pinchRef.current = null; }
-    else onPointerDown(e);
+    if (e.touches.length === 2) {
+      pinchRef.current = null;
+      // Record centre of the two fingers for panning
+      twoFingerPanRef.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+    } else {
+      onPointerDown(e);
+    }
   }
   function onTouchMove(e: React.TouchEvent) {
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const d  = Math.sqrt(dx*dx + dy*dy);
-      if (pinchRef.current !== null) setZoom(z => Math.max(0.2, Math.min(5, z * d / pinchRef.current!)));
+      const d  = Math.sqrt(dx * dx + dy * dy);
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      // Zoom around the pinch centre
+      if (pinchRef.current !== null) {
+        const r  = containerRef.current!.getBoundingClientRect();
+        const lx = cx - r.left, ly = cy - r.top;
+        setZoom(z => {
+          const nz = Math.max(0.2, Math.min(5, z * d / pinchRef.current!));
+          setPan(p => ({ x: lx - (lx - p.x) * (nz / z), y: ly - (ly - p.y) * (nz / z) }));
+          return nz;
+        });
+      }
+
+      // Pan with the centre-of-mass movement
+      if (twoFingerPanRef.current) {
+        const pdx = cx - twoFingerPanRef.current.x;
+        const pdy = cy - twoFingerPanRef.current.y;
+        if (Math.abs(pdx) > 0.5 || Math.abs(pdy) > 0.5) {
+          setPan(p => ({ x: p.x + pdx, y: p.y + pdy }));
+        }
+      }
+      twoFingerPanRef.current = { x: cx, y: cy };
       pinchRef.current = d;
-    } else onPointerMove(e);
+    } else {
+      onPointerMove(e);
+    }
   }
-  function onTouchEnd(e: React.TouchEvent) { pinchRef.current = null; onPointerUp(e); }
+  function onTouchEnd(e: React.TouchEvent) {
+    pinchRef.current = null;
+    twoFingerPanRef.current = null;
+    if (e.touches.length < 2) onPointerUp(e);
+  }
 
   // ── Wheel zoom ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1701,7 +1728,7 @@ function WhiteboardPage() {
 
           {/* Teacher hand overlay */}
           {animPhase !== "idle" && (
-            <TeacherHand pos={handScreenPos} state={handState} isDark={isDark}/>
+            <TeacherHand pos={handScreenPos} state={handState} isDark={isDark} speed={speed}/>
           )}
         </div>{/* /canvas */}
 
@@ -1709,8 +1736,7 @@ function WhiteboardPage() {
 
         {/* ── AI Teaching Panel ────────────────────────────────────────── */}
         {(showAI || mobileTab === "ai") && (
-          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} shrink-0 flex-col border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}
-            style={{height:"100%"}}>
+          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} shrink-0 flex-col overflow-hidden border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}>
 
             {/* Panel header */}
             <div className={`flex shrink-0 flex-col border-b ${isDark?"border-slate-700":"border-gray-200"}`}>
@@ -1976,30 +2002,40 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
 // so the pen tip lands exactly at the writing coordinate on screen.
 // The hand body extends upward from the tip, which is the natural writing posture.
 
-const HAND_W       = 80;           // display width in px (smaller = less text coverage)
-const HAND_TIP_X   = 37;           // tip x-offset inside displayed image (scaled from 60)
-const HAND_TIP_Y   = 108;          // tip y-offset inside displayed image (scaled from 176)
+// Hand is displayed BELOW the writing line so it never covers text.
+// We use CSS scaleY(-1) to flip the image so the tip is at the TOP of the element
+// and the hand body extends DOWNWARD — body never overlaps already-written lines.
+// At 48px wide: image height ≈ 48*(380/262) ≈ 70px.
+// After flip, tip is near the top edge of the element.
+// HAND_TIP_Y is the distance from element top to the (now-flipped) tip ≈ 70-54 = 16px.
+const HAND_W       = 48;           // display width in px
+const HAND_TIP_X   = 22;           // tip x-offset after scale (48 * 121/262 ≈ 22)
+const HAND_TIP_Y   = 16;           // tip near top of flipped image (48*380/262 - 54 ≈ 16)
 
 function TeacherHand({
-  pos, state,
+  pos, state, speed,
 }: {
   pos: { x: number; y: number };
   state: "idle" | "writing" | "done";
   isDark: boolean;
+  speed: Speed;
 }) {
   const isWriting = state === "writing";
   const isDone    = state === "done";
 
+  // Transition duration scales with speed so the hand keeps up at fast pace
+  const moveDur = speed === "fast" ? "0.02s" : speed === "slow" ? "0.18s" : "0.09s";
+
   return (
     <>
-      {/* Status pill — floats just to the left of the tip */}
+      {/* Status pill — floats just above the tip */}
       {isWriting && (
         <div
           className="pointer-events-none absolute z-20 select-none"
           style={{
-            left: Math.max(4, pos.x - 120),
-            top:  Math.max(4, pos.y - 30),
-            transition: "left 0.25s ease-out, top 0.25s ease-out",
+            left: Math.max(4, pos.x - 100),
+            top:  Math.max(4, pos.y - 24),
+            transition: `left ${moveDur} linear, top ${moveDur} linear`,
           }}
         >
           <div className="flex items-center gap-1.5 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur-sm">
@@ -2013,7 +2049,7 @@ function TeacherHand({
           className="pointer-events-none absolute z-20 select-none"
           style={{
             left: Math.max(4, pos.x - 70),
-            top:  Math.max(4, pos.y - 30),
+            top:  Math.max(4, pos.y - 24),
           }}
         >
           <div className="flex items-center gap-1 rounded-full bg-emerald-600/90 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg">
@@ -2022,35 +2058,41 @@ function TeacherHand({
         </div>
       )}
 
-      {/* Real hand photo — tip anchored to writing position */}
+      {/*
+        Hand photo — the image is flipped vertically (scaleY(-1)) so that the
+        marker tip sits at the TOP of the element and the hand body extends
+        DOWNWARD.  This means the hand always appears BELOW the text being
+        written and never covers previously-written lines.
+
+        Anchoring:  left = pos.x − HAND_TIP_X  (horizontal centre of tip)
+                    top  = pos.y − HAND_TIP_Y  (tip near top of flipped image)
+      */}
       <div
         className="pointer-events-none absolute z-10 select-none"
         style={{
           left:    pos.x - HAND_TIP_X,
           top:     pos.y - HAND_TIP_Y,
           width:   HAND_W,
-          // smooth position during writing, ease-out when resting
           transition: isWriting
-            ? "left 0.09s linear, top 0.09s linear, opacity 0.3s"
+            ? `left ${moveDur} linear, top ${moveDur} linear, opacity 0.3s`
             : "left 0.5s ease-out, top 0.5s ease-out, opacity 0.4s",
           opacity: state === "idle" ? 0 : 1,
-          // subtle micro-jitter while writing via CSS animation on the img
         }}
       >
         <style>{`
           @keyframes hwPhotoWrite {
-            0%,100% { transform: rotate(0deg) translate(0px,  0px); }
-            25%      { transform: rotate( 0.6deg) translate( 0.5px, -0.3px); }
-            75%      { transform: rotate(-0.4deg) translate(-0.3px,  0.2px); }
+            0%,100% { transform: scaleY(-1) rotate(0deg); }
+            25%      { transform: scaleY(-1) rotate( 0.5deg) translate( 0.3px, -0.2px); }
+            75%      { transform: scaleY(-1) rotate(-0.4deg) translate(-0.2px,  0.1px); }
           }
           @keyframes hwPhotoIdle {
-            0%,100% { transform: translate(0px, 0px); }
-            50%      { transform: translate(0px, 2px); }
+            0%,100% { transform: scaleY(-1) translate(0px, 0px); }
+            50%      { transform: scaleY(-1) translate(0px,-2px); }
           }
           .hw-photo {
-            transform-origin: ${HAND_TIP_X}px ${HAND_TIP_Y}px;
+            transform-origin: center center;
             animation: ${isWriting
-              ? "hwPhotoWrite 0.28s ease-in-out infinite"
+              ? "hwPhotoWrite 0.25s ease-in-out infinite"
               : "hwPhotoIdle 2.6s ease-in-out infinite"};
           }
         `}</style>
