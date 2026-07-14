@@ -1,0 +1,17 @@
+Enhance the existing **Teaching Board** feature by adding an animated AI robot that teaches exactly like a real teacher writing on a digital board.
+
+When a user asks a question, the Teaching Board should immediately display the robot holding a digital pen. As soon as the AI starts generating the response, the robot should begin writing naturally on the board instead of instantly showing the complete answer.
+
+The answer must be generated **in real time** and should appear gradually as if the robot is physically writing every word. The robot's hand, wrist, elbow, and shoulder should move smoothly while writing. The pen tip must always stay aligned with the current writing position so it feels like the robot is actually creating the content. The writing speed should synchronize with the AI response speed. If the AI pauses briefly, the robot should also pause naturally before continuing.
+
+The robot should never remain completely static. While writing, it should blink occasionally, make subtle head movements, slightly adjust its posture, and perform small idle breathing animations to create a lifelike teaching experience. When moving to a new line or paragraph, the robot should naturally reposition its hand before continuing to write.
+
+The Teaching Board should behave like an intelligent classroom whiteboard. The robot should organize the answer into a clean teaching format with clear titles, subtitles, bullet points, numbered lists, highlighted keywords, examples, and summaries wherever appropriate. Mathematical equations, formulas, diagrams, flowcharts, tables, code snippets, and scientific illustrations should appear progressively, being drawn step by step instead of appearing all at once.
+
+Every explanation should be educational rather than conversational. Instead of giving short chatbot-style responses, the Teaching Board should produce **detailed, structured, classroom-style explanations**. By default, answers should be comprehensive enough to teach the complete topic, including definitions, concepts, step-by-step explanations, examples, real-world applications, important notes, common mistakes, tips for remembering, and a concise summary at the end. The Teaching Board should avoid unnecessarily short responses unless the user specifically requests a brief answer.
+
+The writing itself should feel realistic. Characters should appear progressively as though the pen is creating them in real time. The robot should maintain proper spacing, margins, alignment, and consistent handwriting across the board. If the explanation becomes too long for a single board, the Teaching Board should automatically continue onto additional boards or pages while maintaining the writing animation seamlessly, ensuring that the robot never abruptly stops or cuts off the explanation.
+
+When the answer is complete, the robot should finish the final sentence, place the pen down naturally, look toward the user with a friendly expression, and remain in a subtle idle animation while the completed Teaching Board remains fully visible for reading.
+
+The overall experience should make users genuinely feel that an intelligent AI teacher is standing in front of a classroom, personally writing every explanation on the board in real time. The animation should be smooth, immersive, premium, and educational, transforming the Teaching Board into a highly engaging learning experience while preserving all existing functionality.

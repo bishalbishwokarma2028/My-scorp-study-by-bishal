@@ -353,6 +353,12 @@ function WhiteboardPage() {
   const [isListening, setIsListening] = useState(false);
   const speechRef = useRef<SpeechRecognition | null>(null);
 
+  // ── Robot + mobile state ──────────────────────────────────────────────────
+  const [robotArmAngle, setRobotArmAngle] = useState(-145);
+  const [robotState, setRobotState]       = useState<"idle"|"writing"|"done">("idle");
+  const [showRobot, setShowRobot]         = useState(true);
+  const [mobileTab, setMobileTab]         = useState<"board"|"ai">("board");
+
   // ── Canvas-write state ────────────────────────────────────────────────────
   const [drawOnCanvas, setDrawOnCanvas]   = useState(true);
   const drawOnCanvasRef                   = useRef(true);
@@ -529,6 +535,15 @@ function WhiteboardPage() {
     if (canvas && pos.y * zoomRef.current + panRef.current.y > canvas.height - 120) {
       setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.35)) }));
     }
+
+    // Point robot arm toward the writing position
+    const writePxX = pos.x * zoomRef.current + panRef.current.x;
+    const writePxY = (pos.y - fontSize) * zoomRef.current + panRef.current.y;
+    const shoulderX = canvas.width - 78;
+    const shoulderY = canvas.height - 72;
+    const rawAngle  = Math.atan2(writePxY - shoulderY, writePxX - shoulderX) * (180 / Math.PI);
+    setRobotArmAngle(Math.max(-175, Math.min(-60, rawAngle)));
+    setRobotState("writing");
 
     redrawCanvas();
   }, [redrawCanvas]);
@@ -772,6 +787,7 @@ function WhiteboardPage() {
         if (a.stepIdx >= a.pending.length) {
           a.phase = "done";
           setAnimPhase("done");
+          setRobotState("done");
           return;
         }
         const next = { ...a.pending[a.stepIdx], text: "", revealed: 0 };
@@ -836,6 +852,7 @@ function WhiteboardPage() {
     setVisibleSteps([first]);
     setTotalSteps(steps.length);
     setAnimPhase("running");
+    setRobotState("writing");
 
     rafRef.current = requestAnimationFrame(runAnimLoop);
   }
@@ -1005,11 +1022,27 @@ function WhiteboardPage() {
         </div>
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="flex min-h-0 flex-1">
+      {/* ── Mobile tab bar ──────────────────────────────────────────────── */}
+      <div className={`flex shrink-0 md:hidden border-b ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-white"}`}>
+        <button onClick={()=>setMobileTab("board")}
+          className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${mobileTab==="board"?"border-indigo-500 text-indigo-600":isDark?"border-transparent text-slate-400":"border-transparent text-slate-500"}`}>
+          <Pen size={14}/> Board
+        </button>
+        <button onClick={()=>setMobileTab("ai")}
+          className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${mobileTab==="ai"?"border-indigo-500 text-indigo-600":isDark?"border-transparent text-slate-400":"border-transparent text-slate-500"}`}>
+          <Sparkles size={14}/> AI Teacher
+          {animPhase==="running" && <span className="ml-1 h-2 w-2 animate-pulse rounded-full bg-indigo-500"/>}
+        </button>
+      </div>
 
-        {/* Left toolbar */}
-        <aside className={`flex shrink-0 flex-col gap-0.5 border-r px-0.5 py-1.5 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-gray-50"}`}>
+      {/* ── Body ────────────────────────────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+
+        {/* Board side (toolbar + canvas) — hidden on mobile when AI tab active */}
+        <div className={`flex min-h-0 flex-1 ${mobileTab==="ai"?"hidden md:flex":"flex"}`}>
+
+        {/* Left toolbar — desktop only */}
+        <aside className={`hidden md:flex shrink-0 flex-col gap-0.5 border-r px-0.5 py-1.5 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-gray-50"}`}>
           {([
             ["pen",         <Pen size={15}/>,                   "Pen (P)"],
             ["pencil",      <Pen size={13} className="opacity-50"/>, "Pencil"],
@@ -1126,11 +1159,18 @@ function WhiteboardPage() {
               <p className={`text-sm ${isDark?"text-slate-500":"text-slate-300"}`}>Start drawing, or ask the AI to teach</p>
             </div>
           )}
-        </div>
+
+          {/* AI Robot Teacher overlay */}
+          {showRobot && animPhase !== "idle" && (
+            <RobotTeacher armAngle={robotArmAngle} state={robotState} isDark={isDark}/>
+          )}
+        </div>{/* /canvas */}
+
+        </div>{/* /board-side */}
 
         {/* ── AI Teaching Panel ────────────────────────────────────────── */}
-        {showAI && (
-          <aside className={`flex w-[340px] shrink-0 flex-col border-l ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}
+        {(showAI || mobileTab === "ai") && (
+          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} shrink-0 flex-col border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}
             style={{height:"100%"}}>
 
             {/* Panel header */}
@@ -1159,28 +1199,28 @@ function WhiteboardPage() {
                 </div>
               </div>
 
-              {/* Row 2: Write-on-board toggle */}
-              <div className={`flex items-center justify-between px-3 pb-2`}>
+              {/* Row 2: Toggles */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 pb-2">
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] font-semibold ${isDark?"text-slate-400":"text-slate-500"}`}>
-                    ✏️ Write answers on board
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Clear AI writing button */}
-                  {aiElemIdsRef.current.size > 0 && (
-                    <button onClick={clearAIDrawing}
-                      className={`rounded px-1.5 py-0.5 text-[9px] font-medium transition-colors ${isDark?"text-slate-500 hover:text-red-400 hover:bg-red-900/20":"text-slate-400 hover:text-red-500 hover:bg-red-50"}`}>
-                      Clear board text
-                    </button>
-                  )}
-                  {/* Toggle pill */}
-                  <button
-                    onClick={()=>setDrawOnCanvas(v=>!v)}
+                  <span className={`text-[10px] font-semibold ${isDark?"text-slate-400":"text-slate-500"}`}>✏️ Write on board</span>
+                  <button onClick={()=>setDrawOnCanvas(v=>!v)}
                     className={`relative h-5 w-9 rounded-full transition-colors ${drawOnCanvas?(isDark?"bg-indigo-600":"bg-indigo-500"):(isDark?"bg-slate-700":"bg-gray-300")}`}>
                     <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${drawOnCanvas?"translate-x-4":"translate-x-0.5"}`}/>
                   </button>
                 </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-semibold ${isDark?"text-slate-400":"text-slate-500"}`}>🤖 Robot</span>
+                  <button onClick={()=>setShowRobot(v=>!v)}
+                    className={`relative h-5 w-9 rounded-full transition-colors ${showRobot?(isDark?"bg-indigo-600":"bg-indigo-500"):(isDark?"bg-slate-700":"bg-gray-300")}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${showRobot?"translate-x-4":"translate-x-0.5"}`}/>
+                  </button>
+                </div>
+                {aiElemIdsRef.current.size > 0 && (
+                  <button onClick={clearAIDrawing}
+                    className={`ml-auto rounded px-1.5 py-0.5 text-[9px] font-medium transition-colors ${isDark?"text-slate-500 hover:text-red-400 hover:bg-red-900/20":"text-slate-400 hover:text-red-500 hover:bg-red-50"}`}>
+                    Clear board text
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1386,6 +1426,123 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
       }`}>
       {children}
     </button>
+  );
+}
+
+// ─── Robot Teacher ────────────────────────────────────────────────────────────
+
+function RobotTeacher({ armAngle, state, isDark }: {
+  armAngle: number; state: "idle" | "writing" | "done"; isDark: boolean;
+}) {
+  const isWriting = state === "writing";
+  const isDone    = state === "done";
+  const bodyFill  = isDark ? "#1E293B" : "#EEF2FF";
+  const stroke    = "#6366F1";
+
+  return (
+    <div className="pointer-events-none absolute bottom-14 right-3 z-10 select-none drop-shadow-2xl">
+      <svg width="92" height="122" viewBox="0 0 92 122" fill="none">
+        <style>{`
+          .rb-body { animation: rbBreath 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+          .rb-head  { animation: rbBob   3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+          .rb-el    { animation: rbBlink 4.1s ease-in-out infinite;     transform-box: fill-box; transform-origin: center; }
+          .rb-er    { animation: rbBlink 4.1s ease-in-out infinite 0.12s; transform-box: fill-box; transform-origin: center; }
+          @keyframes rbBreath { 0%,100%{transform:scaleY(1)}   50%{transform:scaleY(1.04)} }
+          @keyframes rbBob    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+          @keyframes rbBlink  { 0%,82%,100%{transform:scaleY(1)} 87%{transform:scaleY(0.08)} 92%{transform:scaleY(1)} }
+        `}</style>
+
+        {/* Antenna */}
+        <line x1="46" y1="7" x2="46" y2="21" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"/>
+        <circle cx="46" cy="5" r="5.5" fill="#4F46E5"/>
+        <circle cx="46" cy="5" r="2.5" fill="#C7D2FE" style={{animation:"rbBreath 1.2s ease-in-out infinite"}}/>
+
+        {/* Head group */}
+        <g className="rb-head">
+          <rect x="20" y="18" width="52" height="42" rx="14" fill={bodyFill} stroke={stroke} strokeWidth="2"/>
+
+          {/* Left eye */}
+          <g className="rb-el">
+            <circle cx="33" cy="36" r="8.5" fill="#4F46E5"/>
+            <circle cx="33" cy="36" r="5.5" fill="#E0E7FF"/>
+            <circle cx="34.5" cy="35" r="2.8" fill="#1E1B4B"/>
+            <circle cx="36"   cy="33" r="1.1" fill="white"/>
+          </g>
+
+          {/* Right eye */}
+          <g className="rb-er">
+            <circle cx="59" cy="36" r="8.5" fill="#4F46E5"/>
+            <circle cx="59" cy="36" r="5.5" fill="#E0E7FF"/>
+            <circle cx="60.5" cy="35" r="2.8" fill="#1E1B4B"/>
+            <circle cx="62"   cy="33" r="1.1" fill="white"/>
+          </g>
+
+          {/* Mouth — changes with state */}
+          {isDone ? (
+            <path d="M 33 52 Q 46 61 59 52" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+          ) : isWriting ? (
+            <>
+              <ellipse cx="46" cy="54" rx="7" ry="3.5" fill="#6366F1" opacity="0.55"/>
+              <ellipse cx="46" cy="54" rx="4" ry="2"   fill="#4F46E5" opacity="0.7"/>
+            </>
+          ) : (
+            <path d="M 36 53 Q 46 50 56 53" stroke={stroke} strokeWidth="2" strokeLinecap="round" fill="none"/>
+          )}
+        </g>
+
+        {/* Body */}
+        <g className="rb-body">
+          <rect x="15" y="62" width="62" height="44" rx="13" fill={bodyFill} stroke={stroke} strokeWidth="2"/>
+          {/* Chest badge */}
+          <circle cx="46" cy="84" r="13" fill="#6366F1" opacity="0.1"/>
+          <circle cx="46" cy="84" r="8"  fill="#6366F1" opacity="0.22"/>
+          <circle cx="46" cy="84" r="4.5" fill="#4F46E5"/>
+          <circle cx="46" cy="84" r="2"  fill="#C7D2FE"/>
+          {/* Side vents */}
+          <rect x="20" y="90" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
+          <rect x="20" y="94" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
+          <rect x="64" y="90" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
+          <rect x="64" y="94" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
+        </g>
+
+        {/* Left arm (idle, static) */}
+        <rect x="2" y="65" width="13" height="30" rx="6.5" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
+
+        {/* Right arm — writing arm, rotates to follow pen position */}
+        <g style={{
+          transformOrigin: "77px 75px",
+          transform: `rotate(${armAngle}deg)`,
+          transition: isWriting ? "transform 0.55s cubic-bezier(0.34,1.56,0.64,1)" : "transform 1.2s ease-in-out",
+        }}>
+          {/* Upper arm */}
+          <rect x="77" y="70" width="26" height="10" rx="5" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
+          {/* Wrist joint */}
+          <circle cx="103" cy="75" r="5.5" fill="#4F46E5"/>
+          {/* Pen body */}
+          <rect x="105" y="72.5" width="17" height="5" rx="2.5" fill={isDark?"#94A3B8":"#334155"}/>
+          {/* Pen grip */}
+          <rect x="108" y="73" width="2" height="4" rx="1" fill={isDark?"#64748B":"#64748B"} opacity="0.5"/>
+          <rect x="112" y="73" width="2" height="4" rx="1" fill={isDark?"#64748B":"#64748B"} opacity="0.5"/>
+          {/* Pen tip */}
+          <path d="M 122 72.5 L 129 75 L 122 77.5 Z" fill="#EF4444"/>
+          {/* Ink dot at tip (visible when writing) */}
+          {isWriting && <circle cx="129" cy="75" r="2" fill="#EF4444" opacity="0.6" style={{animation:"rbBlink 0.4s ease-in-out infinite"}}/>}
+        </g>
+
+        {/* Feet */}
+        <rect x="21" y="104" width="18" height="14" rx="6" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
+        <rect x="53" y="104" width="18" height="14" rx="6" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
+      </svg>
+
+      {/* Status label */}
+      <div className={`mt-0.5 flex items-center justify-center rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider shadow-lg ${
+        isWriting ? "bg-indigo-600 text-white" :
+        isDone    ? "bg-emerald-600 text-white" :
+                    "bg-slate-600 text-white"
+      }`}>
+        {isWriting ? "✏️ Writing…" : isDone ? "✅ Done!" : "💤 Ready"}
+      </div>
+    </div>
   );
 }
 
