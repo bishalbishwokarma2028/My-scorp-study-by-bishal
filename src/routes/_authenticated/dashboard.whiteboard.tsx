@@ -840,7 +840,7 @@ function WhiteboardPage() {
     const isFml    = step.type === "formula";
     const fontSize = isTtl ? 34 : isFml ? 22 : 20;
     const lineH    = fontSize * 1.65;
-    const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
+    const maxW     = Math.max(280, (canvas.width * 0.82) / zoomRef.current);
 
     // Remove old live elements
     const liveIds = liveElemIdsRef.current;
@@ -853,20 +853,22 @@ function WhiteboardPage() {
     const partial = step.fullText.slice(0, charIdx);
     if (!partial) return;
 
-    // Compute label (same logic as writeStepToCanvas) so live text lands at correct Y
+    // Compute label (same logic as writeStepToCanvas) so live text lands at correct Y.
+    // Title steps get extra top padding — must mirror writeStepToCanvas exactly.
     const lbl = step.type === "step" && step.num
       ? `▸  Step ${step.num}`
       : step.type !== "explain" ? `▸  ${TYPE_LABEL[step.type]}` : "";
+    const titlePad = isTtl ? 18 : 0;
     if (lbl) {
       const lid = uid();
       liveElemIdsRef.current.add(lid);
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
         id: lid, tool: "text", points: [], color: clr,
         strokeWidth: 2, opacity: 1, page: pg,
-        text: lbl, fontSize: 16, x1: pos.x, y1: pos.y,
+        text: lbl, fontSize: 16, x1: pos.x, y1: pos.y + titlePad,
       }];
     }
-    const labelOffset = lbl ? 28 : 0;
+    const labelOffset = (lbl ? 28 : 0) + titlePad;
     const startY = pos.y + labelOffset;
 
     const lines = computeLines(ctx, partial, fontSize, isTtl, maxW);
@@ -923,7 +925,7 @@ function WhiteboardPage() {
     const isDiag  = step.type === "diagram";
     const fontSize = isTtl ? 34 : isFml ? 22 : 20;
     const lineH    = fontSize * 1.65;
-    const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
+    const maxW     = Math.max(280, (canvas.width * 0.82) / zoomRef.current);
 
     // Remove any live (in-progress) elements for this step first
     const liveIds = liveElemIdsRef.current;
@@ -1008,12 +1010,16 @@ function WhiteboardPage() {
       return;
     }
 
-    // Label row — bigger, bold, more spacing (skip for plain "explain" steps)
+    // Label row — bigger, bold, more spacing (skip for plain "explain" steps).
+    // For the TITLE step, add top padding so "▸ Topic" isn't flush against the
+    // top of the canvas or the previous step.
     const lbl = step.type === "step" && step.num
       ? `▸  Step ${step.num}`
       : step.type !== "explain"
         ? `▸  ${TYPE_LABEL[step.type]}`
         : "";
+
+    if (isTtl) pos.y += 18; // extra breathing room above the "Topic" label
 
     if (lbl) {
       const labelId = uid();
@@ -1023,7 +1029,7 @@ function WhiteboardPage() {
         strokeWidth: 2, opacity: 1, page: pg,
         text: lbl, fontSize: 16, x1: pos.x, y1: pos.y,
       }];
-      pos.y += 28;
+      pos.y += 28; // gap between label and body text
     }
 
     const lines = computeLines(ctx, step.fullText, fontSize, isTtl, maxW);
@@ -1039,18 +1045,25 @@ function WhiteboardPage() {
       pos.y += lineH;
     }
 
-    // Underline after title — spans the longest title line for a clean look
+    // Track the y-position of the last written line's BASELINE so the hand and
+    // underline are anchored to the actual text, not to the next step's start y.
+    // After the loop, pos.y is exactly one lineH past the last baseline.
+    const lastBaselineY = pos.y - lineH;
+
+    // Underline after title — drawn just below the last title line's descenders,
+    // not at pos.y (which is already lineH below the last line).
     if (isTtl) {
       ctx.font = hwFont(fontSize, true);
       const longestW = Math.max(...lines.map(ln => ctx.measureText(ln).width / zoomRef.current));
+      const underlineY = lastBaselineY + fontSize * 0.28 + 6; // just below glyph descenders
       const sepId = uid();
       aiElemIdsRef.current.add(sepId);
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
         id: sepId, tool: "line", points: [], color: clr,
         strokeWidth: 3, opacity: 0.75, page: pg,
-        x1: pos.x, y1: pos.y + 4, x2: pos.x + Math.min(longestW + 12, maxW), y2: pos.y + 4,
+        x1: pos.x, y1: underlineY, x2: pos.x + Math.min(longestW + 12, maxW), y2: underlineY,
       }];
-      pos.y += 22;
+      pos.y = underlineY + 22; // next content starts 22 px below the underline
     } else {
       pos.y += 12;
     }
@@ -1061,10 +1074,11 @@ function WhiteboardPage() {
       setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
     }
 
-    // Tip sits 1.5 lines below the last written line so the hand body (upward)
-    // only covers the bottom of the current active line, not previous lines.
-    const hx = (pos.x + Math.min(maxW * 0.5, 180)) * zoomRef.current + panRef.current.x;
-    const hy = (pos.y + lineH * 1.0) * zoomRef.current + panRef.current.y;
+    // Park the hand just below the last WRITTEN line (not at the next-step position).
+    // This keeps the hand close to the text after animation completes instead of
+    // floating far below in empty space.
+    const hx = (pos.x + Math.min(maxW * 0.35, 140)) * zoomRef.current + panRef.current.x;
+    const hy = (lastBaselineY + fontSize * 0.5 + 10) * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
     setHandState("writing");
 
