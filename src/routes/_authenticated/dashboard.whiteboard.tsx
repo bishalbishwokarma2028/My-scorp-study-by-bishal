@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/whiteboard")({
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Tool = "pen" | "pencil" | "highlighter" | "eraser" | "select"
-          | "text" | "line" | "arrow" | "rect" | "circle" | "triangle" | "laser";
+          | "text" | "line" | "arrow" | "rect" | "circle" | "triangle" | "laser" | "diagram";
 
 type BgMode  = "blank" | "grid" | "dots";
 type Theme   = "light" | "dark";
@@ -54,11 +54,11 @@ interface ConvMsg { role: "user" | "assistant"; content: string }
 
 function useHandwritingFont() {
   useEffect(() => {
-    if (document.getElementById("caveat-font")) return;
+    if (document.getElementById("hw-font")) return;
     const link = document.createElement("link");
-    link.id   = "caveat-font";
+    link.id   = "hw-font";
     link.rel  = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap";
     document.head.appendChild(link);
   }, []);
 }
@@ -284,13 +284,19 @@ function drawShape(ctx: CanvasRenderingContext2D, el: DrawEl) {
   ctx.restore();
 }
 
+const HW_FAMILY = "'Patrick Hand', cursive";
+
+function hwFont(size: number, bold = false) {
+  return `${bold ? "600" : "400"} ${size}px ${HW_FAMILY}`;
+}
+
 function drawText(ctx: CanvasRenderingContext2D, el: DrawEl) {
   if (!el.text || el.x1 === undefined) return;
   ctx.save();
-  // Use Caveat handwriting font for all AI-generated text (detected by non-standard sizes)
-  const isHW = el.fontSize && [16, 20, 28, 13].includes(el.fontSize);
+  // AI-generated text uses Patrick Hand handwriting font (detected by font sizes 13/16/20/28)
+  const isHW = el.fontSize && [13, 16, 20, 28].includes(el.fontSize);
   ctx.font = isHW
-    ? `${el.strokeWidth >= 3 ? "700" : "500"} ${el.fontSize}px 'Caveat', cursive`
+    ? hwFont(el.fontSize!, el.strokeWidth >= 3)
     : `${el.fontSize ?? 18}px Inter, sans-serif`;
   ctx.fillStyle = el.color;
   ctx.fillText(el.text, el.x1, el.y1!);
@@ -334,7 +340,7 @@ function drawDiagramOnCanvas(
   ctx.lineCap     = "round";
   ctx.lineJoin    = "round";
 
-  const HW_FONT = "600 15px 'Caveat', cursive";
+  const HW_FONT = `400 15px ${HW_FAMILY}`;
   let usedH = 0;
 
   if (kind === "right-triangle") {
@@ -594,6 +600,9 @@ function WhiteboardPage() {
   const aiElemIdsRef                      = useRef<Set<string>>(new Set());
   // callback ref so animation RAF can call it without stale closures
   const writeStepCbRef                    = useRef<(step: TeachStep) => void>(() => {});
+  // Live "currently typing" elements — cleared and rebuilt each word boundary
+  const liveElemIdsRef                    = useRef<Set<string>>(new Set());
+  const writeLiveCharCbRef                = useRef<(step: TeachStep, charIdx: number) => void>(() => {});
 
   useEffect(() => { drawOnCanvasRef.current = drawOnCanvas; }, [drawOnCanvas]);
 
@@ -661,6 +670,8 @@ function WhiteboardPage() {
         drCtx.restore();
       } else if (el.tool === "text") {
         drawText(drCtx, el);
+      } else if (el.tool === "diagram") {
+        drawDiagramOnCanvas(drCtx, el.text ?? "", el.x1 ?? 0, el.y1 ?? 0, el.color);
       } else {
         drawShape(drCtx, el);
       }
@@ -684,7 +695,100 @@ function WhiteboardPage() {
 
   useEffect(() => { redrawCanvas(); }, [redrawCanvas, pan, zoom, page]);
 
-  // ── Write AI step to canvas ──────────────────────────────────────────────
+  // ── Shared word-wrap utility ─────────────────────────────────────────────
+  const computeLines = useCallback((ctx: CanvasRenderingContext2D, text: string, fontSize: number, isTtl: boolean, maxW: number) => {
+    ctx.font = hwFont(fontSize, isTtl);
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width / zoomRef.current > maxW && line) {
+        lines.push(line); line = word;
+      } else { line = test; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }, []);
+
+  // ── Live (in-progress) canvas writing — called every word boundary ───────
+  const writeLiveToCanvas = useCallback((step: TeachStep, charIdx: number) => {
+    if (!drawOnCanvasRef.current || step.type === "separator" || step.type === "diagram") return;
+    const canvas = drawRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const pg       = pageRef.current;
+    const pos      = canvasWritePosRef.current;
+    const clr      = TYPE_COLOR[step.type];
+    const isTtl    = step.type === "title";
+    const isFml    = step.type === "formula";
+    const fontSize = isTtl ? 28 : isFml ? 20 : 16;
+    const lineH    = fontSize * 1.6;
+    const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
+
+    // Remove old live elements
+    const liveIds = liveElemIdsRef.current;
+    if (liveIds.size > 0) {
+      elemRef.current[pg] = (elemRef.current[pg] ?? []).filter(e => !liveIds.has(e.id));
+      liveElemIdsRef.current = new Set();
+    }
+
+    // Partial text typed so far
+    const partial = step.fullText.slice(0, charIdx);
+    if (!partial) return;
+
+    // Compute label (same logic as writeStepToCanvas) so live text lands at correct Y
+    const lbl = step.type === "step" && step.num
+      ? `▸  Step ${step.num}`
+      : step.type !== "explain" ? `▸  ${TYPE_LABEL[step.type]}` : "";
+    if (lbl) {
+      const lid = uid();
+      liveElemIdsRef.current.add(lid);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: lid, tool: "text", points: [], color: clr,
+        strokeWidth: 1, opacity: 1, page: pg,
+        text: lbl, fontSize: 13, x1: pos.x, y1: pos.y,
+      }];
+    }
+    const labelOffset = lbl ? 20 : 0;
+    const startY = pos.y + labelOffset;
+
+    const lines = computeLines(ctx, partial, fontSize, isTtl, maxW);
+
+    let lastLineY = startY;
+    lines.forEach((ln, li) => {
+      const eid = uid();
+      liveElemIdsRef.current.add(eid);
+      const y = startY + li * lineH;
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: eid, tool: "text", points: [], color: clr,
+        strokeWidth: isTtl ? 3 : 1, opacity: 1, page: pg,
+        text: ln, fontSize, x1: pos.x, y1: y,
+      }];
+      lastLineY = y;
+    });
+
+    // Hand follows the end of the last typed character on canvas
+    const lastLine = lines[lines.length - 1] ?? "";
+    ctx.font = hwFont(fontSize, isTtl);
+    const lastLineW = ctx.measureText(lastLine).width / zoomRef.current;
+    const handWX = pos.x + Math.min(lastLineW + 4, maxW - 10);
+    const handWY = lastLineY;
+    const hx = handWX * zoomRef.current + panRef.current.x;
+    const hy = handWY * zoomRef.current + panRef.current.y;
+    setHandScreenPos({ x: hx, y: hy });
+
+    // Auto-pan if near bottom
+    if (lastLineY * zoomRef.current + panRef.current.y > canvas.height - 140) {
+      setPan(p => ({ ...p, y: Math.min(0, -(lastLineY * zoomRef.current - canvas.height * 0.38)) }));
+    }
+
+    redrawCanvas();
+  }, [redrawCanvas, computeLines]);
+
+  // ── Write final AI step to canvas (called when step finishes typing) ─────
   const writeStepToCanvas = useCallback((step: TeachStep) => {
     if (!drawOnCanvasRef.current || step.type === "separator") return;
     const canvas = drawRef.current;
@@ -701,28 +805,31 @@ function WhiteboardPage() {
     const fontSize = isTtl ? 28 : isFml ? 20 : 16;
     const lineH    = fontSize * 1.6;
     const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
-    const hwFont   = (size: number, bold = false) =>
-      `${bold ? "700" : "500"} ${size}px 'Caveat', cursive`;
 
-    // ── Diagram step — draw directly then early-return ───────────────────
+    // Remove any live (in-progress) elements for this step first
+    const liveIds = liveElemIdsRef.current;
+    if (liveIds.size > 0) {
+      elemRef.current[pg] = (elemRef.current[pg] ?? []).filter(e => !liveIds.has(e.id));
+      liveElemIdsRef.current = new Set();
+    }
+
+    // ── Diagram step — store in elemRef so it persists across redraws ────
     if (isDiag) {
-      const tmpCtx = canvas.getContext("2d")!;
-      tmpCtx.save();
-      tmpCtx.translate(panRef.current.x, panRef.current.y);
-      tmpCtx.scale(zoomRef.current, zoomRef.current);
-      const diagH = drawDiagramOnCanvas(tmpCtx, step.fullText, pos.x + 10, pos.y + 4, clr);
-      tmpCtx.restore();
-      pos.y += diagH + 18;
-      const dummyId = uid();
-      aiElemIdsRef.current.add(dummyId);
+      const diagId = uid();
+      aiElemIdsRef.current.add(diagId);
+      // Measure height without drawing (use a temporary off-screen compute)
+      const tmpCanvas = document.createElement("canvas");
+      tmpCanvas.width = 400; tmpCanvas.height = 400;
+      const tmpCtx = tmpCanvas.getContext("2d")!;
+      const diagH = drawDiagramOnCanvas(tmpCtx, step.fullText, 0, 0, clr);
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
-        id: dummyId, tool: "text", points: [], color: "transparent",
-        strokeWidth: 1, opacity: 0, page: pg,
-        text: " ", fontSize: 1, x1: pos.x, y1: pos.y,
+        id: diagId, tool: "diagram" as Tool, points: [], color: clr,
+        strokeWidth: 2, opacity: 1, page: pg,
+        text: step.fullText, fontSize: 1, x1: pos.x + 8, y1: pos.y + 4,
       }];
-      // Update hand position
-      const hx = (pos.x + 60) * zoomRef.current + panRef.current.x;
-      const hy = pos.y * zoomRef.current + panRef.current.y;
+      pos.y += diagH + 24;
+      const hx = (pos.x + 80) * zoomRef.current + panRef.current.x;
+      const hy = (pos.y - 30) * zoomRef.current + panRef.current.y;
       setHandScreenPos({ x: hx, y: hy });
       setHandState("writing");
       if (pos.y * zoomRef.current + panRef.current.y > canvas.height - 140) {
@@ -750,20 +857,7 @@ function WhiteboardPage() {
       pos.y += 20;
     }
 
-    // Word-wrap body text with Caveat font measurement
-    ctx.font = hwFont(fontSize, isTtl);
-    const words = step.fullText.split(" ");
-    const lines: string[] = [];
-    let line = "";
-    for (const word of words) {
-      const test = line ? `${line} ${word}` : word;
-      if (ctx.measureText(test).width / zoomRef.current > maxW && line) {
-        lines.push(line); line = word;
-      } else {
-        line = test;
-      }
-    }
-    if (line) lines.push(line);
+    const lines = computeLines(ctx, step.fullText, fontSize, isTtl, maxW);
 
     for (const ln of lines) {
       const eid = uid();
@@ -787,7 +881,6 @@ function WhiteboardPage() {
       }];
       pos.y += 16;
     } else if (isFml) {
-      // Box around formula
       const boxId = uid();
       aiElemIdsRef.current.add(boxId);
       const boxTop = pos.y - lines.length * lineH - 6;
@@ -801,30 +894,30 @@ function WhiteboardPage() {
       pos.y += 10;
     }
 
-    // Auto-pan down
     if (pos.y * zoomRef.current + panRef.current.y > canvas.height - 140) {
       setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
     }
 
-    // Update hand position to follow writing
     const hx = (pos.x + Math.min(maxW * 0.5, 180)) * zoomRef.current + panRef.current.x;
     const hy = (pos.y - fontSize * 0.5) * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
     setHandState("writing");
 
     redrawCanvas();
-  }, [redrawCanvas]);
+  }, [redrawCanvas, computeLines]);
 
-  // Keep the callback ref in sync so the RAF loop always calls the latest version
+  // Keep the callback refs in sync so the RAF loop always calls the latest version
   useEffect(() => { writeStepCbRef.current = writeStepToCanvas; }, [writeStepToCanvas]);
+  useEffect(() => { writeLiveCharCbRef.current = writeLiveToCanvas; }, [writeLiveToCanvas]);
 
   // Clear only AI-written elements, leaving user drawings untouched
   function clearAIDrawing() {
-    const ids = aiElemIdsRef.current;
+    const ids = new Set([...aiElemIdsRef.current, ...liveElemIdsRef.current]);
     for (let pg = 0; pg < elemRef.current.length; pg++) {
       elemRef.current[pg] = (elemRef.current[pg] ?? []).filter(e => !ids.has(e.id));
     }
     aiElemIdsRef.current = new Set();
+    liveElemIdsRef.current = new Set();
     canvasWritePosRef.current = { x: 48, y: 64 };
     redrawCanvas();
   }
@@ -1079,10 +1172,11 @@ function WhiteboardPage() {
           a.shown[last] = { ...a.shown[last], text: full.slice(0, a.charIdx), revealed: a.charIdx };
           setVisibleSteps([...a.shown]);
           a.pauseMs = cfg.charMs;
-          // Auto-scroll as text reveals
           stepsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+          // ── Simultaneously write to canvas letter by letter ──────────────
+          writeLiveCharCbRef.current(a.pending[a.stepIdx], a.charIdx);
         } else {
-          // Step finished typing — write it to the canvas
+          // Step finished typing — finalize on canvas (clears live elements, adds decorations)
           writeStepCbRef.current(a.pending[a.stepIdx]);
           a.phase = "step-pause"; a.pauseMs = cfg.stepMs;
         }
@@ -1137,8 +1231,14 @@ function WhiteboardPage() {
   function skipAnimation() {
     cancelAnimationFrame(rafRef.current);
     const a = animRef.current;
+    // Clear any in-progress live elements first
+    const pg = pageRef.current;
+    if (liveElemIdsRef.current.size > 0) {
+      elemRef.current[pg] = (elemRef.current[pg] ?? []).filter(e => !liveElemIdsRef.current.has(e.id));
+      liveElemIdsRef.current = new Set();
+    }
     // Write all steps that haven't been written yet to the canvas
-    const alreadyWritten = a.shown.length - 1; // last shown was mid-typing, not written
+    const alreadyWritten = a.shown.length - 1;
     for (let i = Math.max(0, alreadyWritten); i < a.pending.length; i++) {
       writeStepCbRef.current(a.pending[i]);
     }
@@ -1146,6 +1246,7 @@ function WhiteboardPage() {
     a.shown = all; a.phase = "done";
     setVisibleSteps(all);
     setAnimPhase("done");
+    setHandState("done");
   }
 
   function changeSpeed(s: Speed) {
@@ -1691,6 +1792,11 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
 
 // ─── Teacher Hand ─────────────────────────────────────────────────────────────
 
+// ─── Teacher Hand — follows the writing cursor on canvas ──────────────────────
+// The pen tip is positioned at (pos.x, pos.y) in canvas screen coords.
+// The hand SVG is laid out so its pen tip is at (48, 0) in SVG space.
+// We offset left by 48 and up by ~110 so the hand sits above/right of writing point.
+
 function TeacherHand({
   pos, state, isDark,
 }: {
@@ -1701,139 +1807,154 @@ function TeacherHand({
   const isWriting = state === "writing";
   const isDone    = state === "done";
 
-  // The hand is anchored at the bottom-right; the arm rotates toward `pos`
-  // We show it fixed at the bottom-right corner of the canvas, similar to the reference image.
+  // Skin + sleeve tones
+  const skin   = isDark ? "#D4956A" : "#FDDCB4";
+  const skinD  = isDark ? "#B8784E" : "#F5C28A";
+  const sleeve = isDark ? "#1E3A5F" : "#2563EB";
+  const sleeveD= isDark ? "#1A3357" : "#1D4ED8";
+
   return (
-    <div
-      className="pointer-events-none absolute bottom-0 right-0 z-10 select-none"
-      style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.35))" }}
-    >
-      {/* Writing status pill */}
+    <>
+      {/* Status pill — floats near the hand, doesn't move with it */}
       {isWriting && (
-        <div className="absolute bottom-[210px] right-[155px] flex items-center gap-1.5 rounded-full bg-slate-800/90 px-3 py-1.5 text-[11px] font-semibold text-white shadow-xl backdrop-blur">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-400"/>
-          Bishal's Assistant is writing…
+        <div
+          className="pointer-events-none absolute z-20 select-none"
+          style={{
+            left: Math.max(8, pos.x - 110),
+            top:  Math.max(8, pos.y - 150),
+            transition: "left 0.3s ease-out, top 0.3s ease-out",
+          }}
+        >
+          <div className="flex items-center gap-1.5 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400"/>
+            writing…
+          </div>
         </div>
       )}
       {isDone && (
-        <div className="absolute bottom-[210px] right-[155px] flex items-center gap-1.5 rounded-full bg-emerald-700/90 px-3 py-1.5 text-[11px] font-semibold text-white shadow-xl">
-          ✓ Done explaining!
+        <div
+          className="pointer-events-none absolute z-20 select-none"
+          style={{
+            left: Math.max(8, pos.x - 60),
+            top:  Math.max(8, pos.y - 150),
+          }}
+        >
+          <div className="flex items-center gap-1 rounded-full bg-emerald-600/90 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg">
+            ✓ Done!
+          </div>
         </div>
       )}
 
-      {/* Hand + arm SVG — human hand holding a black marker */}
-      <svg
-        width="200" height="220"
-        viewBox="0 0 200 220"
-        fill="none"
-        style={{ display: "block" }}
+      {/* Hand SVG — pen tip anchored to writing position */}
+      <div
+        className="pointer-events-none absolute z-10 select-none"
+        style={{
+          // Shift so the pen tip (SVG x=48, y=130) lands exactly at pos
+          left: pos.x - 48,
+          top:  pos.y - 148,
+          transition: isWriting
+            ? "left 0.08s linear, top 0.08s linear"
+            : "left 0.5s ease-out, top 0.5s ease-out",
+          filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))",
+          opacity: state === "idle" ? 0 : 1,
+          transitionProperty: "left, top, opacity",
+        }}
       >
-        <style>{`
-          @keyframes handWrite {
-            0%,100% { transform: translate(0px, 0px) rotate(-3deg); }
-            25%      { transform: translate(1px,-1px) rotate(-2deg); }
-            75%      { transform: translate(-1px,1px) rotate(-4deg); }
-          }
-          @keyframes handIdle {
-            0%,100% { transform: translateY(0px); }
-            50%      { transform: translateY(-3px); }
-          }
-          .hand-group {
-            transform-origin: 130px 180px;
-            animation: ${isWriting ? "handWrite 0.35s ease-in-out infinite" : "handIdle 2.4s ease-in-out infinite"};
-          }
-        `}</style>
+        <svg width="130" height="160" viewBox="0 0 130 160" fill="none">
+          <style>{`
+            @keyframes hwWrite {
+              0%,100% { transform: rotate(0deg) translate(0,0); }
+              30%      { transform: rotate(1.5deg) translate(0.5px,-0.5px); }
+              70%      { transform: rotate(-1deg) translate(-0.5px,0.5px); }
+            }
+            @keyframes hwIdle {
+              0%,100% { transform: translateY(0); }
+              50%      { transform: translateY(-2px); }
+            }
+            .hw-group {
+              transform-origin: 48px 115px;
+              animation: ${isWriting ? "hwWrite 0.22s ease-in-out infinite" : "hwIdle 2.2s ease-in-out infinite"};
+            }
+          `}</style>
 
-        {/* Forearm / sleeve */}
-        <rect
-          x="70" y="155" width="120" height="70" rx="22"
-          fill={isDark ? "#1E293B" : "#F1F5F9"}
-          stroke={isDark ? "#334155" : "#CBD5E1"}
-          strokeWidth="2"
-        />
-        {/* Sleeve cuff detail */}
-        <rect
-          x="70" y="158" width="120" height="14" rx="7"
-          fill={isDark ? "#334155" : "#E2E8F0"}
-        />
+          <g className="hw-group">
+            {/* ── Forearm / sleeve coming from top-right ── */}
+            {/* Sleeve cylinder */}
+            <rect x="55" y="0" width="68" height="95" rx="28"
+              fill={sleeve} />
+            {/* Sleeve shading */}
+            <rect x="55" y="0" width="68" height="16" rx="14"
+              fill={sleeveD} opacity="0.6"/>
+            {/* Cuff band */}
+            <rect x="52" y="78" width="74" height="18" rx="9"
+              fill={sleeveD}/>
 
-        {/* Hand group — animated */}
-        <g className="hand-group">
-          {/* Palm */}
-          <ellipse cx="130" cy="152" rx="38" ry="30"
-            fill={isDark ? "#FBBF80" : "#FDDCB4"}
-            stroke={isDark ? "#D97706" : "#F59E0B"}
-            strokeWidth="1.2"
-          />
+            {/* ── Palm ── */}
+            <ellipse cx="52" cy="105" rx="30" ry="25"
+              fill={skin}/>
+            {/* Palm shadow */}
+            <ellipse cx="52" cy="110" rx="26" ry="16"
+              fill={skinD} opacity="0.35"/>
 
-          {/* Thumb */}
-          <ellipse cx="94" cy="148" rx="11" ry="17"
-            fill={isDark ? "#FBBF80" : "#FDDCB4"}
-            stroke={isDark ? "#D97706" : "#F59E0B"}
-            strokeWidth="1"
-            transform="rotate(-30 94 148)"
-          />
+            {/* ── Fingers curled around pen ── */}
+            {/* Index */}
+            <rect x="22" y="83" width="14" height="34" rx="7"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Middle */}
+            <rect x="38" y="80" width="13" height="36" rx="6.5"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Ring */}
+            <rect x="53" y="82" width="12" height="32" rx="6"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Pinky */}
+            <rect x="67" y="87" width="11" height="27" rx="5.5"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Thumb (sideways) */}
+            <ellipse cx="14" cy="104" rx="9" ry="15"
+              fill={skin} stroke={skinD} strokeWidth="0.8"
+              transform="rotate(-20 14 104)"/>
 
-          {/* Index finger (holding marker) */}
-          <rect x="118" y="98" width="18" height="52" rx="9"
-            fill={isDark ? "#FBBF80" : "#FDDCB4"}
-            stroke={isDark ? "#D97706" : "#F59E0B"}
-            strokeWidth="1"
-          />
-          {/* Middle finger */}
-          <rect x="138" y="101" width="17" height="49" rx="8.5"
-            fill={isDark ? "#FBBF80" : "#FDDCB4"}
-            stroke={isDark ? "#D97706" : "#F59E0B"}
-            strokeWidth="1"
-          />
-          {/* Ring finger */}
-          <rect x="156" y="108" width="15" height="44" rx="7.5"
-            fill={isDark ? "#FBBF80" : "#FDDCB4"}
-            stroke={isDark ? "#D97706" : "#F59E0B"}
-            strokeWidth="1"
-          />
-          {/* Pinky */}
-          <rect x="172" y="115" width="13" height="37" rx="6.5"
-            fill={isDark ? "#FBBF80" : "#FDDCB4"}
-            stroke={isDark ? "#D97706" : "#F59E0B"}
-            strokeWidth="1"
-          />
+            {/* ── Knuckle creases ── */}
+            <path d="M 24 113 Q 29 111 35 113" stroke={skinD} strokeWidth="0.7" fill="none"/>
+            <path d="M 40 110 Q 44 108 50 110" stroke={skinD} strokeWidth="0.7" fill="none"/>
 
-          {/* Marker pen body */}
-          <rect x="122" y="54" width="12" height="60" rx="6"
-            fill="#1E293B"
-          />
-          {/* Marker clip */}
-          <rect x="133" y="58" width="3" height="32" rx="1.5"
-            fill="#475569"
-          />
-          {/* Marker cap ring */}
-          <rect x="120" y="70" width="16" height="6" rx="3"
-            fill="#334155"
-          />
-          {/* Marker barrel band */}
-          <rect x="120" y="90" width="16" height="4" rx="2"
-            fill="#6366F1"
-          />
-          {/* Marker tip taper */}
-          <path d="M 122 114 L 128 130 L 134 114 Z" fill="#0F172A"/>
-          {/* Marker tip point */}
-          <ellipse cx="128" cy="131" rx="2.5" ry="3.5" fill="#0F172A"/>
-          {/* Ink stroke (visible when writing) */}
-          {isWriting && (
-            <ellipse
-              cx="128" cy="134"
-              rx="2" ry="1.2"
-              fill="#1E293B"
-              style={{ animation: "handWrite 0.35s ease-in-out infinite" }}
-            />
-          )}
-          {/* Knuckle lines */}
-          <path d="M 121 135 Q 128 133 135 135" stroke={isDark?"#D97706":"#F59E0B"} strokeWidth="0.8" fill="none"/>
-          <path d="M 140 133 Q 147 131 154 133" stroke={isDark?"#D97706":"#F59E0B"} strokeWidth="0.8" fill="none"/>
-        </g>
-      </svg>
-    </div>
+            {/* ── Pen / marker ── */}
+            {/* Body (dark barrel) */}
+            <rect x="41" y="46" width="14" height="84" rx="7"
+              fill="#1E293B"/>
+            {/* Barrel highlight */}
+            <rect x="43" y="48" width="4" height="70" rx="2"
+              fill="white" opacity="0.08"/>
+            {/* Color band */}
+            <rect x="40" y="100" width="16" height="6" rx="3"
+              fill="#6366F1"/>
+            {/* Grip section */}
+            <rect x="40" y="88" width="16" height="14" rx="4"
+              fill="#334155"/>
+            {/* Grip ribs */}
+            {[0,4,8].map(dy => (
+              <rect key={dy} x="40" y={90+dy} width="16" height="1.5" rx="0.75"
+                fill="white" opacity="0.12"/>
+            ))}
+            {/* Tip taper */}
+            <path d="M 41 130 L 48 148 L 55 130 Z" fill="#0F172A"/>
+            {/* Tip point — this is the writing contact at SVG (48, 148) */}
+            <circle cx="48" cy="148" r="2" fill="#1E293B"/>
+            {/* Ink dot when writing */}
+            {isWriting && (
+              <circle cx="48" cy="150" r="1.5" fill="#6366F1" opacity="0.9">
+                <animate attributeName="opacity" values="0.9;0.3;0.9" dur="0.25s" repeatCount="indefinite"/>
+              </circle>
+            )}
+
+            {/* Clip */}
+            <rect x="54" y="50" width="3" height="38" rx="1.5"
+              fill="#475569"/>
+            <circle cx="55.5" cy="50" r="3" fill="#475569"/>
+          </g>
+        </svg>
+      </div>
+    </>
   );
 }
 
