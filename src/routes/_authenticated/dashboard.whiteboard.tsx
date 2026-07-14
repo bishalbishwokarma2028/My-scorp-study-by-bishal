@@ -353,6 +353,16 @@ function WhiteboardPage() {
   const [isListening, setIsListening] = useState(false);
   const speechRef = useRef<SpeechRecognition | null>(null);
 
+  // ── Canvas-write state ────────────────────────────────────────────────────
+  const [drawOnCanvas, setDrawOnCanvas]   = useState(true);
+  const drawOnCanvasRef                   = useRef(true);
+  const canvasWritePosRef                 = useRef<{ x: number; y: number }>({ x: 48, y: 64 });
+  const aiElemIdsRef                      = useRef<Set<string>>(new Set());
+  // callback ref so animation RAF can call it without stale closures
+  const writeStepCbRef                    = useRef<(step: TeachStep) => void>(() => {});
+
+  useEffect(() => { drawOnCanvasRef.current = drawOnCanvas; }, [drawOnCanvas]);
+
   const isDark = theme === "dark";
 
   // ── Viewport conversion ──────────────────────────────────────────────────
@@ -370,7 +380,6 @@ function WhiteboardPage() {
     x: wx * zoomRef.current + panRef.current.x,
     y: wy * zoomRef.current + panRef.current.y,
   }), []);
-
   // ── Canvas resize ────────────────────────────────────────────────────────
   function resizeCanvases() {
     const el = containerRef.current;
@@ -440,6 +449,103 @@ function WhiteboardPage() {
   }, [bg, isDark]);
 
   useEffect(() => { redrawCanvas(); }, [redrawCanvas, pan, zoom, page]);
+
+  // ── Write AI step to canvas ──────────────────────────────────────────────
+  const writeStepToCanvas = useCallback((step: TeachStep) => {
+    if (!drawOnCanvasRef.current || step.type === "separator") return;
+    const canvas = drawRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const pg      = pageRef.current;
+    const pos     = canvasWritePosRef.current;
+    const clr     = TYPE_COLOR[step.type];
+    const isTtl   = step.type === "title";
+    const isFml   = step.type === "formula";
+    const fontSize = isTtl ? 26 : isFml ? 18 : 14;
+    const lineH    = fontSize * 1.55;
+    const maxW     = Math.max(200, (canvas.width * 0.55) / zoomRef.current);
+
+    // Label row (skip for plain "explain" steps)
+    const lbl = step.type === "step" && step.num
+      ? `▸ STEP ${step.num}`
+      : step.type !== "explain"
+        ? `▸ ${TYPE_LABEL[step.type].toUpperCase()}`
+        : "";
+
+    if (lbl) {
+      const labelId = uid();
+      aiElemIdsRef.current.add(labelId);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: labelId, tool: "text", points: [], color: clr,
+        strokeWidth: 1, opacity: 1, page: pg,
+        text: lbl, fontSize: 10, x1: pos.x, y1: pos.y,
+      }];
+      pos.y += 16;
+    }
+
+    // Word-wrap body text
+    ctx.font = `${fontSize}px Inter, sans-serif`;
+    const words = step.fullText.split(" ");
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width / zoomRef.current > maxW && line) {
+        lines.push(line); line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+
+    for (const ln of lines) {
+      const eid = uid();
+      aiElemIdsRef.current.add(eid);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: eid, tool: "text", points: [], color: clr,
+        strokeWidth: isTtl ? 3 : 1, opacity: 1, page: pg,
+        text: ln, fontSize, x1: pos.x, y1: pos.y,
+      }];
+      pos.y += lineH;
+    }
+
+    // Underline after title
+    if (isTtl) {
+      const sepId = uid();
+      aiElemIdsRef.current.add(sepId);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: sepId, tool: "line", points: [], color: clr,
+        strokeWidth: 1.5, opacity: 0.4, page: pg,
+        x1: pos.x, y1: pos.y + 2, x2: pos.x + maxW, y2: pos.y + 2,
+      }];
+      pos.y += 14;
+    } else {
+      pos.y += 10;
+    }
+
+    // Auto-pan down if content is near the bottom edge
+    if (canvas && pos.y * zoomRef.current + panRef.current.y > canvas.height - 120) {
+      setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.35)) }));
+    }
+
+    redrawCanvas();
+  }, [redrawCanvas]);
+
+  // Keep the callback ref in sync so the RAF loop always calls the latest version
+  useEffect(() => { writeStepCbRef.current = writeStepToCanvas; }, [writeStepToCanvas]);
+
+  // Clear only AI-written elements, leaving user drawings untouched
+  function clearAIDrawing() {
+    const ids = aiElemIdsRef.current;
+    for (let pg = 0; pg < elemRef.current.length; pg++) {
+      elemRef.current[pg] = (elemRef.current[pg] ?? []).filter(e => !ids.has(e.id));
+    }
+    aiElemIdsRef.current = new Set();
+    canvasWritePosRef.current = { x: 48, y: 64 };
+    redrawCanvas();
+  }
 
   // ── Undo / Redo ──────────────────────────────────────────────────────────
   function snapshot() {
@@ -693,6 +799,8 @@ function WhiteboardPage() {
           // Auto-scroll as text reveals
           stepsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
         } else {
+          // Step finished typing — write it to the canvas
+          writeStepCbRef.current(a.pending[a.stepIdx]);
           a.phase = "step-pause"; a.pauseMs = cfg.stepMs;
         }
       }
@@ -701,7 +809,7 @@ function WhiteboardPage() {
     rafRef.current = requestAnimationFrame(runAnimLoop);
   }
 
-  function startAnimation(steps: TeachStep[]) {
+  function startAnimation(steps: TeachStep[], isFollowUp = false) {
     cancelAnimationFrame(rafRef.current);
     const a = animRef.current;
     a.pending  = steps;
@@ -710,6 +818,14 @@ function WhiteboardPage() {
     a.charIdx  = 0;
     a.paused   = false;
     a.lastTs   = performance.now();
+
+    // Reset canvas write position for a fresh question (not follow-ups)
+    if (!isFollowUp) {
+      canvasWritePosRef.current = { x: 48, y: 64 };
+    } else {
+      // Add a small visual gap between sessions
+      canvasWritePosRef.current.y += 24;
+    }
 
     // Add first step immediately
     const first = { ...steps[0], text: "", revealed: 0 };
@@ -737,6 +853,11 @@ function WhiteboardPage() {
   function skipAnimation() {
     cancelAnimationFrame(rafRef.current);
     const a = animRef.current;
+    // Write all steps that haven't been written yet to the canvas
+    const alreadyWritten = a.shown.length - 1; // last shown was mid-typing, not written
+    for (let i = Math.max(0, alreadyWritten); i < a.pending.length; i++) {
+      writeStepCbRef.current(a.pending[i]);
+    }
     const all = a.pending.map(s => ({ ...s, text: s.fullText, revealed: s.fullText.length }));
     a.shown = all; a.phase = "done";
     setVisibleSteps(all);
@@ -775,13 +896,14 @@ function WhiteboardPage() {
       if (!script || !script.steps.length) throw new Error("Bad script");
 
       const steps = scriptToSteps(script);
+      const isFollowUp = chatHistory.length > 0;
       setChatHistory(p => [...p,
         { role: "user",      content: text },
         { role: "assistant", content: res.text },
       ]);
       setQuestion("");
       animRef.current.speed = speed;
-      startAnimation(steps);
+      startAnimation(steps, isFollowUp);
       await bump();
     } catch {
       toast.error("Teaching failed — please try again");
@@ -829,6 +951,8 @@ function WhiteboardPage() {
     cancelAnimationFrame(rafRef.current);
     elemRef.current = [[]]; setPage(0); setTotalPages(1);
     setVisibleSteps([]); setChatHistory([]); setAnimPhase("idle");
+    aiElemIdsRef.current = new Set();
+    canvasWritePosRef.current = { x: 48, y: 64 };
     redrawCanvas();
   }
 
@@ -1010,27 +1134,53 @@ function WhiteboardPage() {
             style={{height:"100%"}}>
 
             {/* Panel header */}
-            <div className={`flex shrink-0 items-center justify-between border-b px-3 py-2 ${isDark?"border-slate-700":"border-gray-200"}`}>
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600">
-                  <Sparkles size={12} className="text-white"/>
+            <div className={`flex shrink-0 flex-col border-b ${isDark?"border-slate-700":"border-gray-200"}`}>
+              {/* Row 1: title + speed + clear */}
+              <div className={`flex items-center justify-between px-3 py-2`}>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600">
+                    <Sparkles size={12} className="text-white"/>
+                  </div>
+                  <span className={`text-sm font-bold ${isDark?"text-white":"text-slate-800"}`}>AI Teaching Mode</span>
                 </div>
-                <span className={`text-sm font-bold ${isDark?"text-white":"text-slate-800"}`}>AI Teaching Mode</span>
+                <div className="flex items-center gap-1">
+                  {(["slow","normal","fast"] as Speed[]).map(s => (
+                    <button key={s} onClick={()=>changeSpeed(s)}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors ${speed===s?"bg-indigo-600 text-white":(isDark?"text-slate-500 hover:text-slate-300":"text-slate-400 hover:text-slate-600")}`}>
+                      {s==="slow"?"🐢":s==="fast"?"⚡":"●"} {s}
+                    </button>
+                  ))}
+                  {visibleSteps.length > 0 && (
+                    <button onClick={()=>{setVisibleSteps([]);setAnimPhase("idle");cancelAnimationFrame(rafRef.current);}}
+                      title="Clear panel" className={`ml-1 rounded p-1 transition-colors ${isDark?"text-slate-500 hover:text-red-400":"text-slate-400 hover:text-red-500"}`}>
+                      <X size={12}/>
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                {/* Speed selector */}
-                {(["slow","normal","fast"] as Speed[]).map(s => (
-                  <button key={s} onClick={()=>changeSpeed(s)}
-                    className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase transition-colors ${speed===s?(isDark?"bg-indigo-600 text-white":"bg-indigo-600 text-white"):(isDark?"text-slate-500 hover:text-slate-300":"text-slate-400 hover:text-slate-600")}`}>
-                    {s==="slow"?"🐢":s==="fast"?"⚡":"●"} {s}
+
+              {/* Row 2: Write-on-board toggle */}
+              <div className={`flex items-center justify-between px-3 pb-2`}>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-semibold ${isDark?"text-slate-400":"text-slate-500"}`}>
+                    ✏️ Write answers on board
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Clear AI writing button */}
+                  {aiElemIdsRef.current.size > 0 && (
+                    <button onClick={clearAIDrawing}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-medium transition-colors ${isDark?"text-slate-500 hover:text-red-400 hover:bg-red-900/20":"text-slate-400 hover:text-red-500 hover:bg-red-50"}`}>
+                      Clear board text
+                    </button>
+                  )}
+                  {/* Toggle pill */}
+                  <button
+                    onClick={()=>setDrawOnCanvas(v=>!v)}
+                    className={`relative h-5 w-9 rounded-full transition-colors ${drawOnCanvas?(isDark?"bg-indigo-600":"bg-indigo-500"):(isDark?"bg-slate-700":"bg-gray-300")}`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${drawOnCanvas?"translate-x-4":"translate-x-0.5"}`}/>
                   </button>
-                ))}
-                {visibleSteps.length > 0 && (
-                  <button onClick={()=>{setVisibleSteps([]);setAnimPhase("idle");cancelAnimationFrame(rafRef.current);}}
-                    title="Clear teaching" className={`ml-1 rounded p-1 transition-colors ${isDark?"text-slate-500 hover:text-red-400":"text-slate-400 hover:text-red-500"}`}>
-                    <X size={12}/>
-                  </button>
-                )}
+                </div>
               </div>
             </div>
 
