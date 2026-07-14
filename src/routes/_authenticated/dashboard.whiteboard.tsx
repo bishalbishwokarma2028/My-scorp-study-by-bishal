@@ -180,20 +180,27 @@ Step type rules:
 - "answer"     → Final answer with full verification. Explain what the answer means in context. Always last meaningful step.
 - "tip"        → Shortcut, memory aid, or real-world connection — 2-3 sentences. Orange.
 - "warning"    → Common mistake to avoid with explanation of WHY it is wrong — 2-3 sentences. Red.
-- "diagram"    → Draw a visual. text must be exactly one of these codes:
-    right-triangle:a,b,c   (right-angle triangle labeled with a, b, c)
-    axes:x,y               (coordinate axes with x-label and y-label)
+- "diagram"    → Draw a subject-appropriate visual diagram. ONLY include a diagram step when the topic genuinely needs one to be understood. Many topics (algebra, history, grammar, literature) do NOT need diagrams — omit them entirely for those. Only use when it adds real value:
+    • Geometry / trigonometry → right-triangle, circle, axes, number-line
+    • Physics → force-diagram, wave, axes
+    • Biology → dna
+    • Statistics / data → bar-chart
+    • Waves / oscillations → wave
+    The text value must be exactly one of:
+    right-triangle:a,b,c   (right-angle triangle with side labels)
+    axes:x,y               (coordinate axes with axis labels)
     number-line:-5,5       (number line from -5 to 5)
-    circle:r               (circle labeled with radius r)
-    force-diagram:F,mg,N   (force arrows labeled)
-    bar-chart:A,B,C        (simple 3-bar chart)
-    dna:double-helix       (DNA double helix sketch)
-    wave:sine              (sine wave)
+    circle:r               (circle with radius label)
+    force-diagram:F,mg,N   (force arrows with labels)
+    bar-chart:A,B,C        (bar chart with category labels)
+    dna:double-helix       (DNA double helix)
+    wave:sine              (sine wave with amplitude/time axes)
+    If no diagram type fits, do NOT include a diagram step at all.
 - "separator"  → Visual divider between major sections: {"type":"separator","text":""}
 
 Requirements:
-- 18 to 28 steps total. NEVER fewer than 15. This is a full lesson, not a summary.
-- Include AT LEAST one "diagram" step where it visually helps understanding.
+- 15 to 25 steps total. NEVER fewer than 12. This is a full lesson, not a summary.
+- Include a "diagram" step ONLY if the subject is visual (geometry, physics, biology, graphing). Skip entirely for non-visual topics.
 - Include AT LEAST 2 "separator" steps to divide sections.
 - Explain like an enthusiastic teacher who loves the subject. Be detailed, thorough, and educational.
 - Start with title, then explain the big picture, then definitions, then diagrams, then formulas, then worked steps, then answer, then tips and warnings.
@@ -770,12 +777,14 @@ function WhiteboardPage() {
       lastLineY = y;
     });
 
-    // Hand follows the end of the last typed character on canvas
+    // Hand follows the end of the last typed character on canvas.
+    // Y is placed just below the baseline of the current line so the hand
+    // body (which extends downward from the tip) never covers the text above.
     const lastLine = lines[lines.length - 1] ?? "";
     ctx.font = hwFont(fontSize, isTtl);
     const lastLineW = ctx.measureText(lastLine).width / zoomRef.current;
     const handWX = pos.x + Math.min(lastLineW + 4, maxW - 10);
-    const handWY = lastLineY;
+    const handWY = lastLineY + fontSize + 2; // tip lands just below text baseline
     const hx = handWX * zoomRef.current + panRef.current.x;
     const hy = handWY * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
@@ -815,21 +824,36 @@ function WhiteboardPage() {
 
     // ── Diagram step — store in elemRef so it persists across redraws ────
     if (isDiag) {
+      // Section label "── Diagram ──"
+      const lblId = uid();
+      aiElemIdsRef.current.add(lblId);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: lblId, tool: "text", points: [], color: clr,
+        strokeWidth: 1, opacity: 1, page: pg,
+        text: "▸  Diagram", fontSize: 13, x1: pos.x, y1: pos.y,
+      }];
+      pos.y += 22; // gap after label
+
+      // Top padding before diagram
+      pos.y += 10;
+
       const diagId = uid();
       aiElemIdsRef.current.add(diagId);
-      // Measure height without drawing (use a temporary off-screen compute)
+      // Measure height on an off-screen canvas
       const tmpCanvas = document.createElement("canvas");
-      tmpCanvas.width = 400; tmpCanvas.height = 400;
+      tmpCanvas.width = 600; tmpCanvas.height = 600;
       const tmpCtx = tmpCanvas.getContext("2d")!;
       const diagH = drawDiagramOnCanvas(tmpCtx, step.fullText, 0, 0, clr);
+      // Indent diagram by 16px for visual separation
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
         id: diagId, tool: "diagram" as Tool, points: [], color: clr,
         strokeWidth: 2, opacity: 1, page: pg,
-        text: step.fullText, fontSize: 1, x1: pos.x + 8, y1: pos.y + 4,
+        text: step.fullText, fontSize: 1, x1: pos.x + 16, y1: pos.y,
       }];
-      pos.y += diagH + 24;
+      pos.y += diagH + 32; // generous bottom padding after diagram
+
       const hx = (pos.x + 80) * zoomRef.current + panRef.current.x;
-      const hy = (pos.y - 30) * zoomRef.current + panRef.current.y;
+      const hy = pos.y * zoomRef.current + panRef.current.y;
       setHandScreenPos({ x: hx, y: hy });
       setHandState("writing");
       if (pos.y * zoomRef.current + panRef.current.y > canvas.height - 140) {
@@ -898,8 +922,10 @@ function WhiteboardPage() {
       setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
     }
 
+    // pos.y is already advanced past all written lines — tip goes right here,
+    // so the hand body (below the tip) is fully below the written content.
     const hx = (pos.x + Math.min(maxW * 0.5, 180)) * zoomRef.current + panRef.current.x;
-    const hy = (pos.y - fontSize * 0.5) * zoomRef.current + panRef.current.y;
+    const hy = pos.y * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
     setHandState("writing");
 
@@ -1797,6 +1823,13 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
 // The hand SVG is laid out so its pen tip is at (48, 0) in SVG space.
 // We offset left by 48 and up by ~110 so the hand sits above/right of writing point.
 
+// ─── Teacher Hand ─────────────────────────────────────────────────────────────
+// SVG is laid out so the pen tip sits at (48, 8) — the TOP of the SVG.
+// The hand body and sleeve extend DOWNWARD from there.
+// This keeps the entire hand below the text being written.
+// Positioning: left = pos.x − 48  /  top = pos.y − 8
+// so the pen tip lands exactly at the writing position on screen.
+
 function TeacherHand({
   pos, state, isDark,
 }: {
@@ -1807,7 +1840,6 @@ function TeacherHand({
   const isWriting = state === "writing";
   const isDone    = state === "done";
 
-  // Skin + sleeve tones
   const skin   = isDark ? "#D4956A" : "#FDDCB4";
   const skinD  = isDark ? "#B8784E" : "#F5C28A";
   const sleeve = isDark ? "#1E3A5F" : "#2563EB";
@@ -1815,13 +1847,13 @@ function TeacherHand({
 
   return (
     <>
-      {/* Status pill — floats near the hand, doesn't move with it */}
+      {/* Status pill — sits just above/left of the pen tip so it never covers text below */}
       {isWriting && (
         <div
           className="pointer-events-none absolute z-20 select-none"
           style={{
-            left: Math.max(8, pos.x - 110),
-            top:  Math.max(8, pos.y - 150),
+            left: Math.max(4, pos.x - 108),
+            top:  Math.max(4, pos.y - 24),
             transition: "left 0.3s ease-out, top 0.3s ease-out",
           }}
         >
@@ -1835,8 +1867,8 @@ function TeacherHand({
         <div
           className="pointer-events-none absolute z-20 select-none"
           style={{
-            left: Math.max(8, pos.x - 60),
-            top:  Math.max(8, pos.y - 150),
+            left: Math.max(4, pos.x - 58),
+            top:  Math.max(4, pos.y - 24),
           }}
         >
           <div className="flex items-center gap-1 rounded-full bg-emerald-600/90 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg">
@@ -1845,112 +1877,104 @@ function TeacherHand({
         </div>
       )}
 
-      {/* Hand SVG — pen tip anchored to writing position */}
+      {/* Hand SVG — pen tip at TOP (SVG 48,8); hand body below the writing line */}
       <div
         className="pointer-events-none absolute z-10 select-none"
         style={{
-          // Shift so the pen tip (SVG x=48, y=130) lands exactly at pos
           left: pos.x - 48,
-          top:  pos.y - 148,
+          top:  pos.y - 8,   // pen tip at y=8 in SVG lands at pos.y on screen
           transition: isWriting
             ? "left 0.08s linear, top 0.08s linear"
             : "left 0.5s ease-out, top 0.5s ease-out",
-          filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.25))",
+          filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.22))",
           opacity: state === "idle" ? 0 : 1,
           transitionProperty: "left, top, opacity",
         }}
       >
-        <svg width="130" height="160" viewBox="0 0 130 160" fill="none">
+        <svg width="130" height="178" viewBox="0 0 130 178" fill="none">
           <style>{`
             @keyframes hwWrite {
               0%,100% { transform: rotate(0deg) translate(0,0); }
-              30%      { transform: rotate(1.5deg) translate(0.5px,-0.5px); }
-              70%      { transform: rotate(-1deg) translate(-0.5px,0.5px); }
+              30%      { transform: rotate(1.2deg) translate(0.4px,0.4px); }
+              70%      { transform: rotate(-0.8deg) translate(-0.4px,-0.2px); }
             }
             @keyframes hwIdle {
               0%,100% { transform: translateY(0); }
-              50%      { transform: translateY(-2px); }
+              50%      { transform: translateY(2px); }
             }
             .hw-group {
-              transform-origin: 48px 115px;
-              animation: ${isWriting ? "hwWrite 0.22s ease-in-out infinite" : "hwIdle 2.2s ease-in-out infinite"};
+              transform-origin: 48px 96px;
+              animation: ${isWriting
+                ? "hwWrite 0.22s ease-in-out infinite"
+                : "hwIdle 2.4s ease-in-out infinite"};
             }
           `}</style>
 
           <g className="hw-group">
-            {/* ── Forearm / sleeve coming from top-right ── */}
-            {/* Sleeve cylinder */}
-            <rect x="55" y="0" width="68" height="95" rx="28"
-              fill={sleeve} />
-            {/* Sleeve shading */}
-            <rect x="55" y="0" width="68" height="16" rx="14"
-              fill={sleeveD} opacity="0.6"/>
-            {/* Cuff band */}
-            <rect x="52" y="78" width="74" height="18" rx="9"
-              fill={sleeveD}/>
-
-            {/* ── Palm ── */}
-            <ellipse cx="52" cy="105" rx="30" ry="25"
-              fill={skin}/>
-            {/* Palm shadow */}
-            <ellipse cx="52" cy="110" rx="26" ry="16"
-              fill={skinD} opacity="0.35"/>
-
-            {/* ── Fingers curled around pen ── */}
-            {/* Index */}
-            <rect x="22" y="83" width="14" height="34" rx="7"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Middle */}
-            <rect x="38" y="80" width="13" height="36" rx="6.5"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Ring */}
-            <rect x="53" y="82" width="12" height="32" rx="6"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Pinky */}
-            <rect x="67" y="87" width="11" height="27" rx="5.5"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Thumb (sideways) */}
-            <ellipse cx="14" cy="104" rx="9" ry="15"
-              fill={skin} stroke={skinD} strokeWidth="0.8"
-              transform="rotate(-20 14 104)"/>
-
-            {/* ── Knuckle creases ── */}
-            <path d="M 24 113 Q 29 111 35 113" stroke={skinD} strokeWidth="0.7" fill="none"/>
-            <path d="M 40 110 Q 44 108 50 110" stroke={skinD} strokeWidth="0.7" fill="none"/>
-
-            {/* ── Pen / marker ── */}
-            {/* Body (dark barrel) */}
-            <rect x="41" y="46" width="14" height="84" rx="7"
-              fill="#1E293B"/>
-            {/* Barrel highlight */}
-            <rect x="43" y="48" width="4" height="70" rx="2"
-              fill="white" opacity="0.08"/>
-            {/* Color band */}
-            <rect x="40" y="100" width="16" height="6" rx="3"
-              fill="#6366F1"/>
-            {/* Grip section */}
-            <rect x="40" y="88" width="16" height="14" rx="4"
-              fill="#334155"/>
-            {/* Grip ribs */}
-            {[0,4,8].map(dy => (
-              <rect key={dy} x="40" y={90+dy} width="16" height="1.5" rx="0.75"
-                fill="white" opacity="0.12"/>
-            ))}
-            {/* Tip taper */}
-            <path d="M 41 130 L 48 148 L 55 130 Z" fill="#0F172A"/>
-            {/* Tip point — this is the writing contact at SVG (48, 148) */}
-            <circle cx="48" cy="148" r="2" fill="#1E293B"/>
-            {/* Ink dot when writing */}
+            {/* ── Pen / marker (tip at top, barrel going down) ── */}
+            {/* Pen tip taper — writing contact at (48, 8) */}
+            <path d="M 43 22 L 48 8 L 53 22 Z" fill="#0F172A"/>
+            {/* Ink dot at tip when writing */}
             {isWriting && (
-              <circle cx="48" cy="150" r="1.5" fill="#6366F1" opacity="0.9">
-                <animate attributeName="opacity" values="0.9;0.3;0.9" dur="0.25s" repeatCount="indefinite"/>
+              <circle cx="48" cy="8" r="1.8" fill="#6366F1" opacity="0.85">
+                <animate attributeName="opacity" values="0.85;0.2;0.85" dur="0.22s" repeatCount="indefinite"/>
               </circle>
             )}
+            {/* Pen barrel */}
+            <rect x="42" y="22" width="12" height="68" rx="6" fill="#1E293B"/>
+            {/* Barrel highlight stripe */}
+            <rect x="44" y="24" width="3" height="56" rx="1.5" fill="white" opacity="0.07"/>
+            {/* Color band */}
+            <rect x="41" y="46" width="14" height="6" rx="3" fill="#6366F1"/>
+            {/* Grip section */}
+            <rect x="41" y="67" width="14" height="26" rx="4" fill="#334155"/>
+            {/* Grip ribs */}
+            {[0,5,10].map(dy => (
+              <rect key={dy} x="41" y={69+dy} width="14" height="1.5" rx="0.75"
+                fill="white" opacity="0.13"/>
+            ))}
+            {/* Clip on barrel */}
+            <rect x="55" y="26" width="3" height="34" rx="1.5" fill="#475569"/>
+            <circle cx="56.5" cy="26" r="3" fill="#475569"/>
 
-            {/* Clip */}
-            <rect x="54" y="50" width="3" height="38" rx="1.5"
-              fill="#475569"/>
-            <circle cx="55.5" cy="50" r="3" fill="#475569"/>
+            {/* ── Fingers curled around grip (y ≈ 64–106) ── */}
+            {/* Thumb (from left side) */}
+            <ellipse cx="17" cy="88" rx="10" ry="19"
+              fill={skin} stroke={skinD} strokeWidth="0.8"
+              transform="rotate(-18 17 88)"/>
+            {/* Index finger */}
+            <rect x="24" y="62" width="14" height="42" rx="7"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Middle finger */}
+            <rect x="39" y="59" width="13" height="45" rx="6.5"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Ring finger */}
+            <rect x="53" y="62" width="12" height="41" rx="6"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+            {/* Pinky */}
+            <rect x="66" y="67" width="11" height="35" rx="5.5"
+              fill={skin} stroke={skinD} strokeWidth="0.8"/>
+
+            {/* ── Palm ── */}
+            <ellipse cx="48" cy="108" rx="32" ry="22"
+              fill={skin}/>
+            <ellipse cx="48" cy="112" rx="28" ry="14"
+              fill={skinD} opacity="0.28"/>
+
+            {/* Knuckle creases */}
+            <path d="M 26 104 Q 31 102 37 104" stroke={skinD} strokeWidth="0.7" fill="none"/>
+            <path d="M 41 101 Q 46 99 52 101" stroke={skinD} strokeWidth="0.7" fill="none"/>
+
+            {/* ── Wrist cuff ── */}
+            <rect x="18" y="118" width="60" height="13" rx="6.5"
+              fill={sleeveD}/>
+
+            {/* ── Forearm / sleeve (extends down from palm) ── */}
+            <rect x="14" y="126" width="68" height="52" rx="30"
+              fill={sleeve}/>
+            {/* Sleeve shading */}
+            <rect x="14" y="158" width="68" height="20" rx="14"
+              fill={sleeveD} opacity="0.55"/>
           </g>
         </svg>
       </div>

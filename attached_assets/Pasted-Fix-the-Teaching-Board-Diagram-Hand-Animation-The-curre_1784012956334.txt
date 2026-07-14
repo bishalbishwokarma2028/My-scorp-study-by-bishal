@@ -1,0 +1,31 @@
+Fix the Teaching Board Diagram & Hand Animation
+The current behavior of the Teaching Board needs to be improved.
+1. Intelligent Diagram Generation
+Do not generate a square, circle, or any random diagram for every question.
+The AI must first analyze the question and determine whether a diagram is actually required.
+Only generate a diagram when it genuinely helps explain the solution.
+The diagram must match the subject and question type.
+Examples:
+Mathematics (Geometry): Draw the correct geometric figure (triangle, circle, polygon, graph, coordinate plane, etc.).
+Physics: Draw the appropriate circuit, force diagram, ray diagram, motion graph, vectors, free-body diagram, or any relevant physics illustration.
+Chemistry: Draw molecular structures, reaction diagrams, apparatus, laboratory setup, atomic models, or other required scientific diagrams.
+Biology: Draw only the necessary biological structures or labeled diagrams.
+Numerical Problems: Only include diagrams if they are required to solve or explain the problem. Otherwise, do not generate unnecessary graphics.
+If the question does not require a diagram, do not display one at all.
+2. Correct Diagram Placement
+Diagrams must never overlap or mix with the explanation text.
+Always leave sufficient vertical spacing before and after each diagram.
+Display the diagram inside its own dedicated section or container.
+Ensure diagrams are clean, centered, responsive, and easy to understand on both mobile and desktop.
+Labels, arrows, formulas, and annotations should remain clear and readable.
+3. Improve Layout
+The explanation text and the diagram should be visually separated.
+Maintain consistent margins and padding.
+Prevent any clipping, overlapping, or content collision.
+The overall presentation should look professional, clean, and easy to follow.
+4. Fix Hand Animation
+The animated hand must always remain below the content being written, never above or on top of the text.
+As the AI writes, the hand should follow underneath the writing line, just like a real hand writing on a board.
+The hand must never cover, block, or hide any text, formulas, symbols, diagrams, or explanations.
+The writing animation should remain smooth and realistic while keeping 100% of the content fully visible at all times.
+Expected Result: The Teaching Board should generate only context-aware diagrams, place them in a separate and well-spaced section, and display the writing hand below the content so that no text, formulas, or diagrams are ever hidden during the animation.
