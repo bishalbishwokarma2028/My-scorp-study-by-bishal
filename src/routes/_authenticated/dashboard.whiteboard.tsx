@@ -41,7 +41,7 @@ interface DrawEl {
 }
 
 type TeachType = "title" | "explain" | "formula" | "step"
-               | "answer" | "tip" | "warning" | "definition" | "separator";
+               | "answer" | "tip" | "warning" | "definition" | "separator" | "diagram";
 
 interface TeachStep {
   id: string; type: TeachType; text: string;
@@ -49,6 +49,19 @@ interface TeachStep {
 }
 
 interface ConvMsg { role: "user" | "assistant"; content: string }
+
+// ─── Load handwriting font ────────────────────────────────────────────────────
+
+function useHandwritingFont() {
+  useEffect(() => {
+    if (document.getElementById("caveat-font")) return;
+    const link = document.createElement("link");
+    link.id   = "caveat-font";
+    link.rel  = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap";
+    document.head.appendChild(link);
+  }, []);
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -60,38 +73,41 @@ const COLORS = {
 };
 
 const TYPE_COLOR: Record<TeachType, string> = {
-  title: COLORS.blue, explain: COLORS.black, formula: COLORS.purple,
+  title: COLORS.blue, explain: COLORS.black, formula: "#C0392B",
   step: COLORS.blue, answer: COLORS.green, tip: COLORS.orange,
   warning: COLORS.red, definition: COLORS.purple, separator: COLORS.gray,
+  diagram: COLORS.teal,
 };
 
 const DARK_TYPE_BG: Record<TeachType, string> = {
   title: "bg-blue-900/40 border-blue-600",
   explain: "bg-slate-800/70 border-slate-600",
-  formula: "bg-purple-900/40 border-purple-600",
+  formula: "bg-red-900/40 border-red-700",
   step: "bg-blue-900/30 border-blue-700",
   answer: "bg-green-900/40 border-green-600",
   tip: "bg-orange-900/40 border-orange-600",
   warning: "bg-red-900/40 border-red-600",
   definition: "bg-violet-900/40 border-violet-600",
   separator: "bg-transparent border-transparent",
+  diagram: "bg-teal-900/40 border-teal-600",
 };
 const LIGHT_TYPE_BG: Record<TeachType, string> = {
   title: "bg-blue-50 border-blue-300",
   explain: "bg-white border-gray-200",
-  formula: "bg-purple-50 border-purple-300",
+  formula: "bg-red-50 border-red-300",
   step: "bg-blue-50 border-blue-200",
   answer: "bg-green-50 border-green-300",
   tip: "bg-orange-50 border-orange-300",
   warning: "bg-red-50 border-red-300",
   definition: "bg-violet-50 border-violet-300",
   separator: "bg-transparent border-transparent",
+  diagram: "bg-teal-50 border-teal-300",
 };
 
 const TYPE_LABEL: Record<TeachType, string> = {
   title: "Topic", explain: "Explanation", formula: "Formula",
   step: "Step", answer: "Answer", tip: "Pro Tip",
-  warning: "Watch Out", definition: "Definition", separator: "",
+  warning: "Watch Out", definition: "Definition", separator: "", diagram: "Diagram",
 };
 
 const PRESET_COLORS = [
@@ -137,7 +153,7 @@ function buildTeachingPrompt(q: string, history: ConvMsg[]): string {
     ? "\n\nPrevious context:\n" +
       history.slice(-4).map(m => `[${m.role}]: ${m.content.slice(0, 500)}`).join("\n")
     : "";
-  return `You are Bishal's expert AI teacher on an interactive whiteboard. A student asked:
+  return `You are Bishal's expert AI teacher writing on an interactive whiteboard. A student asked:
 "${q}"${ctx}
 
 Return ONLY valid JSON (no markdown, no prose outside the JSON) in this exact structure:
@@ -146,33 +162,48 @@ Return ONLY valid JSON (no markdown, no prose outside the JSON) in this exact st
   "steps": [
     {"type":"title","text":"..."},
     {"type":"explain","text":"..."},
+    {"type":"definition","text":"..."},
+    {"type":"diagram","text":"right-triangle:a,b,c"},
     {"type":"formula","text":"..."},
     {"type":"step","num":1,"text":"..."},
-    {"type":"step","num":2,"text":"..."},
     {"type":"answer","text":"..."},
     {"type":"tip","text":"..."}
   ]
 }
 
 Step type rules:
-- "title"      → Topic heading — always first
-- "explain"    → Overview of what the question is asking
-- "definition" → Define a key term
-- "formula"    → A formula, equation or rule
-- "step"       → Numbered solution steps (include "num": N)
-- "answer"     → Final answer — always green, always last meaningful step
-- "tip"        → Shortcut or memory aid — orange
-- "warning"    → Common mistake to avoid — red
-- "separator"  → Visual divider {"type":"separator","text":""}
+- "title"      → Topic heading — always the very first step. Make it descriptive.
+- "explain"    → Deep explanation of the concept. Write 3-5 sentences like a real teacher. Cover the WHY not just the WHAT. Be thorough.
+- "definition" → Define a key term in full detail. Include origin, meaning, and context. 2-4 sentences.
+- "formula"    → A formula, equation or rule. Always show the full derivation context, not just the formula.
+- "step"       → Numbered solution steps (include "num": N). Each step must be 2-4 sentences with reasoning. Do NOT just state the action — explain WHY you are doing it.
+- "answer"     → Final answer with full verification. Explain what the answer means in context. Always last meaningful step.
+- "tip"        → Shortcut, memory aid, or real-world connection — 2-3 sentences. Orange.
+- "warning"    → Common mistake to avoid with explanation of WHY it is wrong — 2-3 sentences. Red.
+- "diagram"    → Draw a visual. text must be exactly one of these codes:
+    right-triangle:a,b,c   (right-angle triangle labeled with a, b, c)
+    axes:x,y               (coordinate axes with x-label and y-label)
+    number-line:-5,5       (number line from -5 to 5)
+    circle:r               (circle labeled with radius r)
+    force-diagram:F,mg,N   (force arrows labeled)
+    bar-chart:A,B,C        (simple 3-bar chart)
+    dna:double-helix       (DNA double helix sketch)
+    wave:sine              (sine wave)
+- "separator"  → Visual divider between major sections: {"type":"separator","text":""}
 
 Requirements:
-- 8 to 16 steps total. Never fewer than 6.
-- SHORT step text — 1-3 sentences max. This is a whiteboard, not a textbook.
+- 18 to 28 steps total. NEVER fewer than 15. This is a full lesson, not a summary.
+- Include AT LEAST one "diagram" step where it visually helps understanding.
+- Include AT LEAST 2 "separator" steps to divide sections.
+- Explain like an enthusiastic teacher who loves the subject. Be detailed, thorough, and educational.
+- Start with title, then explain the big picture, then definitions, then diagrams, then formulas, then worked steps, then answer, then tips and warnings.
+- Each "explain" step must be 3-5 sentences minimum — really teach the concept deeply.
+- Each "step" must show ALL working with full reasoning — 2-4 sentences per step.
 - No LaTeX: no \\frac, \\sqrt, $...$, backslashes
-- Use Unicode: ×, ÷, √, ², ³, π, ≈, ±, θ, Δ, →, °
-- Fractions as (a)/(b). Square roots as √(x)
-- For follow-ups: build on context, don't repeat the whole intro
-- Match the student's language`;
+- Use Unicode: ×, ÷, √, ², ³, π, ≈, ±, θ, Δ, →, °, ∞, ∑, ∫, ≤, ≥, ≠
+- Fractions as (a)/(b). Square roots as √(x). Exponents as xⁿ.
+- For follow-ups: build on context, go deeper, don't repeat the whole intro
+- Match the student's language and level`;
 }
 
 // ─── Parse AI response ────────────────────────────────────────────────────────
@@ -191,7 +222,7 @@ function parseTeachScript(raw: string): TeachScript | null {
   } catch { return null; }
 }
 
-const VALID_TYPES = new Set(["title","explain","formula","step","answer","tip","warning","definition","separator"]);
+const VALID_TYPES = new Set(["title","explain","formula","step","answer","tip","warning","definition","separator","diagram"]);
 
 function scriptToSteps(s: TeachScript): TeachStep[] {
   return s.steps.map((r, i) => ({
@@ -256,7 +287,11 @@ function drawShape(ctx: CanvasRenderingContext2D, el: DrawEl) {
 function drawText(ctx: CanvasRenderingContext2D, el: DrawEl) {
   if (!el.text || el.x1 === undefined) return;
   ctx.save();
-  ctx.font = `${el.fontSize ?? 18}px Inter, sans-serif`;
+  // Use Caveat handwriting font for all AI-generated text (detected by non-standard sizes)
+  const isHW = el.fontSize && [16, 20, 28, 13].includes(el.fontSize);
+  ctx.font = isHW
+    ? `${el.strokeWidth >= 3 ? "700" : "500"} ${el.fontSize}px 'Caveat', cursive`
+    : `${el.fontSize ?? 18}px Inter, sans-serif`;
   ctx.fillStyle = el.color;
   ctx.fillText(el.text, el.x1, el.y1!);
   ctx.restore();
@@ -282,11 +317,205 @@ function drawBackground(ctx: CanvasRenderingContext2D, W: number, H: number,
   }
 }
 
+// ─── Diagram renderer ─────────────────────────────────────────────────────────
+
+function drawDiagramOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  code: string,
+  ox: number, oy: number,
+  color: string,
+): number /* height used */ {
+  const [kind, ...args] = code.split(":");
+  const labels = (args[0] ?? "").split(",").map(s => s.trim());
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle   = color;
+  ctx.lineWidth   = 2.2;
+  ctx.lineCap     = "round";
+  ctx.lineJoin    = "round";
+
+  const HW_FONT = "600 15px 'Caveat', cursive";
+  let usedH = 0;
+
+  if (kind === "right-triangle") {
+    const [la = "a", lb = "b", lc = "c"] = labels;
+    const W = 140, H = 110;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy + H);
+    ctx.lineTo(ox + W, oy + H);
+    ctx.lineTo(ox, oy);
+    ctx.closePath();
+    ctx.stroke();
+    // right-angle box
+    ctx.beginPath();
+    ctx.moveTo(ox + 14, oy + H);
+    ctx.lineTo(ox + 14, oy + H - 14);
+    ctx.lineTo(ox, oy + H - 14);
+    ctx.stroke();
+    ctx.font = HW_FONT;
+    ctx.fillText(la, ox - 22, oy + H / 2 + 5);   // left side
+    ctx.fillText(lb, ox + W / 2 - 6, oy + H + 20); // bottom
+    ctx.fillText(lc, ox + W / 2 + 14, oy + H / 2 - 12); // hypotenuse
+    usedH = H + 32;
+
+  } else if (kind === "axes") {
+    const [lx = "x", ly = "y"] = labels;
+    const L = 150;
+    // x-axis
+    ctx.beginPath(); ctx.moveTo(ox, oy + L / 2); ctx.lineTo(ox + L, oy + L / 2); ctx.stroke();
+    // y-axis
+    ctx.beginPath(); ctx.moveTo(ox + 30, oy); ctx.lineTo(ox + 30, oy + L); ctx.stroke();
+    // arrowheads
+    ctx.beginPath();
+    ctx.moveTo(ox + L, oy + L / 2); ctx.lineTo(ox + L - 10, oy + L / 2 - 5); ctx.lineTo(ox + L - 10, oy + L / 2 + 5); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(ox + 30, oy); ctx.lineTo(ox + 25, oy + 10); ctx.lineTo(ox + 35, oy + 10); ctx.closePath(); ctx.fill();
+    ctx.font = HW_FONT;
+    ctx.fillText(lx, ox + L + 5, oy + L / 2 + 5);
+    ctx.fillText(ly, ox + 30 - 18, oy - 5);
+    // tick marks
+    for (let i = 1; i <= 4; i++) {
+      const tx = ox + 30 + i * 28, ty = oy + L / 2;
+      ctx.beginPath(); ctx.moveTo(tx, ty - 5); ctx.lineTo(tx, ty + 5); ctx.stroke();
+      const tty = oy + L / 2 - i * 22;
+      ctx.beginPath(); ctx.moveTo(ox + 25, tty); ctx.lineTo(ox + 35, tty); ctx.stroke();
+    }
+    usedH = L + 12;
+
+  } else if (kind === "number-line") {
+    const start = parseInt(labels[0] ?? "-5"), end = parseInt(labels[1] ?? "5");
+    const step  = Math.abs(end - start) <= 10 ? 1 : 2;
+    const scale = 22;
+    const totalW = (end - start) * scale;
+    ctx.beginPath(); ctx.moveTo(ox, oy + 20); ctx.lineTo(ox + totalW + 20, oy + 20); ctx.stroke();
+    // arrowheads
+    ctx.beginPath(); ctx.moveTo(ox + totalW + 20, oy + 20); ctx.lineTo(ox + totalW + 8, oy + 14); ctx.lineTo(ox + totalW + 8, oy + 26); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(ox, oy + 20); ctx.lineTo(ox + 12, oy + 14); ctx.lineTo(ox + 12, oy + 26); ctx.closePath(); ctx.fill();
+    ctx.font = HW_FONT;
+    for (let v = start; v <= end; v += step) {
+      const tx = ox + (v - start) * scale;
+      ctx.beginPath(); ctx.moveTo(tx, oy + 14); ctx.lineTo(tx, oy + 26); ctx.stroke();
+      ctx.fillText(String(v), tx - 5, oy + 40);
+    }
+    usedH = 52;
+
+  } else if (kind === "circle") {
+    const label = labels[0] ?? "r";
+    const R = 55;
+    ctx.beginPath(); ctx.arc(ox + R + 10, oy + R + 5, R, 0, Math.PI * 2); ctx.stroke();
+    // center dot
+    ctx.beginPath(); ctx.arc(ox + R + 10, oy + R + 5, 3, 0, Math.PI * 2); ctx.fill();
+    // radius line
+    ctx.beginPath(); ctx.moveTo(ox + R + 10, oy + R + 5); ctx.lineTo(ox + R + 10 + R, oy + R + 5); ctx.stroke();
+    ctx.font = HW_FONT;
+    ctx.fillText(label, ox + R + 10 + R / 2 - 5, oy + R - 5);
+    ctx.fillText("O", ox + R + 5, oy + R + 1);
+    usedH = R * 2 + 22;
+
+  } else if (kind === "force-diagram") {
+    const arrowLen = 60;
+    const cx = ox + 30, cy = oy + 70;
+    // object box
+    ctx.strokeRect(cx - 18, cy - 18, 36, 36);
+    ctx.font = HW_FONT; ctx.fillText("m", cx - 5, cy + 7);
+    const forces = labels.length ? labels : ["F", "mg", "N"];
+    const dirs   = [[1, 0], [0, 1], [0, -1]]; // right, down, up
+    forces.forEach((lbl, i) => {
+      if (i >= dirs.length) return;
+      const [dx, dy] = dirs[i];
+      const sx = cx + (dx > 0 ? 18 : dx < 0 ? -18 : 0);
+      const sy = cy + (dy > 0 ? 18 : dy < 0 ? -18 : 0);
+      const ex = sx + dx * arrowLen, ey = sy + dy * arrowLen;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+      // arrowhead
+      const angle = Math.atan2(ey - sy, ex - sx);
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - 10 * Math.cos(angle - 0.4), ey - 10 * Math.sin(angle - 0.4));
+      ctx.lineTo(ex - 10 * Math.cos(angle + 0.4), ey - 10 * Math.sin(angle + 0.4));
+      ctx.closePath(); ctx.fill();
+      ctx.fillText(lbl, ex + (dx >= 0 ? 4 : -22), ey + (dy > 0 ? 16 : dy < 0 ? -6 : 5));
+    });
+    usedH = 145;
+
+  } else if (kind === "bar-chart") {
+    const bars    = labels.length ? labels : ["A", "B", "C"];
+    const heights = [80, 55, 68, 40, 72].slice(0, bars.length);
+    const barW = 30, gap = 14, baseY = oy + 100;
+    // y-axis
+    ctx.beginPath(); ctx.moveTo(ox + 10, oy + 5); ctx.lineTo(ox + 10, baseY + 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox + 10, baseY + 5); ctx.lineTo(ox + 10 + bars.length * (barW + gap) + gap, baseY + 5); ctx.stroke();
+    ctx.font = HW_FONT;
+    bars.forEach((lbl, i) => {
+      const bx = ox + 10 + gap + i * (barW + gap);
+      const bh = heights[i] ?? 50;
+      ctx.globalAlpha = 0.25; ctx.fillRect(bx, baseY - bh, barW, bh); ctx.globalAlpha = 1;
+      ctx.strokeRect(bx, baseY - bh, barW, bh);
+      ctx.fillText(lbl, bx + barW / 2 - 5, baseY + 18);
+    });
+    usedH = 118;
+
+  } else if (kind === "wave") {
+    const W = 200, amp = 30, freq = 2;
+    ctx.beginPath();
+    for (let px = 0; px <= W; px++) {
+      const x = ox + px;
+      const y = oy + 40 + amp * Math.sin((px / W) * freq * Math.PI * 2);
+      px === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // axes
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(ox, oy + 40); ctx.lineTo(ox + W, oy + 40); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = HW_FONT;
+    ctx.fillText("Amplitude", ox - 2, oy + 11);
+    ctx.fillText("→ Time", ox + W - 40, oy + 38);
+    usedH = 85;
+
+  } else if (kind === "dna") {
+    const W = 60, H = 120, turns = 3;
+    for (let i = 0; i <= H; i += 2) {
+      const t  = (i / H) * turns * Math.PI * 2;
+      const x1 = ox + W / 2 + (W / 2) * Math.sin(t);
+      const x2 = ox + W / 2 - (W / 2) * Math.sin(t);
+      if (i % 16 < 2) {
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath(); ctx.moveTo(x1, oy + i); ctx.lineTo(x2, oy + i); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+    // two backbone strands
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i <= H; i += 2) {
+      const t = (i / H) * turns * Math.PI * 2;
+      const x = ox + W / 2 + (W / 2) * Math.sin(t);
+      i === 0 ? ctx.moveTo(x, oy + i) : ctx.lineTo(x, oy + i);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i <= H; i += 2) {
+      const t = (i / H) * turns * Math.PI * 2;
+      const x = ox + W / 2 - (W / 2) * Math.sin(t);
+      i === 0 ? ctx.moveTo(x, oy + i) : ctx.lineTo(x, oy + i);
+    }
+    ctx.stroke();
+    ctx.font = HW_FONT;
+    ctx.fillText("DNA", ox + W + 8, oy + H / 2 + 5);
+    usedH = H + 16;
+  }
+
+  ctx.restore();
+  return usedH;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 function WhiteboardPage() {
   const { user } = Route.useRouteContext();
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
+  useHandwritingFont();
 
   // ── Canvas refs ──────────────────────────────────────────────────────────
   const bgRef        = useRef<HTMLCanvasElement>(null);
@@ -353,10 +582,9 @@ function WhiteboardPage() {
   const [isListening, setIsListening] = useState(false);
   const speechRef = useRef<SpeechRecognition | null>(null);
 
-  // ── Robot + mobile state ──────────────────────────────────────────────────
-  const [robotArmAngle, setRobotArmAngle] = useState(-145);
-  const [robotState, setRobotState]       = useState<"idle"|"writing"|"done">("idle");
-  const [showRobot, setShowRobot]         = useState(true);
+  // ── Hand animation state ──────────────────────────────────────────────────
+  const [handScreenPos, setHandScreenPos] = useState<{x:number;y:number}>({x:120,y:120});
+  const [handState, setHandState]         = useState<"idle"|"writing"|"done">("idle");
   const [mobileTab, setMobileTab]         = useState<"board"|"ai">("board");
 
   // ── Canvas-write state ────────────────────────────────────────────────────
@@ -469,15 +697,46 @@ function WhiteboardPage() {
     const clr     = TYPE_COLOR[step.type];
     const isTtl   = step.type === "title";
     const isFml   = step.type === "formula";
-    const fontSize = isTtl ? 26 : isFml ? 18 : 14;
-    const lineH    = fontSize * 1.55;
-    const maxW     = Math.max(200, (canvas.width * 0.55) / zoomRef.current);
+    const isDiag  = step.type === "diagram";
+    const fontSize = isTtl ? 28 : isFml ? 20 : 16;
+    const lineH    = fontSize * 1.6;
+    const maxW     = Math.max(220, (canvas.width * 0.58) / zoomRef.current);
+    const hwFont   = (size: number, bold = false) =>
+      `${bold ? "700" : "500"} ${size}px 'Caveat', cursive`;
+
+    // ── Diagram step — draw directly then early-return ───────────────────
+    if (isDiag) {
+      const tmpCtx = canvas.getContext("2d")!;
+      tmpCtx.save();
+      tmpCtx.translate(panRef.current.x, panRef.current.y);
+      tmpCtx.scale(zoomRef.current, zoomRef.current);
+      const diagH = drawDiagramOnCanvas(tmpCtx, step.fullText, pos.x + 10, pos.y + 4, clr);
+      tmpCtx.restore();
+      pos.y += diagH + 18;
+      const dummyId = uid();
+      aiElemIdsRef.current.add(dummyId);
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: dummyId, tool: "text", points: [], color: "transparent",
+        strokeWidth: 1, opacity: 0, page: pg,
+        text: " ", fontSize: 1, x1: pos.x, y1: pos.y,
+      }];
+      // Update hand position
+      const hx = (pos.x + 60) * zoomRef.current + panRef.current.x;
+      const hy = pos.y * zoomRef.current + panRef.current.y;
+      setHandScreenPos({ x: hx, y: hy });
+      setHandState("writing");
+      if (pos.y * zoomRef.current + panRef.current.y > canvas.height - 140) {
+        setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
+      }
+      redrawCanvas();
+      return;
+    }
 
     // Label row (skip for plain "explain" steps)
     const lbl = step.type === "step" && step.num
-      ? `▸ STEP ${step.num}`
+      ? `▸  Step ${step.num}`
       : step.type !== "explain"
-        ? `▸ ${TYPE_LABEL[step.type].toUpperCase()}`
+        ? `▸  ${TYPE_LABEL[step.type]}`
         : "";
 
     if (lbl) {
@@ -486,13 +745,13 @@ function WhiteboardPage() {
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
         id: labelId, tool: "text", points: [], color: clr,
         strokeWidth: 1, opacity: 1, page: pg,
-        text: lbl, fontSize: 10, x1: pos.x, y1: pos.y,
+        text: lbl, fontSize: 13, x1: pos.x, y1: pos.y,
       }];
-      pos.y += 16;
+      pos.y += 20;
     }
 
-    // Word-wrap body text
-    ctx.font = `${fontSize}px Inter, sans-serif`;
+    // Word-wrap body text with Caveat font measurement
+    ctx.font = hwFont(fontSize, isTtl);
     const words = step.fullText.split(" ");
     const lines: string[] = [];
     let line = "";
@@ -523,27 +782,35 @@ function WhiteboardPage() {
       aiElemIdsRef.current.add(sepId);
       elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
         id: sepId, tool: "line", points: [], color: clr,
-        strokeWidth: 1.5, opacity: 0.4, page: pg,
-        x1: pos.x, y1: pos.y + 2, x2: pos.x + maxW, y2: pos.y + 2,
+        strokeWidth: 2, opacity: 0.5, page: pg,
+        x1: pos.x, y1: pos.y + 2, x2: pos.x + maxW * 0.7, y2: pos.y + 2,
       }];
-      pos.y += 14;
+      pos.y += 16;
+    } else if (isFml) {
+      // Box around formula
+      const boxId = uid();
+      aiElemIdsRef.current.add(boxId);
+      const boxTop = pos.y - lines.length * lineH - 6;
+      elemRef.current[pg] = [...(elemRef.current[pg] ?? []), {
+        id: boxId, tool: "rect", points: [], color: clr,
+        strokeWidth: 1.8, opacity: 0.5, page: pg,
+        x1: pos.x - 8, y1: boxTop, x2: pos.x + maxW * 0.6, y2: pos.y + 4,
+      }];
+      pos.y += 12;
     } else {
       pos.y += 10;
     }
 
-    // Auto-pan down if content is near the bottom edge
-    if (canvas && pos.y * zoomRef.current + panRef.current.y > canvas.height - 120) {
-      setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.35)) }));
+    // Auto-pan down
+    if (pos.y * zoomRef.current + panRef.current.y > canvas.height - 140) {
+      setPan(p => ({ ...p, y: Math.min(0, -(pos.y * zoomRef.current - canvas.height * 0.38)) }));
     }
 
-    // Point robot arm toward the writing position
-    const writePxX = pos.x * zoomRef.current + panRef.current.x;
-    const writePxY = (pos.y - fontSize) * zoomRef.current + panRef.current.y;
-    const shoulderX = canvas.width - 78;
-    const shoulderY = canvas.height - 72;
-    const rawAngle  = Math.atan2(writePxY - shoulderY, writePxX - shoulderX) * (180 / Math.PI);
-    setRobotArmAngle(Math.max(-175, Math.min(-60, rawAngle)));
-    setRobotState("writing");
+    // Update hand position to follow writing
+    const hx = (pos.x + Math.min(maxW * 0.5, 180)) * zoomRef.current + panRef.current.x;
+    const hy = (pos.y - fontSize * 0.5) * zoomRef.current + panRef.current.y;
+    setHandScreenPos({ x: hx, y: hy });
+    setHandState("writing");
 
     redrawCanvas();
   }, [redrawCanvas]);
@@ -787,7 +1054,7 @@ function WhiteboardPage() {
         if (a.stepIdx >= a.pending.length) {
           a.phase = "done";
           setAnimPhase("done");
-          setRobotState("done");
+          setHandState("done");
           return;
         }
         const next = { ...a.pending[a.stepIdx], text: "", revealed: 0 };
@@ -852,7 +1119,7 @@ function WhiteboardPage() {
     setVisibleSteps([first]);
     setTotalSteps(steps.length);
     setAnimPhase("running");
-    setRobotState("writing");
+    setHandState("writing");
 
     rafRef.current = requestAnimationFrame(runAnimLoop);
   }
@@ -1160,9 +1427,9 @@ function WhiteboardPage() {
             </div>
           )}
 
-          {/* AI Robot Teacher overlay */}
-          {showRobot && animPhase !== "idle" && (
-            <RobotTeacher armAngle={robotArmAngle} state={robotState} isDark={isDark}/>
+          {/* Teacher hand overlay */}
+          {animPhase !== "idle" && (
+            <TeacherHand pos={handScreenPos} state={handState} isDark={isDark}/>
           )}
         </div>{/* /canvas */}
 
@@ -1206,13 +1473,6 @@ function WhiteboardPage() {
                   <button onClick={()=>setDrawOnCanvas(v=>!v)}
                     className={`relative h-5 w-9 rounded-full transition-colors ${drawOnCanvas?(isDark?"bg-indigo-600":"bg-indigo-500"):(isDark?"bg-slate-700":"bg-gray-300")}`}>
                     <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${drawOnCanvas?"translate-x-4":"translate-x-0.5"}`}/>
-                  </button>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] font-semibold ${isDark?"text-slate-400":"text-slate-500"}`}>🤖 Robot</span>
-                  <button onClick={()=>setShowRobot(v=>!v)}
-                    className={`relative h-5 w-9 rounded-full transition-colors ${showRobot?(isDark?"bg-indigo-600":"bg-indigo-500"):(isDark?"bg-slate-700":"bg-gray-300")}`}>
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${showRobot?"translate-x-4":"translate-x-0.5"}`}/>
                   </button>
                 </div>
                 {aiElemIdsRef.current.size > 0 && (
@@ -1429,119 +1689,150 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
   );
 }
 
-// ─── Robot Teacher ────────────────────────────────────────────────────────────
+// ─── Teacher Hand ─────────────────────────────────────────────────────────────
 
-function RobotTeacher({ armAngle, state, isDark }: {
-  armAngle: number; state: "idle" | "writing" | "done"; isDark: boolean;
+function TeacherHand({
+  pos, state, isDark,
+}: {
+  pos: { x: number; y: number };
+  state: "idle" | "writing" | "done";
+  isDark: boolean;
 }) {
   const isWriting = state === "writing";
   const isDone    = state === "done";
-  const bodyFill  = isDark ? "#1E293B" : "#EEF2FF";
-  const stroke    = "#6366F1";
 
+  // The hand is anchored at the bottom-right; the arm rotates toward `pos`
+  // We show it fixed at the bottom-right corner of the canvas, similar to the reference image.
   return (
-    <div className="pointer-events-none absolute bottom-14 right-3 z-10 select-none drop-shadow-2xl">
-      <svg width="92" height="122" viewBox="0 0 92 122" fill="none">
+    <div
+      className="pointer-events-none absolute bottom-0 right-0 z-10 select-none"
+      style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.35))" }}
+    >
+      {/* Writing status pill */}
+      {isWriting && (
+        <div className="absolute bottom-[210px] right-[155px] flex items-center gap-1.5 rounded-full bg-slate-800/90 px-3 py-1.5 text-[11px] font-semibold text-white shadow-xl backdrop-blur">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-400"/>
+          Bishal's Assistant is writing…
+        </div>
+      )}
+      {isDone && (
+        <div className="absolute bottom-[210px] right-[155px] flex items-center gap-1.5 rounded-full bg-emerald-700/90 px-3 py-1.5 text-[11px] font-semibold text-white shadow-xl">
+          ✓ Done explaining!
+        </div>
+      )}
+
+      {/* Hand + arm SVG — human hand holding a black marker */}
+      <svg
+        width="200" height="220"
+        viewBox="0 0 200 220"
+        fill="none"
+        style={{ display: "block" }}
+      >
         <style>{`
-          .rb-body { animation: rbBreath 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-          .rb-head  { animation: rbBob   3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
-          .rb-el    { animation: rbBlink 4.1s ease-in-out infinite;     transform-box: fill-box; transform-origin: center; }
-          .rb-er    { animation: rbBlink 4.1s ease-in-out infinite 0.12s; transform-box: fill-box; transform-origin: center; }
-          @keyframes rbBreath { 0%,100%{transform:scaleY(1)}   50%{transform:scaleY(1.04)} }
-          @keyframes rbBob    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
-          @keyframes rbBlink  { 0%,82%,100%{transform:scaleY(1)} 87%{transform:scaleY(0.08)} 92%{transform:scaleY(1)} }
+          @keyframes handWrite {
+            0%,100% { transform: translate(0px, 0px) rotate(-3deg); }
+            25%      { transform: translate(1px,-1px) rotate(-2deg); }
+            75%      { transform: translate(-1px,1px) rotate(-4deg); }
+          }
+          @keyframes handIdle {
+            0%,100% { transform: translateY(0px); }
+            50%      { transform: translateY(-3px); }
+          }
+          .hand-group {
+            transform-origin: 130px 180px;
+            animation: ${isWriting ? "handWrite 0.35s ease-in-out infinite" : "handIdle 2.4s ease-in-out infinite"};
+          }
         `}</style>
 
-        {/* Antenna */}
-        <line x1="46" y1="7" x2="46" y2="21" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"/>
-        <circle cx="46" cy="5" r="5.5" fill="#4F46E5"/>
-        <circle cx="46" cy="5" r="2.5" fill="#C7D2FE" style={{animation:"rbBreath 1.2s ease-in-out infinite"}}/>
+        {/* Forearm / sleeve */}
+        <rect
+          x="70" y="155" width="120" height="70" rx="22"
+          fill={isDark ? "#1E293B" : "#F1F5F9"}
+          stroke={isDark ? "#334155" : "#CBD5E1"}
+          strokeWidth="2"
+        />
+        {/* Sleeve cuff detail */}
+        <rect
+          x="70" y="158" width="120" height="14" rx="7"
+          fill={isDark ? "#334155" : "#E2E8F0"}
+        />
 
-        {/* Head group */}
-        <g className="rb-head">
-          <rect x="20" y="18" width="52" height="42" rx="14" fill={bodyFill} stroke={stroke} strokeWidth="2"/>
+        {/* Hand group — animated */}
+        <g className="hand-group">
+          {/* Palm */}
+          <ellipse cx="130" cy="152" rx="38" ry="30"
+            fill={isDark ? "#FBBF80" : "#FDDCB4"}
+            stroke={isDark ? "#D97706" : "#F59E0B"}
+            strokeWidth="1.2"
+          />
 
-          {/* Left eye */}
-          <g className="rb-el">
-            <circle cx="33" cy="36" r="8.5" fill="#4F46E5"/>
-            <circle cx="33" cy="36" r="5.5" fill="#E0E7FF"/>
-            <circle cx="34.5" cy="35" r="2.8" fill="#1E1B4B"/>
-            <circle cx="36"   cy="33" r="1.1" fill="white"/>
-          </g>
+          {/* Thumb */}
+          <ellipse cx="94" cy="148" rx="11" ry="17"
+            fill={isDark ? "#FBBF80" : "#FDDCB4"}
+            stroke={isDark ? "#D97706" : "#F59E0B"}
+            strokeWidth="1"
+            transform="rotate(-30 94 148)"
+          />
 
-          {/* Right eye */}
-          <g className="rb-er">
-            <circle cx="59" cy="36" r="8.5" fill="#4F46E5"/>
-            <circle cx="59" cy="36" r="5.5" fill="#E0E7FF"/>
-            <circle cx="60.5" cy="35" r="2.8" fill="#1E1B4B"/>
-            <circle cx="62"   cy="33" r="1.1" fill="white"/>
-          </g>
+          {/* Index finger (holding marker) */}
+          <rect x="118" y="98" width="18" height="52" rx="9"
+            fill={isDark ? "#FBBF80" : "#FDDCB4"}
+            stroke={isDark ? "#D97706" : "#F59E0B"}
+            strokeWidth="1"
+          />
+          {/* Middle finger */}
+          <rect x="138" y="101" width="17" height="49" rx="8.5"
+            fill={isDark ? "#FBBF80" : "#FDDCB4"}
+            stroke={isDark ? "#D97706" : "#F59E0B"}
+            strokeWidth="1"
+          />
+          {/* Ring finger */}
+          <rect x="156" y="108" width="15" height="44" rx="7.5"
+            fill={isDark ? "#FBBF80" : "#FDDCB4"}
+            stroke={isDark ? "#D97706" : "#F59E0B"}
+            strokeWidth="1"
+          />
+          {/* Pinky */}
+          <rect x="172" y="115" width="13" height="37" rx="6.5"
+            fill={isDark ? "#FBBF80" : "#FDDCB4"}
+            stroke={isDark ? "#D97706" : "#F59E0B"}
+            strokeWidth="1"
+          />
 
-          {/* Mouth — changes with state */}
-          {isDone ? (
-            <path d="M 33 52 Q 46 61 59 52" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-          ) : isWriting ? (
-            <>
-              <ellipse cx="46" cy="54" rx="7" ry="3.5" fill="#6366F1" opacity="0.55"/>
-              <ellipse cx="46" cy="54" rx="4" ry="2"   fill="#4F46E5" opacity="0.7"/>
-            </>
-          ) : (
-            <path d="M 36 53 Q 46 50 56 53" stroke={stroke} strokeWidth="2" strokeLinecap="round" fill="none"/>
+          {/* Marker pen body */}
+          <rect x="122" y="54" width="12" height="60" rx="6"
+            fill="#1E293B"
+          />
+          {/* Marker clip */}
+          <rect x="133" y="58" width="3" height="32" rx="1.5"
+            fill="#475569"
+          />
+          {/* Marker cap ring */}
+          <rect x="120" y="70" width="16" height="6" rx="3"
+            fill="#334155"
+          />
+          {/* Marker barrel band */}
+          <rect x="120" y="90" width="16" height="4" rx="2"
+            fill="#6366F1"
+          />
+          {/* Marker tip taper */}
+          <path d="M 122 114 L 128 130 L 134 114 Z" fill="#0F172A"/>
+          {/* Marker tip point */}
+          <ellipse cx="128" cy="131" rx="2.5" ry="3.5" fill="#0F172A"/>
+          {/* Ink stroke (visible when writing) */}
+          {isWriting && (
+            <ellipse
+              cx="128" cy="134"
+              rx="2" ry="1.2"
+              fill="#1E293B"
+              style={{ animation: "handWrite 0.35s ease-in-out infinite" }}
+            />
           )}
+          {/* Knuckle lines */}
+          <path d="M 121 135 Q 128 133 135 135" stroke={isDark?"#D97706":"#F59E0B"} strokeWidth="0.8" fill="none"/>
+          <path d="M 140 133 Q 147 131 154 133" stroke={isDark?"#D97706":"#F59E0B"} strokeWidth="0.8" fill="none"/>
         </g>
-
-        {/* Body */}
-        <g className="rb-body">
-          <rect x="15" y="62" width="62" height="44" rx="13" fill={bodyFill} stroke={stroke} strokeWidth="2"/>
-          {/* Chest badge */}
-          <circle cx="46" cy="84" r="13" fill="#6366F1" opacity="0.1"/>
-          <circle cx="46" cy="84" r="8"  fill="#6366F1" opacity="0.22"/>
-          <circle cx="46" cy="84" r="4.5" fill="#4F46E5"/>
-          <circle cx="46" cy="84" r="2"  fill="#C7D2FE"/>
-          {/* Side vents */}
-          <rect x="20" y="90" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
-          <rect x="20" y="94" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
-          <rect x="64" y="90" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
-          <rect x="64" y="94" width="8" height="2.5" rx="1.2" fill={stroke} opacity="0.3"/>
-        </g>
-
-        {/* Left arm (idle, static) */}
-        <rect x="2" y="65" width="13" height="30" rx="6.5" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
-
-        {/* Right arm — writing arm, rotates to follow pen position */}
-        <g style={{
-          transformOrigin: "77px 75px",
-          transform: `rotate(${armAngle}deg)`,
-          transition: isWriting ? "transform 0.55s cubic-bezier(0.34,1.56,0.64,1)" : "transform 1.2s ease-in-out",
-        }}>
-          {/* Upper arm */}
-          <rect x="77" y="70" width="26" height="10" rx="5" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
-          {/* Wrist joint */}
-          <circle cx="103" cy="75" r="5.5" fill="#4F46E5"/>
-          {/* Pen body */}
-          <rect x="105" y="72.5" width="17" height="5" rx="2.5" fill={isDark?"#94A3B8":"#334155"}/>
-          {/* Pen grip */}
-          <rect x="108" y="73" width="2" height="4" rx="1" fill={isDark?"#64748B":"#64748B"} opacity="0.5"/>
-          <rect x="112" y="73" width="2" height="4" rx="1" fill={isDark?"#64748B":"#64748B"} opacity="0.5"/>
-          {/* Pen tip */}
-          <path d="M 122 72.5 L 129 75 L 122 77.5 Z" fill="#EF4444"/>
-          {/* Ink dot at tip (visible when writing) */}
-          {isWriting && <circle cx="129" cy="75" r="2" fill="#EF4444" opacity="0.6" style={{animation:"rbBlink 0.4s ease-in-out infinite"}}/>}
-        </g>
-
-        {/* Feet */}
-        <rect x="21" y="104" width="18" height="14" rx="6" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
-        <rect x="53" y="104" width="18" height="14" rx="6" fill={bodyFill} stroke={stroke} strokeWidth="1.5"/>
       </svg>
-
-      {/* Status label */}
-      <div className={`mt-0.5 flex items-center justify-center rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider shadow-lg ${
-        isWriting ? "bg-indigo-600 text-white" :
-        isDone    ? "bg-emerald-600 text-white" :
-                    "bg-slate-600 text-white"
-      }`}>
-        {isWriting ? "✏️ Writing…" : isDone ? "✅ Done!" : "💤 Ready"}
-      </div>
     </div>
   );
 }
@@ -1565,6 +1856,7 @@ function TeachCard({ step, isDark, isActive }: { step: TeachStep; isDark: boolea
     warning:    <AlertTriangle size={11}/>,
     definition: <BookOpen size={11}/>,
     separator:  null,
+    diagram:    <FlaskConical size={11}/>,
   };
 
   return (
