@@ -1824,14 +1824,19 @@ function ToolBtn({ children, active, onClick, title, isDark }: {
 // We offset left by 48 and up by ~110 so the hand sits above/right of writing point.
 
 // ─── Teacher Hand ─────────────────────────────────────────────────────────────
-// SVG is laid out so the pen tip sits at (48, 8) — the TOP of the SVG.
-// The hand body and sleeve extend DOWNWARD from there.
-// This keeps the entire hand below the text being written.
-// Positioning: left = pos.x − 48  /  top = pos.y − 8
-// so the pen tip lands exactly at the writing position on screen.
+// Uses the real hand-marker photo (public/hand-marker.png, 262×380 RGBA).
+// The blue marker tip sits at ~(121, 355) in the 262×380 source image.
+// Displayed at 130 px wide (scale ≈ 0.496) → tip at display (60, 176).
+// Positioning: left = pos.x − 60 / top = pos.y − 176
+// so the pen tip lands exactly at the writing coordinate on screen.
+// The hand body extends upward from the tip, which is the natural writing posture.
+
+const HAND_W       = 130;          // display width in px
+const HAND_TIP_X   = 60;           // tip x-offset inside displayed image
+const HAND_TIP_Y   = 176;          // tip y-offset inside displayed image
 
 function TeacherHand({
-  pos, state, isDark,
+  pos, state,
 }: {
   pos: { x: number; y: number };
   state: "idle" | "writing" | "done";
@@ -1840,21 +1845,16 @@ function TeacherHand({
   const isWriting = state === "writing";
   const isDone    = state === "done";
 
-  const skin   = isDark ? "#D4956A" : "#FDDCB4";
-  const skinD  = isDark ? "#B8784E" : "#F5C28A";
-  const sleeve = isDark ? "#1E3A5F" : "#2563EB";
-  const sleeveD= isDark ? "#1A3357" : "#1D4ED8";
-
   return (
     <>
-      {/* Status pill — sits just above/left of the pen tip so it never covers text below */}
+      {/* Status pill — floats just to the left of the tip */}
       {isWriting && (
         <div
           className="pointer-events-none absolute z-20 select-none"
           style={{
-            left: Math.max(4, pos.x - 108),
-            top:  Math.max(4, pos.y - 24),
-            transition: "left 0.3s ease-out, top 0.3s ease-out",
+            left: Math.max(4, pos.x - 120),
+            top:  Math.max(4, pos.y - 30),
+            transition: "left 0.25s ease-out, top 0.25s ease-out",
           }}
         >
           <div className="flex items-center gap-1.5 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg backdrop-blur-sm">
@@ -1867,8 +1867,8 @@ function TeacherHand({
         <div
           className="pointer-events-none absolute z-20 select-none"
           style={{
-            left: Math.max(4, pos.x - 58),
-            top:  Math.max(4, pos.y - 24),
+            left: Math.max(4, pos.x - 70),
+            top:  Math.max(4, pos.y - 30),
           }}
         >
           <div className="flex items-center gap-1 rounded-full bg-emerald-600/90 px-2.5 py-1 text-[10px] font-semibold text-white shadow-lg">
@@ -1877,106 +1877,46 @@ function TeacherHand({
         </div>
       )}
 
-      {/* Hand SVG — pen tip at TOP (SVG 48,8); hand body below the writing line */}
+      {/* Real hand photo — tip anchored to writing position */}
       <div
         className="pointer-events-none absolute z-10 select-none"
         style={{
-          left: pos.x - 48,
-          top:  pos.y - 8,   // pen tip at y=8 in SVG lands at pos.y on screen
+          left:    pos.x - HAND_TIP_X,
+          top:     pos.y - HAND_TIP_Y,
+          width:   HAND_W,
+          // smooth position during writing, ease-out when resting
           transition: isWriting
-            ? "left 0.08s linear, top 0.08s linear"
-            : "left 0.5s ease-out, top 0.5s ease-out",
-          filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.22))",
+            ? "left 0.09s linear, top 0.09s linear, opacity 0.3s"
+            : "left 0.5s ease-out, top 0.5s ease-out, opacity 0.4s",
           opacity: state === "idle" ? 0 : 1,
-          transitionProperty: "left, top, opacity",
+          // subtle micro-jitter while writing via CSS animation on the img
         }}
       >
-        <svg width="130" height="178" viewBox="0 0 130 178" fill="none">
-          <style>{`
-            @keyframes hwWrite {
-              0%,100% { transform: rotate(0deg) translate(0,0); }
-              30%      { transform: rotate(1.2deg) translate(0.4px,0.4px); }
-              70%      { transform: rotate(-0.8deg) translate(-0.4px,-0.2px); }
-            }
-            @keyframes hwIdle {
-              0%,100% { transform: translateY(0); }
-              50%      { transform: translateY(2px); }
-            }
-            .hw-group {
-              transform-origin: 48px 96px;
-              animation: ${isWriting
-                ? "hwWrite 0.22s ease-in-out infinite"
-                : "hwIdle 2.4s ease-in-out infinite"};
-            }
-          `}</style>
-
-          <g className="hw-group">
-            {/* ── Pen / marker (tip at top, barrel going down) ── */}
-            {/* Pen tip taper — writing contact at (48, 8) */}
-            <path d="M 43 22 L 48 8 L 53 22 Z" fill="#0F172A"/>
-            {/* Ink dot at tip when writing */}
-            {isWriting && (
-              <circle cx="48" cy="8" r="1.8" fill="#6366F1" opacity="0.85">
-                <animate attributeName="opacity" values="0.85;0.2;0.85" dur="0.22s" repeatCount="indefinite"/>
-              </circle>
-            )}
-            {/* Pen barrel */}
-            <rect x="42" y="22" width="12" height="68" rx="6" fill="#1E293B"/>
-            {/* Barrel highlight stripe */}
-            <rect x="44" y="24" width="3" height="56" rx="1.5" fill="white" opacity="0.07"/>
-            {/* Color band */}
-            <rect x="41" y="46" width="14" height="6" rx="3" fill="#6366F1"/>
-            {/* Grip section */}
-            <rect x="41" y="67" width="14" height="26" rx="4" fill="#334155"/>
-            {/* Grip ribs */}
-            {[0,5,10].map(dy => (
-              <rect key={dy} x="41" y={69+dy} width="14" height="1.5" rx="0.75"
-                fill="white" opacity="0.13"/>
-            ))}
-            {/* Clip on barrel */}
-            <rect x="55" y="26" width="3" height="34" rx="1.5" fill="#475569"/>
-            <circle cx="56.5" cy="26" r="3" fill="#475569"/>
-
-            {/* ── Fingers curled around grip (y ≈ 64–106) ── */}
-            {/* Thumb (from left side) */}
-            <ellipse cx="17" cy="88" rx="10" ry="19"
-              fill={skin} stroke={skinD} strokeWidth="0.8"
-              transform="rotate(-18 17 88)"/>
-            {/* Index finger */}
-            <rect x="24" y="62" width="14" height="42" rx="7"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Middle finger */}
-            <rect x="39" y="59" width="13" height="45" rx="6.5"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Ring finger */}
-            <rect x="53" y="62" width="12" height="41" rx="6"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-            {/* Pinky */}
-            <rect x="66" y="67" width="11" height="35" rx="5.5"
-              fill={skin} stroke={skinD} strokeWidth="0.8"/>
-
-            {/* ── Palm ── */}
-            <ellipse cx="48" cy="108" rx="32" ry="22"
-              fill={skin}/>
-            <ellipse cx="48" cy="112" rx="28" ry="14"
-              fill={skinD} opacity="0.28"/>
-
-            {/* Knuckle creases */}
-            <path d="M 26 104 Q 31 102 37 104" stroke={skinD} strokeWidth="0.7" fill="none"/>
-            <path d="M 41 101 Q 46 99 52 101" stroke={skinD} strokeWidth="0.7" fill="none"/>
-
-            {/* ── Wrist cuff ── */}
-            <rect x="18" y="118" width="60" height="13" rx="6.5"
-              fill={sleeveD}/>
-
-            {/* ── Forearm / sleeve (extends down from palm) ── */}
-            <rect x="14" y="126" width="68" height="52" rx="30"
-              fill={sleeve}/>
-            {/* Sleeve shading */}
-            <rect x="14" y="158" width="68" height="20" rx="14"
-              fill={sleeveD} opacity="0.55"/>
-          </g>
-        </svg>
+        <style>{`
+          @keyframes hwPhotoWrite {
+            0%,100% { transform: rotate(0deg) translate(0px,  0px); }
+            25%      { transform: rotate( 0.6deg) translate( 0.5px, -0.3px); }
+            75%      { transform: rotate(-0.4deg) translate(-0.3px,  0.2px); }
+          }
+          @keyframes hwPhotoIdle {
+            0%,100% { transform: translate(0px, 0px); }
+            50%      { transform: translate(0px, 2px); }
+          }
+          .hw-photo {
+            transform-origin: ${HAND_TIP_X}px ${HAND_TIP_Y}px;
+            animation: ${isWriting
+              ? "hwPhotoWrite 0.28s ease-in-out infinite"
+              : "hwPhotoIdle 2.6s ease-in-out infinite"};
+          }
+        `}</style>
+        <img
+          src="/hand-marker.png"
+          alt=""
+          className="hw-photo block"
+          width={HAND_W}
+          draggable={false}
+          style={{ imageRendering: "auto" }}
+        />
       </div>
     </>
   );
