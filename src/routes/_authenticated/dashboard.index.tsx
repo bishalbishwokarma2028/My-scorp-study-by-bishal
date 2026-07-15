@@ -4,7 +4,7 @@ import {
   MessageSquare, ListChecks, StickyNote, Image as ImageIcon, Sparkles, Flame,
   FileText, Layers, BookOpen, TrendingUp, Star, ArrowRight, Brain,
   Code2, GitCompare, Search, Eye, Languages, Calculator, FlaskConical, Sheet,
-  FileQuestion, Youtube, BookText, Sigma, Microscope,
+  FileQuestion, Youtube, BookText, Sigma, Microscope, ScanText, PenLine, Compass,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDailyTip } from "@/hooks/useDailyTip";
@@ -34,6 +34,9 @@ const quickStart = [
   { to: "/dashboard/formula-sheet",    label: "Formula Sheet",     sub: "Generate formula sheets",       icon: Sheet,         grad: "from-cyan-500 to-blue-600" },
   { to: "/dashboard/mock-test",        label: "Mock Test",         sub: "Timed tests with review",       icon: FlaskConical,  grad: "from-rose-500 to-red-600" },
   { to: "/dashboard/calculator",       label: "Calculator",        sub: "Step-by-step math solver",      icon: Calculator,    grad: "from-green-500 to-emerald-600" },
+  { to: "/dashboard/image-solver",     label: "Image Solver",      sub: "Solve questions from images",   icon: ScanText,      grad: "from-orange-500 to-amber-600" },
+  { to: "/dashboard/whiteboard",       label: "Teaching Board",    sub: "Interactive visual teaching",   icon: PenLine,       grad: "from-sky-500 to-indigo-500" },
+  { to: "/dashboard/career-explorer", label: "Career Explorer",   sub: "Explore 510 career paths",      icon: Compass,       grad: "from-violet-600 to-indigo-600" },
 ];
 
 function greeting() {

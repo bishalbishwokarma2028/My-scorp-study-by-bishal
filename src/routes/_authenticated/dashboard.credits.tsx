@@ -21,6 +21,8 @@ const DEEP_ENGINE_FEATURES = [
   { icon: "⚗️", label: "Science" },
   { icon: "📒", label: "Smart Notes" },
   { icon: "🪜", label: "Step-by-Step Solver" },
+  { icon: "🖼️", label: "Image Solver" },
+  { icon: "🖍️", label: "Teaching Board" },
 ];
 
 const RAPID_ENGINE_FEATURES = [

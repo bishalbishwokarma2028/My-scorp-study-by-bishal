@@ -877,6 +877,8 @@ function WhiteboardPage() {
   const [showAI, setShowAI]           = useState(true);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showSubjects, setShowSubjects] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
+  const [showMobileColorPicker, setShowMobileColorPicker] = useState(false);
 
   // AI state — lazy initializers restore from session cache when navigating back
   const [question, setQuestion]       = useState<string>(() => _wbCache.question ?? "");
@@ -944,7 +946,7 @@ function WhiteboardPage() {
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAI]);
+  }, [showAI, mobileTab]);
 
   // ── Full canvas redraw ───────────────────────────────────────────────────
   const pageRef  = useRef(page);
@@ -1813,6 +1815,7 @@ function WhiteboardPage() {
     eraser:"cursor-cell", select:"cursor-move", text:"cursor-text",
     line:"cursor-crosshair", arrow:"cursor-crosshair", rect:"cursor-crosshair",
     circle:"cursor-crosshair", triangle:"cursor-crosshair", laser:"cursor-crosshair",
+    diagram:"cursor-crosshair",
   };
 
   const currentStepIdx = animRef.current.shown.length - 1;
@@ -1864,7 +1867,7 @@ function WhiteboardPage() {
         </button>
         <button onClick={()=>setMobileTab("ai")}
           className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${mobileTab==="ai"?"border-indigo-500 text-indigo-600":isDark?"border-transparent text-slate-400":"border-transparent text-slate-500"}`}>
-          <Sparkles size={14}/> AI Teacher
+          <Sparkles size={14}/> Bishal's Tutor
           {animPhase==="running" && <span className="ml-1 h-2 w-2 animate-pulse rounded-full bg-indigo-500"/>}
         </button>
       </div>
@@ -1961,6 +1964,7 @@ function WhiteboardPage() {
           <div className="flex items-center gap-0.5 px-1.5 py-1 min-w-max">
             {([
               ["pen",         <Pen size={15}/>,             "Pen"],
+              ["pencil",      <Pen size={13} className="opacity-50"/>, "Pencil"],
               ["highlighter", <Highlighter size={15}/>,     "Highlight"],
               ["eraser",      <Eraser size={15}/>,          "Erase"],
               ["select",      <MousePointer2 size={15}/>,   "Select"],
@@ -1969,6 +1973,8 @@ function WhiteboardPage() {
               ["arrow",       <MoveRight size={15}/>,       "Arrow"],
               ["rect",        <Square size={15}/>,          "Rect"],
               ["circle",      <Circle size={15}/>,          "Circle"],
+              ["triangle",    <Triangle size={15}/>,        "Triangle"],
+              ["laser",       <Dot size={17} className="text-red-500"/>, "Laser"],
             ] as [Tool, React.ReactNode, string][]).map(([t, icon, lbl]) => (
               <button key={t} onClick={()=>setTool(t)} title={lbl}
                 className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] transition-colors min-w-[40px] ${
@@ -1993,14 +1999,120 @@ function WhiteboardPage() {
               </button>
             ))}
             <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
-            {/* Color swatches */}
+            {/* Color swatches + picker */}
             {[COLORS.black,COLORS.blue,COLORS.red,COLORS.green,COLORS.orange,COLORS.purple,COLORS.yellow,COLORS.gray].map(c => (
               <button key={c} onClick={()=>setColor(c)}
                 className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${color===c?"border-indigo-500 scale-110":"border-white/50"}`}
                 style={{background:c}}/>
             ))}
-            <input type="color" value={color} onChange={e=>setColor(e.target.value)}
-              className="h-7 w-7 cursor-pointer rounded-full border-2 border-white/50" title="Custom color"/>
+            {/* Full color picker swatch + Smart Colors popover */}
+            <div className="relative flex items-center">
+              <button onClick={()=>setShowMobileColorPicker(s=>!s)}
+                className="mx-1 h-7 w-7 rounded-full border-2 border-white/80 shadow transition-transform hover:scale-110"
+                style={{background:color}} title="More colors"/>
+              {showMobileColorPicker && (
+                <div className={`absolute bottom-10 left-0 z-50 rounded-xl border p-2 shadow-2xl ${isDark?"border-slate-600 bg-slate-800":"border-gray-200 bg-white"}`}
+                  style={{minWidth:"200px"}}>
+                  <p className={`mb-1.5 text-[9px] font-bold uppercase tracking-widest ${isDark?"text-slate-500":"text-slate-400"}`}>Smart Colors</p>
+                  <div className="mb-2 grid grid-cols-4 gap-1">
+                    {([
+                      [COLORS.blue,   "Explanation"],
+                      [COLORS.green,  "Correct"],
+                      [COLORS.red,    "Mistake"],
+                      [COLORS.orange, "Warning"],
+                      [COLORS.purple, "Definition"],
+                      [COLORS.yellow, "Highlight"],
+                      [COLORS.black,  "Default"],
+                      [COLORS.gray,   "Note"],
+                    ] as [string,string][]).map(([c,lbl]) => (
+                      <button key={c} onClick={()=>{setColor(c);setShowMobileColorPicker(false);}}
+                        title={lbl}
+                        className={`h-6 w-6 rounded border-2 transition-transform hover:scale-110 ${color===c?"border-indigo-500 scale-110":"border-white/50"}`}
+                        style={{background:c}}/>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-6 gap-1 mb-2">
+                    {PRESET_COLORS.map(c => (
+                      <button key={c} onClick={()=>{setColor(c);setShowMobileColorPicker(false);}}
+                        className={`h-5 w-5 rounded border transition-transform hover:scale-110 ${color===c?"border-indigo-500 scale-110":"border-white/20"}`}
+                        style={{background:c}}/>
+                    ))}
+                  </div>
+                  <input type="color" value={color} onChange={e=>{setColor(e.target.value);}}
+                    className="h-6 w-full cursor-pointer rounded"/>
+                </div>
+              )}
+            </div>
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            {/* Page navigation */}
+            <button onClick={()=>setPage(p=>Math.max(0,p-1))} title="Prev page"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <ChevronLeft size={15}/><span>Prev</span>
+            </button>
+            <button onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))} title="Next page"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <ChevronRight size={15}/><span>Next</span>
+            </button>
+            <button onClick={addPage} title="Add page"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <Plus size={15}/><span>Add pg</span>
+            </button>
+            <button onClick={dupPage} title="Duplicate page"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <CopyPlus size={15}/><span>Dup pg</span>
+            </button>
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            {/* Background mode */}
+            {(["blank","grid","dots"] as BgMode[]).map(m => (
+              <button key={m} onClick={()=>setBg(m)} title={m}
+                className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${bg===m?(isDark?"bg-indigo-700 text-white":"bg-indigo-100 text-indigo-700"):(isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100")}`}>
+                {m==="grid"?<Grid3x3 size={15}/>:m==="dots"?<Dot size={15}/>:<Minus size={15}/>}
+                <span>{m==="blank"?"Blank":m==="grid"?"Grid":"Dots"}</span>
+              </button>
+            ))}
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            {/* Theme toggle */}
+            <button onClick={()=>setTheme(t=>t==="light"?"dark":"light")} title="Theme"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              {isDark?<Sun size={15}/>:<Moon size={15}/>}
+              <span>Theme</span>
+            </button>
+            {/* Zoom in/out/reset */}
+            <button onClick={()=>setZoom(z=>Math.min(5,z*1.25))} title="Zoom in"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <ZoomIn size={15}/><span>Zoom+</span>
+            </button>
+            <button onClick={()=>setZoom(z=>Math.max(0.2,z/1.25))} title="Zoom out"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <ZoomOut size={15}/><span>Zoom-</span>
+            </button>
+            <button onClick={()=>{setZoom(1);setPan({x:0,y:0});}} title="Reset zoom"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <span className="font-mono text-[11px]">{Math.round(zoom*100)}%</span>
+              <span>Reset</span>
+            </button>
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            {/* Export PNG */}
+            <button onClick={exportPNG} title="Export PNG"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <Download size={15}/><span>Export</span>
+            </button>
+            {/* New board */}
+            <button onClick={newBoard} title="New board"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <RotateCcw size={15}/><span>New</span>
+            </button>
+            {/* Fullscreen */}
+            <button onClick={toggleFullscreen} title="Fullscreen"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              {isFullscreen?<Minimize2 size={15}/>:<Maximize2 size={15}/>}
+              <span>{isFullscreen?"Exit FS":"Full"}</span>
+            </button>
+            {/* Toggle Tutor panel (switches to AI tab on mobile) */}
+            <button onClick={()=>setMobileTab(t=>t==="ai"?"board":"ai")} title="Bishal's Tutor"
+              className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}>
+              <Sparkles size={15}/><span>Tutor</span>
+            </button>
           </div>
         </div>
 
@@ -2051,11 +2163,18 @@ function WhiteboardPage() {
 
         </div>{/* /board-side */}
 
-        {/* ── AI Teaching Panel ─────────────────────────────────────────────
-             Mobile: flex-1 min-h-0 so it fills remaining height in the flex-col body.
-             Desktop: shrink-0 fixed-width sidebar.                                  */}
-        {(showAI || mobileTab === "ai") && (
-          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} flex-1 min-h-0 md:flex-none md:shrink-0 flex-col overflow-hidden border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}>
+        {/* ── Bishal's Tutor Panel ───────────────────────────────────────────
+             Mobile: full-height when AI tab active (not hidden — just invisible so
+             canvas state is never unmounted or lost). Use visibility-based show/hide
+             on mobile, not conditional render, so board content persists.
+             Desktop: shrink-0 fixed-width sidebar controlled by showAI.             */}
+        <aside className={`
+          flex-1 min-h-0 md:flex-none md:shrink-0 flex-col overflow-hidden
+          border-t md:border-t-0 md:border-l md:w-[340px] w-full
+          ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}
+          ${mobileTab==="ai" ? "flex" : "hidden md:flex"}
+          ${!showAI ? "md:hidden" : ""}
+        `}>
 
             {/* Panel header */}
             <div className={`flex shrink-0 flex-col border-b ${isDark?"border-slate-700":"border-gray-200"}`}>
@@ -2273,7 +2392,6 @@ function WhiteboardPage() {
               </p>
             </div>
           </aside>
-        )}
       </div>
     </div>
   );

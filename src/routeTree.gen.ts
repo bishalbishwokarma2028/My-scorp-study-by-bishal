@@ -40,6 +40,7 @@ import { Route as AuthenticatedDashboardCreditsRouteImport } from './routes/_aut
 import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
 import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
 import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
+import { Route as AuthenticatedDashboardCareerExplorerRouteImport } from './routes/_authenticated/dashboard.career-explorer'
 import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
 import { Route as AdminAdminUsersRouteImport } from './routes/_admin/admin.users'
 import { Route as AdminAdminUsageRouteImport } from './routes/_admin/admin.usage'
@@ -224,6 +225,12 @@ const AuthenticatedDashboardChatRoute =
     path: '/dashboard/chat',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardCareerExplorerRoute =
+  AuthenticatedDashboardCareerExplorerRouteImport.update({
+    id: '/dashboard/career-explorer',
+    path: '/dashboard/career-explorer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardCalculatorRoute =
   AuthenticatedDashboardCalculatorRouteImport.update({
     id: '/dashboard/calculator',
@@ -260,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/admin/usage': typeof AdminAdminUsageRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
+  '/dashboard/career-explorer': typeof AuthenticatedDashboardCareerExplorerRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
@@ -296,6 +304,7 @@ export interface FileRoutesByTo {
   '/admin/usage': typeof AdminAdminUsageRoute
   '/admin/users': typeof AdminAdminUsersRoute
   '/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
+  '/dashboard/career-explorer': typeof AuthenticatedDashboardCareerExplorerRoute
   '/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
@@ -335,6 +344,7 @@ export interface FileRoutesById {
   '/_admin/admin/usage': typeof AdminAdminUsageRoute
   '/_admin/admin/users': typeof AdminAdminUsersRoute
   '/_authenticated/dashboard/calculator': typeof AuthenticatedDashboardCalculatorRoute
+  '/_authenticated/dashboard/career-explorer': typeof AuthenticatedDashboardCareerExplorerRoute
   '/_authenticated/dashboard/chat': typeof AuthenticatedDashboardChatRoute
   '/_authenticated/dashboard/code-tutor': typeof AuthenticatedDashboardCodeTutorRoute
   '/_authenticated/dashboard/compare': typeof AuthenticatedDashboardCompareRoute
@@ -373,6 +383,7 @@ export interface FileRouteTypes {
     | '/admin/usage'
     | '/admin/users'
     | '/dashboard/calculator'
+    | '/dashboard/career-explorer'
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
     | '/dashboard/compare'
@@ -409,6 +420,7 @@ export interface FileRouteTypes {
     | '/admin/usage'
     | '/admin/users'
     | '/dashboard/calculator'
+    | '/dashboard/career-explorer'
     | '/dashboard/chat'
     | '/dashboard/code-tutor'
     | '/dashboard/compare'
@@ -447,6 +459,7 @@ export interface FileRouteTypes {
     | '/_admin/admin/usage'
     | '/_admin/admin/users'
     | '/_authenticated/dashboard/calculator'
+    | '/_authenticated/dashboard/career-explorer'
     | '/_authenticated/dashboard/chat'
     | '/_authenticated/dashboard/code-tutor'
     | '/_authenticated/dashboard/compare'
@@ -702,6 +715,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardChatRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/career-explorer': {
+      id: '/_authenticated/dashboard/career-explorer'
+      path: '/dashboard/career-explorer'
+      fullPath: '/dashboard/career-explorer'
+      preLoaderRoute: typeof AuthenticatedDashboardCareerExplorerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/calculator': {
       id: '/_authenticated/dashboard/calculator'
       path: '/dashboard/calculator'
@@ -762,6 +782,7 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardCalculatorRoute: typeof AuthenticatedDashboardCalculatorRoute
+  AuthenticatedDashboardCareerExplorerRoute: typeof AuthenticatedDashboardCareerExplorerRoute
   AuthenticatedDashboardChatRoute: typeof AuthenticatedDashboardChatRoute
   AuthenticatedDashboardCodeTutorRoute: typeof AuthenticatedDashboardCodeTutorRoute
   AuthenticatedDashboardCompareRoute: typeof AuthenticatedDashboardCompareRoute
@@ -791,6 +812,8 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardCalculatorRoute: AuthenticatedDashboardCalculatorRoute,
+  AuthenticatedDashboardCareerExplorerRoute:
+    AuthenticatedDashboardCareerExplorerRoute,
   AuthenticatedDashboardChatRoute: AuthenticatedDashboardChatRoute,
   AuthenticatedDashboardCodeTutorRoute: AuthenticatedDashboardCodeTutorRoute,
   AuthenticatedDashboardCompareRoute: AuthenticatedDashboardCompareRoute,

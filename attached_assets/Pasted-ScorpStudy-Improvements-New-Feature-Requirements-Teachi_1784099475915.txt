@@ -1,0 +1,32 @@
+ScorpStudy Improvements & New Feature Requirements
+
+Teaching Board – Mobile Responsiveness
+
+- The Teaching Board must be fully responsive and optimized for mobile devices.
+- On mobile, the interface is divided into two sections: Board and AI Teacher. Rename AI Teacher to Bishal's Tutor.
+- Many Teaching Board features are currently missing on mobile, and the whiteboard is not functioning properly. All whiteboard tools and features must be visible and fully functional.
+- When a user asks a question in Bishal's Tutor and receives an answer, switching to the Board tab should display the same generated content, diagrams, and whiteboard output exactly as it does on the desktop version.
+- Ensure that all Teaching Board features are available on mobile with the same functionality and user experience as the desktop version.
+- Verify that every tool, button, panel, drawing feature, and interaction is visible, responsive, and fully functional on all supported mobile screen sizes.
+
+Credit Reminder Improvements
+
+- In the Credit Reminder section, include both Image Solver and Teaching Board under the Deep Engine category so users can clearly see that these features consume Deep Engine credits.
+
+Overview & Homepage Improvements
+
+- Add Image Solver and Teaching Board to the Overview section.
+- Also include both features in the Everything You Need to Ace Your Exams section so they are prominently displayed alongside the other core features.
+
+New Feature – ScorpStudy Career Explorer
+
+- Add a brand-new feature called ScorpStudy Career Explorer.
+- This feature must include all the content, information, sections, and functionality from the PDF I have provided. No important content should be omitted.
+- Organize the content into a clear, structured, and easy-to-navigate interface so users can effortlessly explore different career paths.
+- Design a modern, premium, and highly attractive UI with a clean layout, intuitive navigation, smooth animations, and an excellent overall user experience.
+- Ensure the feature is fully responsive across desktop, tablet, and mobile devices.
+- Use visually appealing cards, icons, timelines, expandable sections, charts, and other UI components wherever appropriate to improve readability and engagement.
+- Include advanced search, filtering, and categorization options so users can quickly find careers, courses, qualifications, entrance requirements, and other relevant information.
+- Display all text, tables, diagrams, images, and other content from the provided PDF in a clean and well-formatted manner.
+- Make sure every feature is fully functional, fast, responsive, and optimized for the best possible user experience.
+- Maintain a consistent design language with the rest of the ScorpStudy application while making ScorpStudy Career Explorer feel like a premium, flagship feature.

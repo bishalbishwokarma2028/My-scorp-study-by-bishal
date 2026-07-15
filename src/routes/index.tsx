@@ -4,7 +4,7 @@ import {
   Sparkles, Globe, Clock, Star, Shield, ArrowRight, Calculator as CalcIcon, FlaskConical,
   Atom, History as HistoryIcon, Code2, Languages as LangIcon, BarChart3, Music, Palette,
   CheckCircle2, XCircle, Zap, TrendingUp, Brain, Map, ExternalLink, GraduationCap, Trophy,
-  GitCompare, Search, Eye, FileQuestion, Youtube, BookText, Sigma, Microscope,
+  GitCompare, Search, Eye, FileQuestion, Youtube, BookText, Sigma, Microscope, ScanText, PenLine, Compass,
 } from "lucide-react";
 import logoUrl from "@/assets/scorpstudy-logo.png";
 
@@ -48,6 +48,9 @@ const features = [
   { icon: BookText, title: "Grammar", desc: "A complete English grammar reference with clear rules, examples, practice exercises, and an AI tutor to clear every doubt instantly.", color: "from-cyan-500 to-blue-600" },
   { icon: Sigma, title: "Mathematics", desc: "Every math topic explained with formulas, worked examples, step-by-step practice questions, and an AI chat for follow-up questions.", color: "from-indigo-500 to-purple-600" },
   { icon: Microscope, title: "Science", desc: "Physics, Chemistry, Biology, and Earth Science — explained with real experiments, diagrams, and an AI tutor for every single topic.", color: "from-emerald-500 to-green-600" },
+  { icon: ScanText, title: "Image Solver", desc: "Snap or upload any question paper, worksheet, or diagram. Bishal's Assistant reads it instantly and delivers a full, step-by-step solution on the spot.", color: "from-orange-500 to-amber-600", badge: "New" },
+  { icon: PenLine, title: "Teaching Board", desc: "An interactive visual teaching canvas where you can draw, annotate, and explain any concept — perfect for working through problems step by step.", color: "from-sky-500 to-indigo-500" },
+  { icon: Compass, title: "Career Explorer", desc: "Explore 510 career paths across 24 categories with real salary data for Nepal and abroad, required skills, growth trajectories, and industry insights.", color: "from-violet-600 to-indigo-600", badge: "New" },
 ];
 
 const subjects = [
