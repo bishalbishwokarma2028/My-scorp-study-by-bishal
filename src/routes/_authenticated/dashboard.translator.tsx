@@ -76,16 +76,24 @@ function TranslatorPage() {
         : isAutoDetect ? `IMPORTANT: Auto-detect the language. If the text appears to be romanized/transliterated (written in Latin letters but representing a non-Latin language like Nepali, Hindi, Arabic, etc.), detect the intended language, convert to native script, then translate.`
         : "";
       const res = await askAI(
-        `You are an expert multilingual translator and transliteration specialist.
+        `You are a professional human translator with native-level fluency in both ${from} and ${target}.
 
 ${romanizedNote}
 
 Translate the following text from ${from} to ${target}.
-Output ONLY the translated text in ${target}. No explanations, no notes, no quotes, no preamble, no "Translation:" prefix.
 
-TEXT:
+TRANSLATION RULES (follow every rule):
+1. Produce a NATURAL, FLUENT translation — as if originally written in ${target} by a native speaker.
+2. Preserve the original MEANING, TONE, and REGISTER (formal stays formal, casual stays casual, technical stays technical).
+3. Use correct ${target} GRAMMAR and natural sentence structure — never translate word-for-word.
+4. Preserve TECHNICAL TERMINOLOGY accurately; use the accepted ${target} term, not a literal calque.
+5. Preserve PROPER NOUNS, names, and titles as-is unless they have a well-known ${target} equivalent.
+6. Keep FORMATTING (paragraphs, bullet points, line breaks) identical to the source.
+7. Output ONLY the translated text — no explanations, no notes, no quotes, no "Translation:" prefix.
+
+TEXT TO TRANSLATE:
 ${text}`,
-        `You are a precise multilingual translator. You understand romanized/transliterated text in any language. When source is a non-Latin language but text is in Latin script, convert transliteration to native script first, then translate. Output ONLY the final translation.`,
+        `You are a professional human translator specialising in accurate, natural, context-aware multilingual translation. When source is a non-Latin language but text is in Latin script, first mentally reconstruct the native-script original, then translate. Produce idiomatic target-language output that preserves meaning, tone, grammar, and technical terminology. Output ONLY the final translation.`,
       );
       const translated = res.text.trim().replace(/^["']|["']$/g, "").replace(/^Translation:\s*/i, "").trim();
       if (!translated) {

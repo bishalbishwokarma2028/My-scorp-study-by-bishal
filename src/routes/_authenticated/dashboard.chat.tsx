@@ -56,17 +56,24 @@ const WEB_SEARCH_KEYWORDS = [
   "recent", "latest", "current", "now", "2024", "2025", "2026", "as of",
   // News signals
   "news", "breaking", "viral", "trending", "update", "announcement", "happened",
-  "just in", "headline", "report", "confirmed",
+  "just in", "headline", "report", "confirmed", "live update", "developing",
   // Sports
   "match", "score", "winner", "result", "results", "standings", "fixture", "lineup",
   "cricket", "football", "soccer", "ipl", "world cup", "premier league",
   "champions league", "nba", "nfl", "wimbledon", "olympics", "t20", "odi", "test match",
   "tournament", "championship", "league", "series", "final", "semifinal", "playoffs",
-  "who is winning", "live score", "toss",
-  // Politics / world
+  "who is winning", "live score", "toss", "batting", "bowling", "runs",
+  // Politics / world events
   "election", "politics", "government", "president", "prime minister", "parliament",
   "war", "conflict", "economy", "stock market", "share price", "earthquake", "disaster",
-  "who won", "weather", "live", "ceasefire", "protest", "policy",
+  "who won", "weather", "live", "ceasefire", "protest", "policy", "sanctions",
+  "military", "summit", "treaty", "vote", "referendum", "coup",
+  // Geography / current facts
+  "capital of", "population of", "currency of", "flag of", "president of", "prime minister of",
+  "largest", "smallest", "richest", "poorest", "fastest", "ranked",
+  // Tech / business current events
+  "released", "launched", "ipo", "acquisition", "merger", "bankruptcy",
+  "elon musk", "openai", "google", "apple", "microsoft", "meta", "tesla", "spacex",
 ];
 
 function needsWebSearch(text: string): boolean {

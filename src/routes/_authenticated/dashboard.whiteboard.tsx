@@ -151,6 +151,25 @@ const FOLLOWUP_CHIPS = [
   "Go deeper into this topic",
 ];
 
+// ─── Session persistence (survives route changes, resets on page refresh) ─────
+// Canvas elements and key AI state are stored here so the Teaching Board
+// preserves its session when the user navigates to another feature and returns.
+
+interface _WBCache {
+  chatHistory: ConvMsg[];
+  visibleSteps: TeachStep[];
+  question: string;
+  totalSteps: number;
+  animPhase: AnimPhase;
+  page: number;
+  totalPages: number;
+  drawOnCanvas: boolean;
+  elems: DrawEl[][];
+  writePos: { x: number; y: number };
+  aiElemIds: string[];
+}
+const _wbCache: Partial<_WBCache> = {};
+
 // ─── AI prompt ────────────────────────────────────────────────────────────────
 
 function buildTeachingPrompt(q: string, history: ConvMsg[]): string {
@@ -162,13 +181,18 @@ function buildTeachingPrompt(q: string, history: ConvMsg[]): string {
   // Detect question intent to guide AI format selection
   const ql = q.toLowerCase();
   const isComparison = /\b(differ|difference|compare|vs\.?|versus|contrast|between .* and|which is better|pros.{0,10}cons)\b/.test(ql);
-  const isVisual = /\b(triangle|circle|wave|force|graph|axes|coordinate|sine|cosine|dna|helix|bar chart|histogram|geometry|trigonometry|physics|projectile|vector|frequency|amplitude)\b/.test(ql);
+  const isVisual = /\b(triangle|circle|wave|force|graph|axes|coordinate|sine|cosine|dna|helix|bar chart|histogram|geometry|trigonometry|physics|projectile|vector|frequency|amplitude|optics|refraction|reflection|lens|prism|pendulum)\b/.test(ql);
+  const isDeriv  = /\b(derive|derivation|proof|prove|differentiat|integrat|integral|differential|laplace|fourier|maxwell|kirchhoff|bernoulli|stokes|gauss|hamiltonian|lagrangian|gradient|curl|divergence|ohm.s law|faraday|coulomb|thermodynamic|entropy|work.energy|potential energy|kinetic energy|conservation)\b/.test(ql);
+  const isAlgo   = /\b(algorithm|sort|sorting|bubble sort|quick sort|merge sort|heap sort|insertion sort|selection sort|binary search|linear search|bfs|dfs|dijkstra|graph traversal|encrypt|decrypt|encryption|decryption|cipher|hash|hashing|rsa|aes|des|md5|sha|workflow|flowchart|process flow|state machine|turing|finite automata|pipeline|network packet|tcp|handshake|osi layer)\b/.test(ql);
 
   const comparisonHint = isComparison
     ? `\n\nIMPORTANT: The student is asking for a COMPARISON. You MUST include exactly one "table" step that shows the comparison in two columns. Do NOT skip the table.`
     : "";
-  const visualHint = isVisual
-    ? `\n\nThe topic is visual — consider whether a diagram genuinely helps understanding. If so, include ONE appropriate diagram step.`
+
+  const visualHint = isAlgo
+    ? `\n\nThis involves a process, algorithm, or workflow. You MUST include exactly ONE "diagram" step using a flow-diagram. Use the format: flow-diagram:Step1→Step2→Step3→Step4 (use real step names from the topic, max 6 steps separated by →).`
+    : (isVisual || isDeriv)
+    ? `\n\nThe topic is visual or involves a mathematical/scientific derivation — you SHOULD include ONE appropriate diagram step if it directly illustrates the core concept.`
     : `\n\nThe topic is NOT visual — do NOT include any diagram steps.`;
 
   return `You are Bishal's expert AI teacher writing on an interactive whiteboard. A student asked:
@@ -213,23 +237,27 @@ Step type rules:
     • Biology (genetics) → dna
     • Statistics / data sets → bar-chart
     • Graphing functions → axes
+    • Algorithms / processes / workflows / encryption → flow-diagram
     The text value must be EXACTLY one of (copy precisely):
-      right-triangle:a,b,c   → right-angle triangle labeled a, b, c (hypotenuse)
-      axes:x,y               → coordinate plane with labeled axes
-      number-line:-5,5       → number line (replace -5,5 with actual range)
-      circle:r               → circle with radius r labeled
-      force-diagram:F,mg,N   → free-body force arrows (replace labels with actual forces)
-      bar-chart:A,B,C        → bar chart (replace A,B,C with actual category names)
-      dna:double-helix       → DNA double helix
-      wave:sine              → sine wave with axes
-    FORBIDDEN: Do NOT use diagram for algebra, calculus (non-graphing), chemistry equations, history, language, grammar, literature, definitions, or any non-visual concept. ONE diagram maximum per response.
+      right-triangle:a,b,c          → right-angle triangle labeled a, b, c (hypotenuse)
+      axes:x,y                      → coordinate plane with labeled axes
+      number-line:-5,5              → number line (replace -5,5 with actual range)
+      circle:r                      → circle with radius r labeled
+      force-diagram:F,mg,N          → free-body force arrows (replace labels with actual forces)
+      bar-chart:A,B,C               → bar chart (replace A,B,C with actual category names)
+      dna:double-helix              → DNA double helix
+      wave:sine                     → sine wave with axes
+      flow-diagram:Step1→Step2→Step3 → flowchart of steps (replace with actual step names, max 6, separated by →)
+    FORBIDDEN: Do NOT use diagram for algebra, chemistry equations, history, language, grammar, literature, or definitions. ONE diagram maximum per response.
 - "separator"  → Visual divider between major sections: {"type":"separator","text":""}
 
 Requirements:
 - 15 to 25 steps total. NEVER fewer than 12. This is a full lesson, not a summary.
 - For comparison questions: include a "table" step — this is mandatory.
-- For visual topics: include AT MOST ONE "diagram" step. Place it AFTER the explanation, BEFORE the worked steps.
-- For non-visual topics (algebra, history, grammar, etc.): ZERO diagram steps.
+- For visual/physics/geometry/biology topics: include AT MOST ONE "diagram" step. Place it AFTER the explanation.
+- For algorithm/process/workflow/encryption topics: include EXACTLY ONE "flow-diagram" step showing the process flow.
+- For math derivations (calculus, differential equations, etc.): use a diagram only if a graph or coordinate system directly illustrates the result.
+- For non-visual topics (algebra, chemistry equations, history, grammar, etc.): ZERO diagram steps.
 - Include AT LEAST 2 "separator" steps to divide sections.
 - Explain like an enthusiastic teacher who loves the subject. Be detailed, thorough, and educational.
 - Structure: title → explain big picture → definitions → [diagram if visual] → [table if comparison] → formulas → worked steps → answer → tips → warnings.
@@ -546,6 +574,63 @@ function drawDiagramOnCanvas(
     ctx.font = HW_FONT;
     ctx.fillText("DNA", ox + W + 8, oy + H / 2 + 5);
     usedH = H + 16;
+
+  } else if (kind === "flow-diagram") {
+    // Parse arrow-separated steps: "flow-diagram:StepA→StepB→StepC"
+    const rawSteps = (args[0] ?? "").split("→").map(s => s.trim()).filter(Boolean);
+    const steps = rawSteps.length ? rawSteps : ["Start", "Process", "End"];
+    const boxW = 160, boxH = 38, arrowGap = 22;
+    ctx.font = `400 13px ${HW_FAMILY}`;
+
+    let cy = oy;
+    steps.forEach((step, i) => {
+      // Diamond shape for first/last (start/end), rectangle for middle
+      const isTerminal = i === 0 || i === steps.length - 1;
+      if (isTerminal) {
+        // Rounded-corner terminal box (stadium shape)
+        const r = boxH / 2;
+        ctx.beginPath();
+        ctx.moveTo(ox + r, cy);
+        ctx.lineTo(ox + boxW - r, cy);
+        ctx.quadraticCurveTo(ox + boxW, cy, ox + boxW, cy + r);
+        ctx.quadraticCurveTo(ox + boxW, cy + boxH, ox + boxW - r, cy + boxH);
+        ctx.lineTo(ox + r, cy + boxH);
+        ctx.quadraticCurveTo(ox, cy + boxH, ox, cy + r);
+        ctx.quadraticCurveTo(ox, cy, ox + r, cy);
+        ctx.closePath();
+        ctx.save(); ctx.globalAlpha = 0.12; ctx.fill(); ctx.globalAlpha = 1; ctx.restore();
+        ctx.stroke();
+      } else {
+        ctx.save(); ctx.globalAlpha = 0.08; ctx.fillRect(ox, cy, boxW, boxH); ctx.globalAlpha = 1; ctx.restore();
+        ctx.strokeRect(ox, cy, boxW, boxH);
+      }
+      // Center text (clip if too wide)
+      const tw = ctx.measureText(step).width;
+      const tx = ox + boxW / 2 - Math.min(tw, boxW - 14) / 2;
+      ctx.save();
+      ctx.rect(ox + 4, cy, boxW - 8, boxH);
+      ctx.clip();
+      ctx.fillText(step, tx, cy + boxH / 2 + 5);
+      ctx.restore();
+
+      // Arrow to next box
+      if (i < steps.length - 1) {
+        const arrowTopY = cy + boxH;
+        const arrowBotY = arrowTopY + arrowGap;
+        const mx = ox + boxW / 2;
+        ctx.beginPath(); ctx.moveTo(mx, arrowTopY); ctx.lineTo(mx, arrowBotY); ctx.stroke();
+        // Arrowhead
+        ctx.beginPath();
+        ctx.moveTo(mx, arrowBotY);
+        ctx.lineTo(mx - 7, arrowBotY - 10);
+        ctx.lineTo(mx + 7, arrowBotY - 10);
+        ctx.closePath(); ctx.fill();
+        cy = arrowBotY;
+      } else {
+        cy += boxH;
+      }
+    });
+    usedH = cy - oy + 8;
   }
 
   ctx.restore();
@@ -679,21 +764,24 @@ function WhiteboardPage() {
   const [theme, setTheme]             = useState<Theme>("light");
   const [zoom, setZoom]               = useState(1);
   const [pan, setPan]                 = useState<Pt>({ x: 0, y: 0 });
-  const [page, setPage]               = useState(0);
-  const [totalPages, setTotalPages]   = useState(1);
+  const [page, setPage]               = useState<number>(() => _wbCache.page ?? 0);
+  const [totalPages, setTotalPages]   = useState<number>(() => _wbCache.totalPages ?? 1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showAI, setShowAI]           = useState(true);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showSubjects, setShowSubjects] = useState(false);
 
-  // AI state
-  const [question, setQuestion]       = useState("");
+  // AI state — lazy initializers restore from session cache when navigating back
+  const [question, setQuestion]       = useState<string>(() => _wbCache.question ?? "");
   const [loading, setLoading]         = useState(false);
-  const [animPhase, setAnimPhase]     = useState<AnimPhase>("idle");
-  const [visibleSteps, setVisibleSteps] = useState<TeachStep[]>([]);
-  const [totalSteps, setTotalSteps]   = useState(0);
+  const [animPhase, setAnimPhase]     = useState<AnimPhase>(() => {
+    const p = _wbCache.animPhase;
+    return (p === "running") ? "done" : (p ?? "idle"); // can't resume mid-animation
+  });
+  const [visibleSteps, setVisibleSteps] = useState<TeachStep[]>(() => _wbCache.visibleSteps ?? []);
+  const [totalSteps, setTotalSteps]   = useState<number>(() => _wbCache.totalSteps ?? 0);
   const [speed, setSpeed]             = useState<Speed>("slow");
-  const [chatHistory, setChatHistory] = useState<ConvMsg[]>([]);
+  const [chatHistory, setChatHistory] = useState<ConvMsg[]>(() => _wbCache.chatHistory ?? []);
   const [showTextInput, setShowTextInput] = useState(false);
   const [textDraft, setTextDraft]     = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -705,7 +793,7 @@ function WhiteboardPage() {
   const [mobileTab, setMobileTab]         = useState<"board"|"ai">("board");
 
   // ── Canvas-write state ────────────────────────────────────────────────────
-  const [drawOnCanvas, setDrawOnCanvas]   = useState(true);
+  const [drawOnCanvas, setDrawOnCanvas]   = useState<boolean>(() => _wbCache.drawOnCanvas ?? true);
   const drawOnCanvasRef                   = useRef(true);
   const canvasWritePosRef                 = useRef<{ x: number; y: number }>({ x: 48, y: 64 });
   const aiElemIdsRef                      = useRef<Set<string>>(new Set());
@@ -1493,6 +1581,37 @@ function WhiteboardPage() {
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
+  // ── Session persistence: save state on unmount, restore canvas on mount ───
+  // A ref that always holds the latest state values without stale closures.
+  const persistRef = useRef({ chatHistory, visibleSteps, question, totalSteps, animPhase, page, totalPages, drawOnCanvas });
+  // Update on every render (no deps = runs after every render — intentional).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { persistRef.current = { chatHistory, visibleSteps, question, totalSteps, animPhase, page, totalPages, drawOnCanvas }; });
+
+  // Save everything to the module-level cache when navigating away.
+  useEffect(() => {
+    return () => {
+      Object.assign(_wbCache, persistRef.current);
+      _wbCache.elems    = elemRef.current.map(p => [...p]);
+      _wbCache.writePos = { ...canvasWritePosRef.current };
+      _wbCache.aiElemIds = [...aiElemIdsRef.current];
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Restore canvas elements from cache on mount, then trigger a redraw.
+  useEffect(() => {
+    if (_wbCache.elems && _wbCache.elems.some(p => p.length > 0)) {
+      elemRef.current = _wbCache.elems.map(p => [...p]);
+      canvasWritePosRef.current = _wbCache.writePos ?? { x: 48, y: 64 };
+      if (_wbCache.aiElemIds) {
+        aiElemIdsRef.current = new Set(_wbCache.aiElemIds);
+      }
+      // Redraw after canvas has been sized by the ResizeObserver
+      const tid = setTimeout(() => redrawCanvas(), 80);
+      return () => clearTimeout(tid);
+    }
+  }, [redrawCanvas]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── AI teach function ─────────────────────────────────────────────────────
   async function teach(q?: string) {
     const text = (q ?? question).trim();
@@ -1646,8 +1765,8 @@ function WhiteboardPage() {
         {/* Board side (toolbar + canvas) — hidden on mobile when AI tab active */}
         <div className={`flex min-h-0 flex-1 ${mobileTab==="ai"?"hidden md:flex":"flex"}`}>
 
-        {/* Left toolbar — desktop only */}
-        <aside className={`hidden md:flex shrink-0 flex-col gap-0.5 border-r px-0.5 py-1.5 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-gray-50"}`}>
+        {/* Left toolbar — desktop only, sticky (overflow-y-auto so it never overflows viewport) */}
+        <aside className={`hidden md:flex shrink-0 flex-col gap-0.5 border-r px-0.5 py-1.5 overflow-y-auto overflow-x-hidden min-h-0 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-gray-50"}`}>
           {([
             ["pen",         <Pen size={15}/>,                   "Pen (P)"],
             ["pencil",      <Pen size={13} className="opacity-50"/>, "Pencil"],
@@ -1773,9 +1892,9 @@ function WhiteboardPage() {
 
         </div>{/* /board-side */}
 
-        {/* ── AI Teaching Panel ────────────────────────────────────────── */}
+        {/* ── AI Teaching Panel — sticky right sidebar (min-h-0 is critical for inner overflow-y-auto to work) */}
         {(showAI || mobileTab === "ai") && (
-          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} shrink-0 flex-col overflow-hidden border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}>
+          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} shrink-0 min-h-0 flex-col overflow-hidden border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}>
 
             {/* Panel header */}
             <div className={`flex shrink-0 flex-col border-b ${isDark?"border-slate-700":"border-gray-200"}`}>
