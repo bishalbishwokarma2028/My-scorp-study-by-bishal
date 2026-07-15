@@ -1704,6 +1704,42 @@ function WhiteboardPage() {
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
+  // ── Native non-passive touch listeners on the draw canvas ────────────────
+  // React synthetic touch events are passive by default — e.preventDefault()
+  // inside them is silently ignored, so the browser steals every touch for
+  // scroll/zoom and nothing reaches the canvas.  We must attach raw DOM
+  // listeners with { passive: false } so preventDefault actually works.
+  //
+  // Use a ref that's updated every render so the listeners always call the
+  // latest version of the handlers (avoids stale-closure bugs).
+  const touchCbRef = useRef({ onTouchStart, onTouchMove, onTouchEnd });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { touchCbRef.current = { onTouchStart, onTouchMove, onTouchEnd }; });
+
+  useEffect(() => {
+    const canvas = drawRef.current;
+    if (!canvas) return;
+    function nStart(e: TouchEvent) {
+      e.preventDefault();
+      touchCbRef.current.onTouchStart(e as unknown as React.TouchEvent);
+    }
+    function nMove(e: TouchEvent) {
+      e.preventDefault();
+      touchCbRef.current.onTouchMove(e as unknown as React.TouchEvent);
+    }
+    function nEnd(e: TouchEvent) {
+      touchCbRef.current.onTouchEnd(e as unknown as React.TouchEvent);
+    }
+    canvas.addEventListener("touchstart", nStart, { passive: false });
+    canvas.addEventListener("touchmove",  nMove,  { passive: false });
+    canvas.addEventListener("touchend",   nEnd,   { passive: false });
+    return () => {
+      canvas.removeEventListener("touchstart", nStart);
+      canvas.removeEventListener("touchmove",  nMove);
+      canvas.removeEventListener("touchend",   nEnd);
+    };
+  }, []); // empty deps — the touchCbRef always has the latest handlers
+
   // ── Session persistence: save state on unmount, restore canvas on mount ───
   // A ref that always holds the latest state values without stale closures.
   const persistRef = useRef({ chatHistory, visibleSteps, question, totalSteps, animPhase, page, totalPages, drawOnCanvas });
@@ -2134,7 +2170,6 @@ function WhiteboardPage() {
             style={{touchAction:"none"}}
             onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
             onMouseLeave={()=>{if(tool==="laser"){laserPosRef.current=null;redrawCanvas();}}}
-            onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
             onContextMenu={e=>e.preventDefault()}/>
 
           {/* Text input overlay */}
