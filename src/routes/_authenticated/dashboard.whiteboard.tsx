@@ -1336,7 +1336,10 @@ function WhiteboardPage() {
   function getPos(e: React.MouseEvent | React.TouchEvent): Pt {
     const r = drawRef.current!.getBoundingClientRect();
     if ("touches" in e) {
-      const t = e.touches[0];
+      // touchend: e.touches is empty — fall back to changedTouches
+      const list = e.touches.length > 0 ? e.touches : e.changedTouches;
+      const t = list[0];
+      if (!t) return { x: 0, y: 0 };
       return { x: t.clientX - r.left, y: t.clientY - r.top };
     }
     const m = e as React.MouseEvent;
@@ -1429,6 +1432,8 @@ function WhiteboardPage() {
   const twoFingerPanRef = useRef<Pt | null>(null);
 
   function onTouchStart(e: React.TouchEvent) {
+    // Prevent browser scroll/zoom from stealing touch events on the canvas
+    e.preventDefault();
     if (e.touches.length === 2) {
       pinchRef.current = null;
       // Record centre of the two fingers for panning
@@ -1441,6 +1446,7 @@ function WhiteboardPage() {
     }
   }
   function onTouchMove(e: React.TouchEvent) {
+    e.preventDefault();
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -1881,7 +1887,7 @@ function WhiteboardPage() {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
 
         {/* Board side (toolbar + canvas) — hidden on mobile when AI tab active */}
-        <div className={`flex min-h-0 flex-1 ${mobileTab==="ai"?"hidden md:flex":"flex"}`}>
+        <div className={`flex-col md:flex-row min-h-0 flex-1 ${mobileTab==="ai"?"hidden md:flex":"flex"}`}>
 
         {/* Left toolbar — desktop only, sticky (overflow-y-auto so it never overflows viewport) */}
         <aside className={`hidden md:flex shrink-0 flex-col gap-0.5 border-r px-0.5 py-1.5 overflow-y-auto overflow-x-hidden min-h-0 ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-gray-50"}`}>
@@ -2125,6 +2131,7 @@ function WhiteboardPage() {
         <div ref={containerRef} className={`relative flex-1 overflow-hidden ${cursorMap[tool]}`} style={{touchAction:"none"}}>
           <canvas ref={bgRef}   className="absolute inset-0 pointer-events-none"/>
           <canvas ref={drawRef} className="absolute inset-0"
+            style={{touchAction:"none"}}
             onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
             onMouseLeave={()=>{if(tool==="laser"){laserPosRef.current=null;redrawCanvas();}}}
             onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
