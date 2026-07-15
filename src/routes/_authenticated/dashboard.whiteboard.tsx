@@ -1712,33 +1712,97 @@ function WhiteboardPage() {
   //
   // Use a ref that's updated every render so the listeners always call the
   // latest version of the handlers (avoids stale-closure bugs).
-  const touchCbRef = useRef({ onTouchStart, onTouchMove, onTouchEnd });
+  // A ref updated every render so native DOM listeners always call the latest handlers.
+  const touchCbRef = useRef({ onPointerDown, onPointerMove, onPointerUp, onTouchMove });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { touchCbRef.current = { onTouchStart, onTouchMove, onTouchEnd }; });
+  useEffect(() => { touchCbRef.current = { onPointerDown, onPointerMove, onPointerUp, onTouchMove }; });
 
   useEffect(() => {
     const canvas = drawRef.current;
     if (!canvas) return;
-    function nStart(e: TouchEvent) {
+
+    // Track active pointer IDs so we can switch from draw to pinch when a 2nd finger lands.
+    const activeIds = new Set<number>();
+
+    // ── Pointer events: single-finger draw (and mouse draw on desktop) ─────
+    // PointerEvent extends MouseEvent so getPos() uses e.clientX/clientY directly.
+    function onPtrDown(e: PointerEvent) {
       e.preventDefault();
-      touchCbRef.current.onTouchStart(e as unknown as React.TouchEvent);
+      activeIds.add(e.pointerId);
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      if (activeIds.size === 1) {
+        // First finger: start drawing
+        touchCbRef.current.onPointerDown(e as unknown as React.MouseEvent);
+      } else {
+        // Second finger landed: cancel the ongoing stroke, switch to pinch
+        isDrawRef.current = false;
+        curPathRef.current = null;
+      }
     }
-    function nMove(e: TouchEvent) {
+    function onPtrMove(e: PointerEvent) {
+      if (!activeIds.has(e.pointerId)) return;
       e.preventDefault();
-      touchCbRef.current.onTouchMove(e as unknown as React.TouchEvent);
+      if (activeIds.size === 1) {
+        touchCbRef.current.onPointerMove(e as unknown as React.MouseEvent);
+      }
+      // 2-pointer move is handled by touchmove below (has both touch coords)
     }
-    function nEnd(e: TouchEvent) {
-      touchCbRef.current.onTouchEnd(e as unknown as React.TouchEvent);
+    function onPtrUp(e: PointerEvent) {
+      activeIds.delete(e.pointerId);
+      if (activeIds.size === 0) {
+        touchCbRef.current.onPointerUp(e as unknown as React.MouseEvent);
+      }
     }
-    canvas.addEventListener("touchstart", nStart, { passive: false });
-    canvas.addEventListener("touchmove",  nMove,  { passive: false });
-    canvas.addEventListener("touchend",   nEnd,   { passive: false });
+    function onPtrLeave(e: PointerEvent) {
+      // Clear laser trail when pointer leaves the canvas
+      if (e.pointerType === "mouse") {
+        laserPosRef.current = null;
+        redrawCanvas();
+      }
+    }
+
+    // ── Touch events: only for 2-finger pinch zoom ──────────────────────
+    function onTchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        pinchRef.current = null;
+        twoFingerPanRef.current = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        };
+      }
+    }
+    function onTchMove(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        touchCbRef.current.onTouchMove(e as unknown as React.TouchEvent);
+      }
+    }
+    function onTchEnd(e: TouchEvent) {
+      if (e.touches.length < 2) {
+        pinchRef.current = null;
+        twoFingerPanRef.current = null;
+      }
+    }
+
+    canvas.addEventListener("pointerdown",   onPtrDown,  { passive: false });
+    canvas.addEventListener("pointermove",   onPtrMove,  { passive: false });
+    canvas.addEventListener("pointerup",     onPtrUp,    { passive: false });
+    canvas.addEventListener("pointercancel", onPtrUp,    { passive: false });
+    canvas.addEventListener("pointerleave",  onPtrLeave, { passive: true  });
+    canvas.addEventListener("touchstart",    onTchStart, { passive: true  });
+    canvas.addEventListener("touchmove",     onTchMove,  { passive: false });
+    canvas.addEventListener("touchend",      onTchEnd,   { passive: true  });
     return () => {
-      canvas.removeEventListener("touchstart", nStart);
-      canvas.removeEventListener("touchmove",  nMove);
-      canvas.removeEventListener("touchend",   nEnd);
+      canvas.removeEventListener("pointerdown",   onPtrDown);
+      canvas.removeEventListener("pointermove",   onPtrMove);
+      canvas.removeEventListener("pointerup",     onPtrUp);
+      canvas.removeEventListener("pointercancel", onPtrUp);
+      canvas.removeEventListener("pointerleave",  onPtrLeave);
+      canvas.removeEventListener("touchstart",    onTchStart);
+      canvas.removeEventListener("touchmove",     onTchMove);
+      canvas.removeEventListener("touchend",      onTchEnd);
     };
-  }, []); // empty deps — the touchCbRef always has the latest handlers
+  }, []); // empty deps — touchCbRef + stable refs always have latest values
 
   // ── Session persistence: save state on unmount, restore canvas on mount ───
   // A ref that always holds the latest state values without stale closures.
@@ -1869,7 +1933,7 @@ function WhiteboardPage() {
 
   // ─── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className={`flex h-full flex-col overflow-hidden ${isDark ? "bg-slate-950" : "bg-white"}`}>
+    <div className={`flex flex-col overflow-hidden ${isDark ? "bg-slate-950" : "bg-white"} fixed inset-x-0 bottom-0 top-14 lg:static lg:h-full`}>
 
       {/* ── Top bar ─────────────────────────────────────────────────────── */}
       <div className={`flex shrink-0 items-center justify-between border-b px-2 py-1 ${isDark ? "border-slate-700 bg-slate-900" : "border-gray-200 bg-white"}`}>
@@ -2168,8 +2232,6 @@ function WhiteboardPage() {
           <canvas ref={bgRef}   className="absolute inset-0 pointer-events-none"/>
           <canvas ref={drawRef} className="absolute inset-0"
             style={{touchAction:"none"}}
-            onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
-            onMouseLeave={()=>{if(tool==="laser"){laserPosRef.current=null;redrawCanvas();}}}
             onContextMenu={e=>e.preventDefault()}/>
 
           {/* Text input overlay */}
