@@ -230,24 +230,54 @@ Step type rules:
 - "tip"        → Shortcut, memory aid, or real-world connection — 2-3 sentences.
 - "warning"    → Common mistake to avoid with explanation of WHY it is wrong — 2-3 sentences.
 - "table"      → A two-column comparison or reference table. Use ONLY for: comparison questions, difference questions, pros/cons, properties lists, or "X vs Y" questions. Format: pipe-separated columns, backslash-n between rows. First row = bold headers. Example: "Aspect|Description\\nPoint1A|Point1B\\nPoint2A|Point2B". Include 6 to 7 data rows (not counting the header) so each side is thoroughly compared. Make each cell substantive — a short phrase or sentence, not a single word. Do NOT use table for worked solutions or simple explanations.
-- "diagram"    → Draw a subject-appropriate visual. STRICT RULES — only include when the visual DIRECTLY illustrates the concept being taught:
-    • Geometry / trigonometry → right-triangle, circle, axes, number-line
-    • Physics (forces, motion) → force-diagram, axes
-    • Waves / oscillations → wave
-    • Biology (genetics) → dna
-    • Statistics / data sets → bar-chart
-    • Graphing functions → axes
-    • Algorithms / processes / workflows / encryption → flow-diagram
-    The text value must be EXACTLY one of (copy precisely):
-      right-triangle:a,b,c          → right-angle triangle labeled a, b, c (hypotenuse)
-      axes:x,y                      → coordinate plane with labeled axes
-      number-line:-5,5              → number line (replace -5,5 with actual range)
-      circle:r                      → circle with radius r labeled
-      force-diagram:F,mg,N          → free-body force arrows (replace labels with actual forces)
-      bar-chart:A,B,C               → bar chart (replace A,B,C with actual category names)
-      dna:double-helix              → DNA double helix
-      wave:sine                     → sine wave with axes
-      flow-diagram:Step1→Step2→Step3 → flowchart of steps (replace with actual step names, max 6, separated by →)
+- "diagram"    → Draw a subject-appropriate visual. STRICT RULES:
+    The text value must use EXACTLY one of the formats below. Replace ALL placeholders with REAL values from the topic.
+    ┌─────────────────────────────────────────────────────────────────────────────────────┐
+    │ FORMAT                                     │ WHEN TO USE                            │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ right-triangle:a,b,hyp                     │ Pythagorean theorem, trig, geometry    │
+    │   Replace a,b,hyp with REAL side names     │                                        │
+    │   e.g. right-triangle:3,4,5 or             │                                        │
+    │        right-triangle:opposite,adjacent,hypotenuse                                  │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ axes:xlabel,ylabel                          │ Graphing functions, coordinates, plots │
+    │   e.g. axes:time(s),distance(m)            │ or axes:x,f(x)                         │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ number-line:start,end                       │ Integers, inequalities, sets            │
+    │   e.g. number-line:-5,5                    │                                        │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ circle:label                               │ Circle geometry, radians, pi           │
+    │   e.g. circle:r=5cm                        │                                        │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ force-diagram:Label1:dir,Label2:dir,...     │ Free body diagrams, Newton's laws,     │
+    │   dir = up | down | left | right           │ equilibrium, friction, tension         │
+    │   ALWAYS use real force names and correct  │                                        │
+    │   directions for the specific scenario:    │                                        │
+    │   • Newton's 2nd Law moving right:         │                                        │
+    │     force-diagram:Applied Force:right,Weight:down,Normal:up,Friction:left           │
+    │   • Object on table (at rest):             │                                        │
+    │     force-diagram:Normal Force:up,Weight:down                                       │
+    │   • Hanging object:                        │                                        │
+    │     force-diagram:Tension:up,Weight:down   │                                        │
+    │   • Projectile (peak):                     │                                        │
+    │     force-diagram:Velocity:right,Weight:down                                        │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ bar-chart:Label1:value,Label2:value,...     │ Data comparison, statistics, rates     │
+    │   ALWAYS include real numeric values       │                                        │
+    │   e.g. bar-chart:Monday:45,Tuesday:60,Wednesday:30,Thursday:80,Friday:55            │
+    │   or   bar-chart:Mercury:88,Venus:225,Earth:365,Mars:687                            │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ dna:double-helix                           │ DNA structure, genetics, biology       │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ wave:sine                                  │ Waves, oscillations, sound, light      │
+    ├─────────────────────────────────────────────────────────────────────────────────────┤
+    │ flow-diagram:Step1→Step2→Step3→...         │ Algorithms, processes, workflows,      │
+    │   Use REAL step names from the topic       │ encryption, sorting, protocols         │
+    │   e.g. (Bubble Sort):                      │                                        │
+    │     flow-diagram:Start→Compare adjacent→Swap if needed→Repeat until sorted→End     │
+    │   e.g. (TCP handshake):                    │                                        │
+    │     flow-diagram:Client sends SYN→Server sends SYN-ACK→Client sends ACK→Connected  │
+    └─────────────────────────────────────────────────────────────────────────────────────┘
     FORBIDDEN: Do NOT use diagram for algebra, chemistry equations, history, language, grammar, literature, or definitions. ONE diagram maximum per response.
 - "separator"  → Visual divider between major sections: {"type":"separator","text":""}
 
@@ -483,47 +513,121 @@ function drawDiagramOnCanvas(
     usedH = R * 2 + 22;
 
   } else if (kind === "force-diagram") {
-    const arrowLen = 60;
-    const cx = ox + 30, cy = oy + 70;
-    // object box
-    ctx.strokeRect(cx - 18, cy - 18, 36, 36);
-    ctx.font = HW_FONT; ctx.fillText("m", cx - 5, cy + 7);
-    const forces = labels.length ? labels : ["F", "mg", "N"];
-    const dirs   = [[1, 0], [0, 1], [0, -1]]; // right, down, up
-    forces.forEach((lbl, i) => {
-      if (i >= dirs.length) return;
-      const [dx, dy] = dirs[i];
-      const sx = cx + (dx > 0 ? 18 : dx < 0 ? -18 : 0);
-      const sy = cy + (dy > 0 ? 18 : dy < 0 ? -18 : 0);
+    const arrowLen = 62;
+    const cx = ox + 70, cy = oy + 80;
+    // Object box
+    ctx.strokeRect(cx - 22, cy - 22, 44, 44);
+    ctx.font = `bold 13px ${HW_FAMILY}`; ctx.fillText("obj", cx - 10, cy + 6);
+    ctx.font = HW_FONT;
+
+    // Smart direction resolver: map common physics labels to directions [dx,dy]
+    // Supports format "label:dir" where dir ∈ up|down|left|right|upright|upleft
+    // or falls back to heuristic based on label text.
+    function resolveDir(raw: string): [number, number] {
+      const lower = raw.toLowerCase();
+      // Explicit suffix e.g. "Normal:up" → dir=up
+      if (lower.includes(":up"))     return [0, -1];
+      if (lower.includes(":down"))   return [0,  1];
+      if (lower.includes(":right"))  return [1,  0];
+      if (lower.includes(":left"))   return [-1, 0];
+      // Heuristic from label name
+      if (/\b(n|normal|fn|f_n|normal force|reaction)\b/.test(lower)) return [0, -1]; // up
+      if (/\b(w|weight|mg|m×g|m\.g|fg|gravity|g|gravitational)\b/.test(lower)) return [0, 1]; // down
+      if (/\b(f|fa|f_a|applied|push|pull|thrust|drive|net|resultant)\b/.test(lower)) return [1, 0]; // right
+      if (/\b(fr|f_f|friction|drag|air resistance|resistance|retarding)\b/.test(lower)) return [-1, 0]; // left
+      if (/\b(t|tension|string|rope|cable)\b/.test(lower)) return [0, -1]; // up
+      if (/\b(lift|buoy|upthrust|archimedes)\b/.test(lower)) return [0, -1]; // up
+      if (/\b(torque|moment)\b/.test(lower)) return [1, 0]; // right
+      // Assign by index order: up, right, down, left, up-right, up-left
+      return [0, -1]; // default up
+    }
+
+    const forces = labels.length >= 2 ? labels : ["Applied Force:right", "Weight:down", "Normal:up", "Friction:left"];
+    // Deduplicate directions to avoid two arrows in same direction
+    const usedDirs = new Set<string>();
+    // Fallback rotation if direction already taken
+    const fallbackDirs: [number,number][] = [[0,-1],[1,0],[0,1],[-1,0]];
+    let fallbackIdx = 0;
+
+    forces.forEach(rawLbl => {
+      const label = rawLbl.replace(/:.*$/, ""); // strip ":dir" suffix for display
+      let [dx, dy] = resolveDir(rawLbl);
+      const dirKey = `${dx},${dy}`;
+      if (usedDirs.has(dirKey)) {
+        // Find next unused direction
+        while (fallbackIdx < fallbackDirs.length && usedDirs.has(`${fallbackDirs[fallbackIdx][0]},${fallbackDirs[fallbackIdx][1]}`)) fallbackIdx++;
+        if (fallbackIdx < fallbackDirs.length) { [dx, dy] = fallbackDirs[fallbackIdx++]; }
+      }
+      usedDirs.add(`${dx},${dy}`);
+
+      const sx = cx + (dx > 0 ? 22 : dx < 0 ? -22 : 0);
+      const sy = cy + (dy > 0 ? 22 : dy < 0 ? -22 : 0);
       const ex = sx + dx * arrowLen, ey = sy + dy * arrowLen;
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
-      // arrowhead
+      // Arrowhead
       const angle = Math.atan2(ey - sy, ex - sx);
       ctx.beginPath();
       ctx.moveTo(ex, ey);
-      ctx.lineTo(ex - 10 * Math.cos(angle - 0.4), ey - 10 * Math.sin(angle - 0.4));
-      ctx.lineTo(ex - 10 * Math.cos(angle + 0.4), ey - 10 * Math.sin(angle + 0.4));
+      ctx.lineTo(ex - 11 * Math.cos(angle - 0.4), ey - 11 * Math.sin(angle - 0.4));
+      ctx.lineTo(ex - 11 * Math.cos(angle + 0.4), ey - 11 * Math.sin(angle + 0.4));
       ctx.closePath(); ctx.fill();
-      ctx.fillText(lbl, ex + (dx >= 0 ? 4 : -22), ey + (dy > 0 ? 16 : dy < 0 ? -6 : 5));
+      // Label
+      const lx = dx > 0 ? ex + 5 : dx < 0 ? ex - ctx.measureText(label).width - 5 : ex - ctx.measureText(label).width / 2;
+      const ly = dy > 0 ? ey + 16 : dy < 0 ? ey - 6 : ey + 5;
+      ctx.fillText(label, lx, ly);
     });
-    usedH = 145;
+    usedH = 170;
 
   } else if (kind === "bar-chart") {
-    const bars    = labels.length ? labels : ["A", "B", "C"];
-    const heights = [80, 55, 68, 40, 72].slice(0, bars.length);
-    const barW = 30, gap = 14, baseY = oy + 100;
-    // y-axis
-    ctx.beginPath(); ctx.moveTo(ox + 10, oy + 5); ctx.lineTo(ox + 10, baseY + 5); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(ox + 10, baseY + 5); ctx.lineTo(ox + 10 + bars.length * (barW + gap) + gap, baseY + 5); ctx.stroke();
-    ctx.font = HW_FONT;
-    bars.forEach((lbl, i) => {
-      const bx = ox + 10 + gap + i * (barW + gap);
-      const bh = heights[i] ?? 50;
-      ctx.globalAlpha = 0.25; ctx.fillRect(bx, baseY - bh, barW, bh); ctx.globalAlpha = 1;
-      ctx.strokeRect(bx, baseY - bh, barW, bh);
-      ctx.fillText(lbl, bx + barW / 2 - 5, baseY + 18);
+    // Supports "label:value" pairs e.g. "Physics:90,Math:75,Chemistry:60"
+    // or plain labels e.g. "A,B,C" (heights assigned proportionally)
+    const barDefs = labels.length ? labels : ["A:80", "B:55", "C:68"];
+    const parsedBars = barDefs.map((raw, i) => {
+      const [lbl, val] = raw.split(":").map(s => s.trim());
+      const numVal = val ? parseFloat(val) : NaN;
+      return { lbl: lbl || String(i + 1), val: isNaN(numVal) ? NaN : numVal };
     });
-    usedH = 118;
+    // Normalise heights to 0–85 range
+    const rawVals = parsedBars.map(b => b.val).filter(v => !isNaN(v));
+    const maxVal = rawVals.length > 0 ? Math.max(...rawVals) : 100;
+    const minVal = rawVals.length > 0 ? Math.min(0, Math.min(...rawVals)) : 0;
+    const range  = maxVal - minVal || 1;
+    const defaultHts = [80, 55, 70, 45, 65, 50, 60];
+    const heights = parsedBars.map((b, i) =>
+      isNaN(b.val) ? (defaultHts[i % defaultHts.length]) : Math.max(6, Math.round(((b.val - minVal) / range) * 85))
+    );
+
+    const barW = 28, gap = 12, baseY = oy + 105;
+    // Axes
+    ctx.beginPath(); ctx.moveTo(ox + 12, oy + 5); ctx.lineTo(ox + 12, baseY + 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox + 12, baseY + 5); ctx.lineTo(ox + 12 + parsedBars.length * (barW + gap) + gap + 10, baseY + 5); ctx.stroke();
+    ctx.font = HW_FONT;
+    // Y-axis ticks
+    for (let t = 0; t <= 4; t++) {
+      const ty = baseY - (t / 4) * 85;
+      ctx.beginPath(); ctx.moveTo(ox + 8, ty); ctx.lineTo(ox + 16, ty); ctx.stroke();
+      const tickLabel = isNaN(parsedBars[0]?.val) ? String(t * 25) : String(Math.round(minVal + (t / 4) * range));
+      ctx.save(); ctx.globalAlpha = 0.55; ctx.fillText(tickLabel, ox - 14, ty + 4); ctx.restore();
+    }
+    parsedBars.forEach((bar, i) => {
+      const bx = ox + 12 + gap + i * (barW + gap);
+      const bh = heights[i];
+      ctx.globalAlpha = 0.22; ctx.fillRect(bx, baseY - bh, barW, bh); ctx.globalAlpha = 1;
+      ctx.strokeRect(bx, baseY - bh, barW, bh);
+      // Value label above bar
+      if (!isNaN(bar.val)) {
+        ctx.save(); ctx.globalAlpha = 0.75; ctx.fillText(String(bar.val), bx + barW / 2 - 8, baseY - bh - 4); ctx.restore();
+      }
+      // X-axis label (may be long — truncate)
+      const maxLabelW = barW + gap - 2;
+      const fullLbl = bar.lbl;
+      let displayLbl = fullLbl;
+      while (ctx.measureText(displayLbl).width > maxLabelW && displayLbl.length > 3)
+        displayLbl = displayLbl.slice(0, -1);
+      if (displayLbl !== fullLbl) displayLbl += "…";
+      ctx.fillText(displayLbl, bx + barW / 2 - ctx.measureText(displayLbl).width / 2, baseY + 18);
+    });
+    usedH = 128;
 
   } else if (kind === "wave") {
     const W = 200, amp = 30, freq = 2;
@@ -988,7 +1092,7 @@ function WhiteboardPage() {
     ctx.font = hwFont(fontSize, isTtl);
     const lastLineW = ctx.measureText(lastLine).width / zoomRef.current;
     const handWX = pos.x + Math.min(lastLineW + 4, maxW - 10);
-    const handWY = lastLineY + lineH * 1.5; // tip lands in the empty space below
+    const handWY = lastLineY + lineH * 2.5; // tip lands below the current line
     const hx = handWX * zoomRef.current + panRef.current.x;
     const hy = handWY * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
@@ -1171,7 +1275,7 @@ function WhiteboardPage() {
     // This keeps the hand close to the text after animation completes instead of
     // floating far below in empty space.
     const hx = (pos.x + Math.min(maxW * 0.35, 140)) * zoomRef.current + panRef.current.x;
-    const hy = (lastBaselineY + fontSize * 0.5 + 10) * zoomRef.current + panRef.current.y;
+    const hy = (lastBaselineY + fontSize * 0.5 + 30) * zoomRef.current + panRef.current.y;
     setHandScreenPos({ x: hx, y: hy });
     setHandState("writing");
 

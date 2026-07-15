@@ -188,7 +188,10 @@ function TranslatorPage() {
       const userPrompt  = buildTranslatePrompt(text, from, target, isAutoDetect);
       const systemPrompt = buildSystemPrompt(from, target);
 
-      const res = await askAI(userPrompt, systemPrompt);
+      // Use preferCerebras=true so we get gpt-oss-120b (120B params) instead of
+      // llama-3.1-8b-instant. The 8B model is unreliable for Nepali, Hindi, and
+      // other non-Latin scripts. maxTokens=2048 allows longer translated passages.
+      const res = await askAI(userPrompt, systemPrompt, undefined, true, 2048);
 
       // Strip common AI wrapper artefacts
       let translated = res.text.trim();
