@@ -948,6 +948,11 @@ function WhiteboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAI, mobileTab]);
 
+  // Auto-switch to Board tab on mobile when the AI starts writing
+  useEffect(() => {
+    if (animPhase === "running") setMobileTab("board");
+  }, [animPhase]);
+
   // ── Full canvas redraw ───────────────────────────────────────────────────
   const pageRef  = useRef(page);
   const toolRef  = useRef(tool);
@@ -1833,7 +1838,7 @@ function WhiteboardPage() {
           </span>
           {!quotaLoading && <QuotaBadge quota={quota} />}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="hidden md:flex items-center gap-0.5">
           {(["blank","grid","dots"] as BgMode[]).map(m => (
             <TBtn key={m} active={bg===m} onClick={()=>setBg(m)} title={m} isDark={isDark}>
               {m==="grid"?<Grid3x3 size={13}/>:m==="dots"?<Dot size={13}/>:<Minus size={13}/>}
@@ -1959,8 +1964,8 @@ function WhiteboardPage() {
         </aside>
 
         {/* ── Mobile tool strip (shown above canvas on mobile only) ───────── */}
-        <div className={`flex shrink-0 md:hidden border-b overflow-x-auto ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-white"}`}
-          style={{scrollbarWidth:"none"}}>
+        <div className={`flex shrink-0 md:hidden border-b ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-white"}`}
+          style={{overflowX:"scroll", WebkitOverflowScrolling:"touch", scrollbarWidth:"none"}}>
           <div className="flex items-center gap-0.5 px-1.5 py-1 min-w-max">
             {([
               ["pen",         <Pen size={15}/>,             "Pen"],

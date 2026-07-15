@@ -58,33 +58,59 @@ export const getCareerDetail = createServerFn({ method: "GET" })
 
 const InterestInput = z.object({ interest: z.string().min(1).max(500) });
 
-/** Scores all 510 careers against a free-text interest string and returns the top matches. */
+/** Scores all 510 careers against a free-text interest string and returns the best matches. */
 export const findCareersByInterest = createServerFn({ method: "GET" })
   .inputValidator((d: unknown) => InterestInput.parse(d))
   .handler(async ({ data }): Promise<CareerIndex[]> => {
     const tokens = tokenize(data.interest);
     if (tokens.length === 0) return [];
 
+    // Deduplicate tokens so "coding coding" doesn't double-score
+    const uniqueTokens = [...new Set(tokens)];
+
     const scored = careersData.map((c) => {
       let score = 0;
       const titleTokens = tokenize(c.title);
       const catTokens = tokenize(c.category);
       const skillTokens = c.skills.flatMap(s => tokenize(s));
-      const overviewTokens = tokenize(c.overview.slice(0, 300));
+      const overviewTokens = tokenize(c.overview.slice(0, 400));
+      const rolesTokens = tokenize(c.roles.slice(0, 200));
 
-      for (const tok of tokens) {
-        if (titleTokens.some(t => t.includes(tok) || tok.includes(t))) score += 6;
-        if (catTokens.some(t => t.includes(tok) || tok.includes(t))) score += 4;
-        if (skillTokens.some(t => t.includes(tok) || tok.includes(t))) score += 2;
-        if (overviewTokens.some(t => t.includes(tok) || tok.includes(t))) score += 1;
+      for (const tok of uniqueTokens) {
+        // Exact match scores higher than substring match
+        const titleExact = titleTokens.some(t => t === tok);
+        const titlePartial = !titleExact && titleTokens.some(t => t.includes(tok) || tok.includes(t));
+        if (titleExact)   score += 10;
+        else if (titlePartial) score += 4;
+
+        const catExact = catTokens.some(t => t === tok);
+        const catPartial = !catExact && catTokens.some(t => t.includes(tok) || tok.includes(t));
+        if (catExact)   score += 8;
+        else if (catPartial) score += 3;
+
+        const skillExact = skillTokens.some(t => t === tok);
+        const skillPartial = !skillExact && skillTokens.some(t => t.includes(tok) || tok.includes(t));
+        if (skillExact)   score += 5;
+        else if (skillPartial) score += 2;
+
+        if (overviewTokens.some(t => t === tok)) score += 2;
+        if (rolesTokens.some(t => t === tok))    score += 2;
       }
       return { career: c, score };
     });
 
-    return scored
-      .filter(s => s.score > 0)
+    // Require a meaningful score — at least 5 points so weak matches are excluded
+    const minScore = Math.max(5, uniqueTokens.length * 2);
+    const filtered = scored.filter(s => s.score >= minScore);
+
+    // Also require score to be at least 30% of the max score found
+    const maxScore = filtered.length > 0 ? Math.max(...filtered.map(s => s.score)) : 0;
+    const threshold = maxScore * 0.30;
+
+    return filtered
+      .filter(s => s.score >= threshold)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 18)
+      .slice(0, 10)
       .map(s => ({
         id: s.career.id,
         title: s.career.title,
