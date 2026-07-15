@@ -11,7 +11,7 @@ Imported into Replit from a Lovable-connected zip export.
 - Dependencies are managed with Bun (`bun install`).
 
 ## Environment / secrets
-All required keys are stored as Replit Secrets (not in `.env`, since Replit Secrets don't transfer across zip export/import — see `.env.example` for the full reference list and accepted alternate names). All of the below are configured as of this setup:
+All required keys are stored as Replit Secrets (not in `.env`, since Replit Secrets don't transfer across zip export/import — see `.env.example` for the full reference list and accepted alternate names). All of the below are configured as of this setup (re-added 2026-07-15 after zip re-import):
 - Supabase: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - AI providers: `GROQ_API_KEY_1..7`, `GROQ_COMPOUND_KEY_1..8`, `CEREBRAS_API_KEY_1..16`, `OPENROUTER_API_KEY`, `HUGGINGFACE_API_KEY`
 - Web search: `TAVILY_API_KEY` (+ `_2..4`), `SERPER_API_KEY`
