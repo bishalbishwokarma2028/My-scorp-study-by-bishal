@@ -723,7 +723,10 @@ function WhiteboardPage() {
   const bgRef        = useRef<HTMLCanvasElement>(null);
   const drawRef      = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const stepsEndRef  = useRef<HTMLDivElement>(null);
+  const stepsEndRef       = useRef<HTMLDivElement>(null);
+  const stepsScrollRef    = useRef<HTMLDivElement>(null);
+  // True when user scrolled up in the AI steps panel — stops auto-scroll
+  const userScrolledUpRef = useRef(false);
   const textInputRef = useRef<HTMLInputElement>(null);
   const questionRef  = useRef<HTMLTextAreaElement>(null);
 
@@ -1496,7 +1499,10 @@ function WhiteboardPage() {
       if (didType) {
         a.shown[last] = { ...a.shown[last], text: full.slice(0, a.charIdx), revealed: a.charIdx };
         setVisibleSteps([...a.shown]);
-        stepsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        // Only auto-scroll if user hasn't manually scrolled up to read earlier steps
+        if (!userScrolledUpRef.current) {
+          stepsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
         // Canvas + hand update — one call per frame (with final charIdx)
         writeLiveCharCbRef.current(a.pending[a.stepIdx], a.charIdx);
       }
@@ -1845,6 +1851,55 @@ function WhiteboardPage() {
           <ToolBtn active={false} onClick={dupPage}  title="Dup page"  isDark={isDark}><CopyPlus size={14}/></ToolBtn>
         </aside>
 
+        {/* ── Mobile tool strip (shown above canvas on mobile only) ───────── */}
+        <div className={`flex shrink-0 md:hidden border-b overflow-x-auto ${isDark?"border-slate-700 bg-slate-900":"border-gray-200 bg-white"}`}
+          style={{scrollbarWidth:"none"}}>
+          <div className="flex items-center gap-0.5 px-1.5 py-1 min-w-max">
+            {([
+              ["pen",         <Pen size={15}/>,             "Pen"],
+              ["highlighter", <Highlighter size={15}/>,     "Highlight"],
+              ["eraser",      <Eraser size={15}/>,          "Erase"],
+              ["select",      <MousePointer2 size={15}/>,   "Select"],
+              ["text",        <Type size={15}/>,            "Text"],
+              ["line",        <Minus size={15}/>,           "Line"],
+              ["arrow",       <MoveRight size={15}/>,       "Arrow"],
+              ["rect",        <Square size={15}/>,          "Rect"],
+              ["circle",      <Circle size={15}/>,          "Circle"],
+            ] as [Tool, React.ReactNode, string][]).map(([t, icon, lbl]) => (
+              <button key={t} onClick={()=>setTool(t)} title={lbl}
+                className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] transition-colors min-w-[40px] ${
+                  tool===t
+                    ? (isDark?"bg-indigo-700 text-white":"bg-indigo-100 text-indigo-700")
+                    : (isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100")
+                }`}>
+                {icon}
+                <span>{lbl}</span>
+              </button>
+            ))}
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            <button onClick={undo} title="Undo" className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}><Undo2 size={15}/><span>Undo</span></button>
+            <button onClick={redo} title="Redo" className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}><Redo2 size={15}/><span>Redo</span></button>
+            <button onClick={clearPage} title="Clear" className={`flex flex-col items-center gap-0.5 rounded px-1.5 py-1 text-[9px] min-w-[40px] ${isDark?"text-slate-400 hover:bg-slate-700":"text-slate-500 hover:bg-gray-100"}`}><Trash2 size={15}/><span>Clear</span></button>
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            {/* Stroke widths */}
+            {STROKE_WIDTHS.map(w => (
+              <button key={w} onClick={()=>setStrokeWidth(w)} title={`${w}px`}
+                className={`flex h-9 w-9 items-center justify-center rounded transition-colors ${strokeWidth===w?(isDark?"bg-indigo-700":"bg-indigo-100"):(isDark?"hover:bg-slate-700":"hover:bg-gray-100")}`}>
+                <div className="rounded-full" style={{width:Math.max(3,w*1.2),height:Math.max(3,w*1.2),background:color}}/>
+              </button>
+            ))}
+            <div className={`mx-1 h-8 w-px ${isDark?"bg-slate-700":"bg-gray-200"}`}/>
+            {/* Color swatches */}
+            {[COLORS.black,COLORS.blue,COLORS.red,COLORS.green,COLORS.orange,COLORS.purple,COLORS.yellow,COLORS.gray].map(c => (
+              <button key={c} onClick={()=>setColor(c)}
+                className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${color===c?"border-indigo-500 scale-110":"border-white/50"}`}
+                style={{background:c}}/>
+            ))}
+            <input type="color" value={color} onChange={e=>setColor(e.target.value)}
+              className="h-7 w-7 cursor-pointer rounded-full border-2 border-white/50" title="Custom color"/>
+          </div>
+        </div>
+
         {/* Canvas */}
         <div ref={containerRef} className={`relative flex-1 overflow-hidden ${cursorMap[tool]}`} style={{touchAction:"none"}}>
           <canvas ref={bgRef}   className="absolute inset-0 pointer-events-none"/>
@@ -1892,9 +1947,11 @@ function WhiteboardPage() {
 
         </div>{/* /board-side */}
 
-        {/* ── AI Teaching Panel — sticky right sidebar (min-h-0 is critical for inner overflow-y-auto to work) */}
+        {/* ── AI Teaching Panel ─────────────────────────────────────────────
+             Mobile: flex-1 min-h-0 so it fills remaining height in the flex-col body.
+             Desktop: shrink-0 fixed-width sidebar.                                  */}
         {(showAI || mobileTab === "ai") && (
-          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} shrink-0 min-h-0 flex-col overflow-hidden border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}>
+          <aside className={`${mobileTab==="board"?"hidden md:flex":"flex"} flex-1 min-h-0 md:flex-none md:shrink-0 flex-col overflow-hidden border-t md:border-t-0 md:border-l md:w-[340px] w-full ${isDark?"border-slate-700 bg-slate-900":"border-gray-100 bg-gray-50"}`}>
 
             {/* Panel header */}
             <div className={`flex shrink-0 flex-col border-b ${isDark?"border-slate-700":"border-gray-200"}`}>
@@ -1986,7 +2043,14 @@ function WhiteboardPage() {
             )}
 
             {/* Teaching steps — scrollable, takes all remaining space */}
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div ref={stepsScrollRef} className="min-h-0 flex-1 overflow-y-auto"
+              onScroll={() => {
+                const el = stepsScrollRef.current;
+                if (!el) return;
+                // User is considered "scrolled up" if more than 80px from bottom
+                const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+                userScrolledUpRef.current = fromBottom > 80;
+              }}>
               <div className="flex flex-col gap-2 p-2.5">
                 {visibleSteps.length === 0 && !loading && (
                   <div className={`rounded-xl border p-4 text-center ${isDark?"border-slate-700 bg-slate-800":"border-gray-100 bg-white"}`}>
