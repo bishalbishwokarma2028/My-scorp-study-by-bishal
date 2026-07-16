@@ -27,9 +27,9 @@ type DocSection = {
 };
 type DocBlock = { heading: DocSection; body: DocSection[] };
 
-type MindmapData   = { center: string; branches: { label: string; color: string; items: string[] }[] };
+type MindmapData   = { center: string; branches: { label: string; items: string[] }[] };
 type ProcessData   = { title: string; steps: { label: string; description: string }[] };
-type DataFactsData = { title: string; facts: { label: string; detail: string; color: string }[] };
+type DataFactsData = { title: string; facts: { label: string; detail: string }[] };
 type TimelineData  = { title: string; events: { label: string; detail: string }[] };
 type ComparisonData = { title: string; left: { label: string; points: string[] }; right: { label: string; points: string[] } };
 type FrameworkData = { title: string; levels: { label: string; items: string[] }[] };
@@ -44,11 +44,11 @@ type VisualData =
 
 const VISUAL_CATEGORIES: { type: VisualType; label: string }[] = [
   { type: "mindmap",    label: "Mindmap" },
-  { type: "process",    label: "Process" },
-  { type: "data",       label: "Data" },
-  { type: "timeline",   label: "Timelines" },
-  { type: "comparison", label: "Comparison" },
-  { type: "framework",  label: "Business Frameworks" },
+  { type: "process",   label: "Process" },
+  { type: "data",      label: "Data" },
+  { type: "timeline",  label: "Timelines" },
+  { type: "comparison",label: "Comparison" },
+  { type: "framework", label: "Business Frameworks" },
 ];
 
 // ── Markdown parser → blocks ───────────────────────────────────────────────────
@@ -92,7 +92,6 @@ function parseMarkdown(text: string): DocBlock[] {
     }
   }
 
-  // Group into blocks (heading + body)
   const blocks: DocBlock[] = [];
   let cur: DocBlock | null = null;
   for (const sec of raw) {
@@ -111,15 +110,14 @@ function parseMarkdown(text: string): DocBlock[] {
 // ── AI visual generation ───────────────────────────────────────────────────────
 async function generateVisual(context: string, heading: string, type: VisualType): Promise<VisualData | null> {
   const sys = "Return ONLY raw valid JSON. No markdown fences, no prose. JSON only.";
-  const colors = ["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6"];
 
   const prompts: Record<VisualType, string> = {
-    mindmap:    `Create a detailed educational mindmap for "${heading}" using context: "${context}". Return JSON: {"center":"${heading.slice(0,16)}","branches":[{"label":"Branch (max 12 chars)","color":"#6366f1","items":["item1","item2","item3"]}]}. Use 4-5 branches. Colors in order: ${colors.join(",")}. Items max 22 chars each.`,
-    process:    `Create a step-by-step process for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","steps":[{"label":"Step Name (max 15 chars)","description":"One clear sentence describing this step."}]}. Include 5-6 steps.`,
-    data:       `Create key facts visualization for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","facts":[{"label":"Fact Title (max 22 chars)","detail":"One-sentence explanation.","color":"#6366f1"}]}. Include 6 facts. Cycle colors: ${colors.join(",")}.`,
-    timeline:   `Create a timeline for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","events":[{"label":"Stage/Event Name","detail":"Brief one-sentence description."}]}. Include 5-6 events in logical order.`,
-    comparison: `Create a comparison for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","left":{"label":"Category A","points":["point1","point2","point3","point4"]},"right":{"label":"Category B","points":["point1","point2","point3","point4"]}}. 4 points per side.`,
-    framework:  `Create a hierarchical framework for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","levels":[{"label":"Level Name","items":["item1","item2","item3"]}]}. Include 3-4 levels, 2-3 items each.`,
+    mindmap:    `Create a detailed educational mindmap for "${heading}". Extract key concepts DIRECTLY from this content: "${context}". Return JSON: {"center":"${heading.slice(0,20)}","branches":[{"label":"Key Concept (max 14 chars)","items":["specific point from text","another point","third point"]}]}. Use 4-5 branches. Extract real terms and facts from the content above.`,
+    process:    `Create a step-by-step process for "${heading}". Use ACTUAL steps and details from this content: "${context}". Return JSON: {"title":"${heading}","steps":[{"label":"Step Name","description":"Description using actual content from the text above."}]}. Include 5-6 steps. Use real content, not generic placeholders.`,
+    data:       `Create key facts visualization for "${heading}". Extract REAL facts and key points from this content: "${context}". Return JSON: {"title":"${heading}","facts":[{"label":"Fact Title from the text","detail":"Specific fact or detail extracted from the content above."}]}. Include 6 facts. Use actual content.`,
+    timeline:   `Create a timeline for "${heading}". Extract ACTUAL events, stages, or phases from this content: "${context}". Return JSON: {"title":"${heading}","events":[{"label":"Stage or Event Name from content","detail":"Detail taken directly from the text above."}]}. Include 5-6 events. Use real content.`,
+    comparison: `Create a comparison for "${heading}". Extract TWO contrasting aspects from this content: "${context}". Return JSON: {"title":"${heading}","left":{"label":"Aspect A (from content)","points":["point from text","point from text","point from text","point from text"]},"right":{"label":"Aspect B (from content)","points":["point from text","point from text","point from text","point from text"]}}. Use real contrasts from the content.`,
+    framework:  `Create a hierarchical framework for "${heading}". Organize the ACTUAL content from this text: "${context}" into levels. Return JSON: {"title":"${heading}","levels":[{"label":"Level Name from content","items":["item from text","item from text","item from text"]}]}. Include 3-4 levels, 2-3 items each. Use real content.`,
   };
 
   try {
@@ -143,39 +141,41 @@ function Inline({ text }: { text: string }) {
   );
 }
 
-// ── Visual renderers ───────────────────────────────────────────────────────────
+// ── Visual renderers — White + Blue theme ──────────────────────────────────────
 function MindmapVisual({ data }: { data: MindmapData }) {
-  const cx = 300, cy = 195, radius = 148;
+  const cx = 300, cy = 185, radius = 140;
   const branches = (data.branches || []).slice(0, 6);
   const n = branches.length || 1;
+  const nodeColors = ["#1d4ed8","#2563eb","#3b82f6","#1e40af","#0369a1","#0284c7"];
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
-      <div className="px-4 pt-4 pb-1 text-center">
-        <span className="text-white font-bold text-base">{data.center}</span>
+    <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 border-b border-blue-100 bg-blue-50 text-center">
+        <span className="text-blue-900 font-bold text-sm">{data.center}</span>
       </div>
-      <svg viewBox="0 0 600 390" className="w-full">
-        <circle cx={cx} cy={cy} r={54} fill="#2563eb" />
-        <circle cx={cx} cy={cy} r={49} fill="#1d4ed8" />
+      <svg viewBox="0 0 600 370" className="w-full">
+        {/* Center circle */}
+        <circle cx={cx} cy={cy} r={50} fill="#1e3a8a" />
         {data.center.split(" ").slice(0, 3).map((word, wi) => (
-          <text key={wi} x={cx} y={cy - 8 + wi * 14} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">{word}</text>
+          <text key={wi} x={cx} y={cy - 8 + wi * 14} textAnchor="middle" fill="white" fontSize="9.5" fontWeight="bold">{word}</text>
         ))}
         {branches.map((b, i) => {
           const angle = ((i * 360) / n - 90) * (Math.PI / 180);
           const bx = cx + radius * Math.cos(angle);
           const by = cy + radius * Math.sin(angle);
-          const mx = cx + (radius * 0.45) * Math.cos(angle);
-          const my = cy + (radius * 0.45) * Math.sin(angle);
+          const mx = cx + (radius * 0.5) * Math.cos(angle);
+          const my = cy + (radius * 0.5) * Math.sin(angle);
+          const col = nodeColors[i % nodeColors.length];
           return (
             <g key={i}>
-              <path d={`M ${cx} ${cy} Q ${mx} ${my} ${bx} ${by}`} stroke={b.color} strokeWidth="1.8" fill="none" opacity="0.75" />
-              <rect x={bx - 47} y={by - 14} width={94} height={28} rx="14" fill={b.color} />
-              <text x={bx} y={by + 1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="9.5" fontWeight="bold">
-                {(b.label || "").slice(0, 14)}
+              <path d={`M ${cx} ${cy} Q ${mx} ${my} ${bx} ${by}`} stroke={col} strokeWidth="1.5" fill="none" opacity="0.6" />
+              <rect x={bx - 48} y={by - 13} width={96} height={26} rx="13" fill={col} />
+              <text x={bx} y={by + 1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="9" fontWeight="bold">
+                {(b.label || "").slice(0, 15)}
               </text>
               {(b.items || []).slice(0, 3).map((item, j) => (
-                <text key={j} x={bx} y={by + 30 + j * 15} textAnchor="middle" fill="#bfdbfe" fontSize="8.5">
-                  ∙ {item.slice(0, 24)}
+                <text key={j} x={bx} y={by + 28 + j * 14} textAnchor="middle" fill="#374151" fontSize="8">
+                  ∙ {item.slice(0, 26)}
                 </text>
               ))}
             </g>
@@ -188,20 +188,20 @@ function MindmapVisual({ data }: { data: MindmapData }) {
 
 function ProcessVisual({ data }: { data: ProcessData }) {
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
-      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
-        <span className="text-white font-bold">{data.title}</span>
+    <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 border-b border-blue-100 bg-blue-50 text-center">
+        <span className="text-blue-900 font-bold text-sm">{data.title}</span>
       </div>
-      <div className="p-5 space-y-2">
+      <div className="p-4 space-y-2">
         {(data.steps || []).map((step, i) => (
           <div key={i} className="flex items-start gap-3">
             <div className="flex flex-col items-center flex-shrink-0">
-              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold shadow">{i + 1}</div>
-              {i < (data.steps.length - 1) && <div className="w-px h-4 bg-blue-400/40 mt-0.5" />}
+              <div className="h-7 w-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
+              {i < (data.steps.length - 1) && <div className="w-px h-3 bg-blue-200 mt-0.5" />}
             </div>
-            <div className="flex-1 pb-1">
-              <div className="text-white font-semibold text-sm">{step.label}</div>
-              <div className="text-blue-200 text-xs mt-0.5 leading-relaxed">{step.description}</div>
+            <div className="flex-1 pb-1 min-w-0">
+              <div className="text-blue-900 font-semibold text-sm">{step.label}</div>
+              <div className="text-gray-600 text-xs mt-0.5 leading-relaxed">{step.description}</div>
             </div>
           </div>
         ))}
@@ -211,16 +211,18 @@ function ProcessVisual({ data }: { data: ProcessData }) {
 }
 
 function DataVisual({ data }: { data: DataFactsData }) {
+  const bgColors = ["#eff6ff","#e0f2fe","#dbeafe","#ede9fe","#f0fdf4","#fef3c7"];
+  const borderColors = ["#2563eb","#0284c7","#1d4ed8","#7c3aed","#16a34a","#d97706"];
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
-      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
-        <span className="text-white font-bold">{data.title}</span>
+    <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 border-b border-blue-100 bg-blue-50 text-center">
+        <span className="text-blue-900 font-bold text-sm">{data.title}</span>
       </div>
-      <div className="p-4 grid grid-cols-2 gap-2.5">
+      <div className="p-3 grid grid-cols-2 gap-2">
         {(data.facts || []).map((fact, i) => (
-          <div key={i} className="rounded-xl p-3" style={{ background: (fact.color || "#6366f1") + "30", borderLeft: `3px solid ${fact.color || "#6366f1"}` }}>
-            <div className="text-white font-semibold text-xs mb-1">{fact.label}</div>
-            <div className="text-blue-200 text-xs leading-relaxed">{fact.detail}</div>
+          <div key={i} className="rounded-lg p-2.5" style={{ background: bgColors[i % bgColors.length], borderLeft: `3px solid ${borderColors[i % borderColors.length]}` }}>
+            <div className="text-blue-900 font-semibold text-xs mb-1">{fact.label}</div>
+            <div className="text-gray-600 text-xs leading-relaxed">{fact.detail}</div>
           </div>
         ))}
       </div>
@@ -230,20 +232,20 @@ function DataVisual({ data }: { data: DataFactsData }) {
 
 function TimelineVisual({ data }: { data: TimelineData }) {
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
-      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
-        <span className="text-white font-bold">{data.title}</span>
+    <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 border-b border-blue-100 bg-blue-50 text-center">
+        <span className="text-blue-900 font-bold text-sm">{data.title}</span>
       </div>
-      <div className="p-5">
+      <div className="p-4">
         {(data.events || []).map((ev, i) => (
-          <div key={i} className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <div className="h-3 w-3 rounded-full bg-cyan-400 flex-shrink-0 mt-1.5" />
-              {i < (data.events.length - 1) && <div className="w-px flex-1 bg-blue-600 mt-1 min-h-[20px]" />}
+          <div key={i} className="flex gap-3">
+            <div className="flex flex-col items-center flex-shrink-0">
+              <div className="h-3 w-3 rounded-full bg-blue-600 mt-1.5 flex-shrink-0 ring-2 ring-blue-200" />
+              {i < (data.events.length - 1) && <div className="w-px flex-1 bg-blue-200 mt-1 min-h-[18px]" />}
             </div>
-            <div className="pb-4">
-              <div className="text-white font-semibold text-sm">{ev.label}</div>
-              <div className="text-blue-200 text-xs mt-0.5 leading-relaxed">{ev.detail}</div>
+            <div className="pb-3 min-w-0">
+              <div className="text-blue-900 font-semibold text-sm">{ev.label}</div>
+              <div className="text-gray-600 text-xs mt-0.5 leading-relaxed">{ev.detail}</div>
             </div>
           </div>
         ))}
@@ -255,20 +257,21 @@ function TimelineVisual({ data }: { data: TimelineData }) {
 function ComparisonVisual({ data }: { data: ComparisonData }) {
   const sides = [data.left, data.right];
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
-      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
-        <span className="text-white font-bold">{data.title}</span>
+    <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 border-b border-blue-100 bg-blue-50 text-center">
+        <span className="text-blue-900 font-bold text-sm">{data.title}</span>
       </div>
-      <div className="p-4 grid grid-cols-2 gap-4">
+      <div className="p-3 grid grid-cols-2 gap-3">
         {sides.map((side, si) => (
           <div key={si}>
-            <div className={`text-center font-bold text-xs mb-2.5 py-1.5 rounded-lg ${si === 0 ? "bg-blue-600" : "bg-indigo-600"} text-white`}>
+            <div className={`text-center font-bold text-xs mb-2 py-1.5 rounded-lg text-white ${si === 0 ? "bg-blue-600" : "bg-blue-800"}`}>
               {(side || {}).label || "Side"}
             </div>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5">
               {((side || {}).points || []).map((pt, pi) => (
-                <li key={pi} className="flex items-start gap-1.5 text-xs text-blue-100">
-                  <span className="text-cyan-400 flex-shrink-0 mt-0.5">•</span>{pt}
+                <li key={pi} className="flex items-start gap-1.5 text-xs text-gray-700">
+                  <span className="text-blue-500 flex-shrink-0 mt-0.5 font-bold">•</span>
+                  <span>{pt}</span>
                 </li>
               ))}
             </ul>
@@ -280,19 +283,20 @@ function ComparisonVisual({ data }: { data: ComparisonData }) {
 }
 
 function FrameworkVisual({ data }: { data: FrameworkData }) {
-  const bgs = ["#1e40af","#1d4ed8","#2563eb","#3b82f6"];
+  const bgs   = ["#1e3a8a","#1e40af","#1d4ed8","#2563eb"];
+  const texts  = ["white","white","white","white"];
   return (
-    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
-      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
-        <span className="text-white font-bold">{data.title}</span>
+    <div className="rounded-xl border border-blue-200 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-2.5 border-b border-blue-100 bg-blue-50 text-center">
+        <span className="text-blue-900 font-bold text-sm">{data.title}</span>
       </div>
-      <div className="p-4 space-y-2.5">
+      <div className="p-3 space-y-2">
         {(data.levels || []).map((level, i) => (
-          <div key={i} className="rounded-xl p-3" style={{ background: bgs[i % bgs.length] }}>
-            <div className="text-white font-bold text-xs mb-2">{level.label}</div>
+          <div key={i} className="rounded-lg px-3 py-2.5" style={{ background: bgs[i % bgs.length] }}>
+            <div className="text-white font-bold text-xs mb-1.5">{level.label}</div>
             <div className="flex flex-wrap gap-1.5">
               {(level.items || []).map((item, j) => (
-                <span key={j} className="px-2 py-0.5 rounded-full bg-white/15 text-blue-100 text-xs">{item}</span>
+                <span key={j} className="px-2 py-0.5 rounded-full text-xs" style={{ background: "rgba(255,255,255,0.15)", color: texts[i % texts.length] }}>{item}</span>
               ))}
             </div>
           </div>
@@ -319,66 +323,69 @@ function VisualThumb({ type }: { type: VisualType }) {
   const content: Record<VisualType, React.ReactNode> = {
     mindmap: (
       <svg viewBox="0 0 60 45" className="w-full h-full">
-        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
-        <circle cx="30" cy="22" r="7" fill="#2563eb"/>
+        <rect width="60" height="45" rx="4" fill="#eff6ff"/>
+        <circle cx="30" cy="22" r="7" fill="#1e3a8a"/>
         {[[0,-14],[13,7],[-13,7],[10,-11],[-10,-11]].map(([dx,dy],i) => (
           <g key={i}>
-            <line x1="30" y1="22" x2={30+(dx||0)} y2={22+(dy||0)} stroke="#60a5fa" strokeWidth="0.8"/>
-            <circle cx={30+(dx||0)} cy={22+(dy||0)} r="3.5" fill={["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6"][i]}/>
+            <line x1="30" y1="22" x2={30+(dx||0)} y2={22+(dy||0)} stroke="#93c5fd" strokeWidth="0.8"/>
+            <circle cx={30+(dx||0)} cy={22+(dy||0)} r="3.5" fill={["#1d4ed8","#2563eb","#3b82f6","#1e40af","#0369a1"][i]}/>
           </g>
         ))}
       </svg>
     ),
     process: (
       <svg viewBox="0 0 60 45" className="w-full h-full">
-        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        <rect width="60" height="45" rx="4" fill="#eff6ff"/>
         {[5,14,23,32].map((y,i) => (
           <g key={i}>
-            <rect x="10" y={y} width="40" height="7" rx="2" fill="#2563eb"/>
-            {i < 3 && <line x1="30" y1={y+7} x2="30" y2={y+9} stroke="#60a5fa" strokeWidth="1"/>}
+            <rect x="10" y={y} width="40" height="7" rx="2" fill="#1d4ed8"/>
+            {i < 3 && <line x1="30" y1={y+7} x2="30" y2={y+9} stroke="#93c5fd" strokeWidth="1"/>}
           </g>
         ))}
       </svg>
     ),
     data: (
       <svg viewBox="0 0 60 45" className="w-full h-full">
-        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
-        {[[5,5,"#6366f1"],[33,5,"#f59e0b"],[5,25,"#10b981"],[33,25,"#ef4444"]].map(([x,y,c],i) => (
-          <rect key={i} x={x} y={y} width="22" height="15" rx="2" fill={c as string} opacity="0.85"/>
+        <rect width="60" height="45" rx="4" fill="#eff6ff"/>
+        {([[5,5,"#1d4ed8"],[33,5,"#1e40af"],[5,25,"#2563eb"],[33,25,"#0369a1"]] as [number,number,string][]).map(([x,y,c],i) => (
+          <g key={i}>
+            <rect x={x} y={y} width="22" height="15" rx="2" fill="#dbeafe"/>
+            <rect x={x} y={y} width="3" height="15" rx="1" fill={c}/>
+          </g>
         ))}
       </svg>
     ),
     timeline: (
       <svg viewBox="0 0 60 45" className="w-full h-full">
-        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
-        <line x1="20" y1="4" x2="20" y2="41" stroke="#3b82f6" strokeWidth="1.5"/>
+        <rect width="60" height="45" rx="4" fill="#eff6ff"/>
+        <line x1="20" y1="4" x2="20" y2="41" stroke="#93c5fd" strokeWidth="1.5"/>
         {[7,16,25,34].map((y,i) => (
           <g key={i}>
-            <circle cx="20" cy={y} r="2.5" fill="#22d3ee"/>
-            <rect x="25" y={y-3} width="27" height="6" rx="1.5" fill="#2563eb"/>
+            <circle cx="20" cy={y} r="2.5" fill="#1d4ed8"/>
+            <rect x="25" y={y-3} width="27" height="6" rx="1.5" fill="#dbeafe"/>
           </g>
         ))}
       </svg>
     ),
     comparison: (
       <svg viewBox="0 0 60 45" className="w-full h-full">
-        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
-        <line x1="30" y1="4" x2="30" y2="41" stroke="#3b82f6" strokeWidth="0.8"/>
-        <rect x="3" y="4" width="24" height="7" rx="2" fill="#2563eb"/>
-        <rect x="33" y="4" width="24" height="7" rx="2" fill="#4f46e5"/>
-        {[15,22,29,36].map((y,i) => (
-          <g key={i}>
-            <rect x="4" y={y} width="22" height="4.5" rx="1" fill="#1d4ed8" opacity="0.8"/>
-            <rect x="34" y={y} width="22" height="4.5" rx="1" fill="#3730a3" opacity="0.8"/>
+        <rect width="60" height="45" rx="4" fill="#eff6ff"/>
+        <line x1="30" y1="4" x2="30" y2="41" stroke="#93c5fd" strokeWidth="0.8"/>
+        <rect x="3" y="4" width="24" height="7" rx="2" fill="#1d4ed8"/>
+        <rect x="33" y="4" width="24" height="7" rx="2" fill="#1e3a8a"/>
+        {[15,22,29,36].map((y) => (
+          <g key={y}>
+            <rect x="4" y={y} width="22" height="4.5" rx="1" fill="#dbeafe"/>
+            <rect x="34" y={y} width="22" height="4.5" rx="1" fill="#bfdbfe"/>
           </g>
         ))}
       </svg>
     ),
     framework: (
       <svg viewBox="0 0 60 45" className="w-full h-full">
-        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
-        <rect x="15" y="4"  width="30" height="9"  rx="2" fill="#1e40af"/>
-        <rect x="8"  y="16" width="44" height="9"  rx="2" fill="#1d4ed8"/>
+        <rect width="60" height="45" rx="4" fill="#eff6ff"/>
+        <rect x="15" y="4"  width="30" height="9"  rx="2" fill="#1e3a8a"/>
+        <rect x="8"  y="16" width="44" height="9"  rx="2" fill="#1e40af"/>
         <rect x="3"  y="28" width="54" height="9"  rx="2" fill="#2563eb"/>
       </svg>
     ),
@@ -482,7 +489,7 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
     const heading = block.heading.content;
     const bodyText = block.body.map(s =>
       (s.type === "bullet" || s.type === "numbered") ? (s.items || []).join(". ") : s.content
-    ).join(" ").slice(0, 500);
+    ).join(" ").slice(0, 600);
 
     setGeneratingVisual(activeBlockIdx);
     setShowSuggestions(false);
@@ -515,19 +522,18 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
   if (mode === "landing") {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between border-b px-5 py-3">
+        <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0">
           <div>
             <h1 className="text-lg font-bold text-gray-900">Memorizer</h1>
             <p className="text-xs text-muted-foreground">Transform any content into rich visual study documents</p>
           </div>
           <QuotaBadge feature="memorizer" />
         </div>
-        <div className="flex flex-1 items-center justify-center p-8">
+        <div className="flex flex-1 items-center justify-center p-8 overflow-y-auto">
           <div className="w-full max-w-xl">
             <h2 className="text-center text-2xl font-bold text-gray-800 mb-1">How would you like to start?</h2>
             <p className="text-center text-sm text-muted-foreground mb-8">Choose your method to create a visual memory document</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Paste */}
               <button
                 onClick={() => setMode("paste-input")}
                 className="group relative overflow-hidden rounded-2xl p-6 text-left transition-transform hover:scale-[1.03] hover:shadow-xl focus:outline-none"
@@ -539,7 +545,6 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
                 <h3 className="text-white font-bold text-base mb-1">By pasting my text</h3>
                 <p className="text-purple-100 text-sm leading-snug">Create from notes, an outline or existing content.</p>
               </button>
-              {/* Describe */}
               <button
                 onClick={() => setMode("describe-input")}
                 className="group relative overflow-hidden rounded-2xl p-6 text-left transition-transform hover:scale-[1.03] hover:shadow-xl focus:outline-none"
@@ -562,13 +567,13 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
   if (mode === "paste-input") {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 border-b px-5 py-3">
+        <div className="flex items-center gap-3 border-b px-5 py-3 flex-shrink-0">
           <button onClick={() => setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <h1 className="text-base font-bold text-gray-900">Paste Your Text</h1>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center p-8">
+        <div className="flex flex-1 flex-col items-center justify-center p-8 overflow-y-auto">
           <div className="w-full max-w-2xl space-y-3">
             <label className="block text-sm font-medium text-gray-700">
               Paste your notes, outline, or any text content
@@ -596,14 +601,14 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
   if (mode === "describe-input") {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 border-b px-5 py-3">
+        <div className="flex items-center gap-3 border-b px-5 py-3 flex-shrink-0">
           <button onClick={() => setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <h1 className="text-base font-bold text-gray-900">Describe Your Idea</h1>
           <div className="ml-auto"><QuotaBadge feature="memorizer" /></div>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center p-8">
+        <div className="flex flex-1 flex-col items-center justify-center p-8 overflow-y-auto">
           <div className="w-full max-w-2xl space-y-3">
             <label className="block text-sm font-medium text-gray-700">
               What topic or idea would you like to explore?
@@ -633,72 +638,79 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
   }
 
   // ── Document view ───────────────────────────────────────────────────────────
+  // Uses a 2-column sticky layout: left panel (AI suggestions) + right (scrollable doc)
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden bg-white">
 
-      {/* AI Suggestions sidebar */}
-      {showSuggestions && (
-        <div className="w-72 flex-shrink-0 border-r bg-white flex flex-col overflow-hidden shadow-2xl z-20">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-2 font-semibold text-sm text-cyan-600">
-              <Zap className="h-4 w-4" /> AI Suggestions
+      {/* ── Left panel: AI Suggestions — sticky, does NOT scroll ── */}
+      <div
+        className={`flex-shrink-0 border-r bg-white flex flex-col overflow-hidden transition-all duration-200 ${showSuggestions ? "w-72" : "w-0"}`}
+        style={{ height: "100%" }}
+      >
+        {showSuggestions && (
+          <>
+            <div className="flex items-center justify-between border-b px-4 py-3 flex-shrink-0">
+              <div className="flex items-center gap-2 font-semibold text-sm text-blue-700">
+                <Zap className="h-4 w-4" /> AI Suggestions
+              </div>
+              <button onClick={() => setShowSuggestions(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <button onClick={() => setShowSuggestions(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
 
-          {/* Thumbnail grid */}
-          <div className="p-3 border-b">
-            <div className="grid grid-cols-2 gap-2">
-              {VISUAL_CATEGORIES.map(cat => (
-                <button
-                  key={cat.type}
-                  onClick={() => handleSelectVisualType(cat.type)}
-                  className="group overflow-hidden rounded-lg border border-border hover:border-blue-400 hover:shadow-md transition-all focus:outline-none"
-                  title={cat.label}
-                >
-                  <VisualThumb type={cat.type} />
-                  <div className="py-1 text-center text-[10px] text-muted-foreground group-hover:text-blue-600 font-medium transition-colors">
-                    {cat.label}
-                  </div>
-                </button>
-              ))}
+            {/* Thumbnail grid */}
+            <div className="p-3 border-b flex-shrink-0">
+              <div className="grid grid-cols-2 gap-2">
+                {VISUAL_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.type}
+                    onClick={() => handleSelectVisualType(cat.type)}
+                    className="group overflow-hidden rounded-lg border border-border hover:border-blue-400 hover:shadow-md transition-all focus:outline-none"
+                    title={cat.label}
+                  >
+                    <VisualThumb type={cat.type} />
+                    <div className="py-1 text-center text-[10px] text-muted-foreground group-hover:text-blue-600 font-medium transition-colors">
+                      {cat.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Category list */}
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="text-sm font-semibold text-gray-700 mb-2.5">⊞ Categories</div>
-            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 mb-3 bg-gray-50">
-              <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <input
-                value={categorySearch}
-                onChange={e => setCategorySearch(e.target.value)}
-                placeholder="Search (e.g. Mindmap...)"
-                className="flex-1 bg-transparent text-xs text-gray-700 focus:outline-none placeholder:text-muted-foreground"
-              />
+            {/* Category list — scrolls within its own column */}
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="text-sm font-semibold text-gray-700 mb-2.5">⊞ Categories</div>
+              <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 mb-3 bg-gray-50">
+                <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <input
+                  value={categorySearch}
+                  onChange={e => setCategorySearch(e.target.value)}
+                  placeholder="Search (e.g. Mindmap...)"
+                  className="flex-1 bg-transparent text-xs text-gray-700 focus:outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-0.5">
+                {filteredCats.map(cat => (
+                  <button
+                    key={cat.type}
+                    onClick={() => handleSelectVisualType(cat.type)}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                  >
+                    <span>{cat.label}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="space-y-0.5">
-              {filteredCats.map(cat => (
-                <button
-                  key={cat.type}
-                  onClick={() => handleSelectVisualType(cat.type)}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                >
-                  <span>{cat.label}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
-      {/* Document area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between border-b px-4 py-2 bg-white flex-shrink-0">
+      {/* ── Right panel: Document — scrolls independently ── */}
+      <div className="flex flex-1 flex-col overflow-hidden" style={{ height: "100%" }}>
+
+        {/* Toolbar — sticky at top of right panel */}
+        <div className="flex items-center justify-between border-b px-4 py-2 bg-white flex-shrink-0 z-10">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={reset} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
               <ArrowLeft className="h-3.5 w-3.5" /> Back
@@ -707,7 +719,7 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1">
-              Click <Zap className="inline h-3 w-3 text-cyan-500" /> to visualize a section
+              Click <Zap className="inline h-3 w-3 text-blue-500" /> to visualize a section
             </span>
             <button onClick={reset} className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent transition-colors">
               <RefreshCw className="h-3 w-3" /> New
@@ -715,23 +727,23 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
           </div>
         </div>
 
-        {/* Scrollable document */}
-        <div className="flex-1 overflow-y-auto bg-white">
+        {/* Scrollable document — only this scrolls */}
+        <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto py-8 px-2">
             {blocks.map((block, blockIdx) => {
-              const isTitle    = block.heading.type === "title";
-              const isH2       = block.heading.type === "h2";
-              const isLoading  = generatingVisual === blockIdx;
-              const hasVisual  = !!visuals[blockIdx];
+              const isTitle   = block.heading.type === "title";
+              const isH2      = block.heading.type === "h2";
+              const isLoading = generatingVisual === blockIdx;
+              const hasVisual = !!visuals[blockIdx];
 
               return (
                 <div key={blockIdx} className="flex">
-                  {/* Left gutter (48px) — holds lightning bolt */}
+                  {/* Left gutter (48px) — lightning bolt, scrolls with content so it stays aligned */}
                   <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
                     {isH2 && (
                       <button
                         onClick={() => openSuggestions(blockIdx)}
-                        className="mt-4 flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500 text-white shadow-md hover:bg-cyan-600 active:scale-95 transition-all z-10"
+                        className="mt-4 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-md hover:bg-blue-700 active:scale-95 transition-all z-10"
                         title="Generate visual for this section"
                       >
                         {isLoading
@@ -742,19 +754,22 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
                   </div>
 
                   {/* Content with blue left border on h2 blocks */}
-                  <div className={`flex-1 pb-7 pr-8 ${isH2 ? "border-l-2 border-blue-400 pl-5" : "pl-2"}`}>
-                    {/* Heading */}
+                  <div className={`flex-1 pb-7 pr-6 ${isH2 ? "border-l-2 border-blue-400 pl-5" : "pl-2"}`}>
+
+                    {/* Title heading */}
                     {isTitle && block.heading.content && (
                       <h1 className="text-3xl font-bold text-gray-900 mb-4 mt-2 flex items-center gap-3">
-                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xl select-none">🧠</span>
+                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-xl select-none">🧠</span>
                         {block.heading.content}
                       </h1>
                     )}
+
+                    {/* Section heading */}
                     {isH2 && (
                       <h2 className="text-xl font-bold text-gray-800 mt-1 mb-3">{block.heading.content}</h2>
                     )}
 
-                    {/* Body sections */}
+                    {/* Body — paragraphs, bullets, numbered lists */}
                     {block.body.map(sec => {
                       if (sec.type === "paragraph") return (
                         <p key={sec.id} className="text-gray-700 text-sm leading-relaxed mb-3">
@@ -778,18 +793,18 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
                       return null;
                     })}
 
-                    {/* Visual loading state */}
+                    {/* Visual loading state — inside the border line */}
                     {isH2 && isLoading && (
                       <div className="mt-4 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                         <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
-                        Generating visual from AI…
+                        Generating visual from section content…
                       </div>
                     )}
 
-                    {/* Visual embed */}
+                    {/* Visual embed — inside the border line, full width of content area */}
                     {isH2 && hasVisual && !isLoading && (
-                      <div className="mt-4 max-w-lg">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-1.5">
                           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">AI Generated Visual</span>
                           <div className="flex items-center gap-2">
                             <button
@@ -806,6 +821,7 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
                             </button>
                           </div>
                         </div>
+                        {/* Visual rendered inside the section's border-left container */}
                         <VisualRenderer visual={visuals[blockIdx]} />
                       </div>
                     )}
