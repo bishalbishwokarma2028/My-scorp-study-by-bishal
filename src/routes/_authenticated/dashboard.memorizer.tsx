@@ -415,43 +415,53 @@ function MemorizerPage() {
     setGenerating(true);
     try {
       const res = await askAI(
-        `Write a comprehensive, long-form educational document about: "${topicInput.trim()}"
+        `Write a VERY comprehensive, long-form educational document about: "${topicInput.trim()}"
+
+You MUST write at least 1500 words. Do NOT stop early. Complete every section fully.
 
 Use this EXACT markdown format:
 # ${topicInput.trim()}
 
 ## Introduction
-[3-4 sentence introductory paragraph]
+[4-5 sentence introductory paragraph. Be thorough.]
 
 ## [Core Concept 1 — name it specifically for the topic]
-[2-3 paragraphs, 3-5 sentences each, key terms in **bold**]
-- Relevant bullet point 1
-- Relevant bullet point 2
-- Relevant bullet point 3
+[3-4 full paragraphs, 4-6 sentences each, key terms in **bold**]
+- Detailed bullet point 1 with explanation
+- Detailed bullet point 2 with explanation
+- Detailed bullet point 3 with explanation
+- Detailed bullet point 4 with explanation
 
 ## [Core Concept 2 — name it specifically for the topic]
-[2-3 paragraphs]
-1. Numbered item 1 with clear explanation
-2. Numbered item 2 with clear explanation
-3. Numbered item 3 with clear explanation
+[3-4 full paragraphs]
+1. Detailed numbered item 1 with full explanation
+2. Detailed numbered item 2 with full explanation
+3. Detailed numbered item 3 with full explanation
+4. Detailed numbered item 4 with full explanation
+
+## [Core Concept 3 — name it specifically for the topic]
+[3 full paragraphs with key terms in **bold**]
 
 ## [Applications / Types / Examples relevant to the topic]
-[2-3 paragraphs]
+[3-4 full paragraphs, specific real-world examples]
 
 ## [Benefits / Advantages / Impact]
-[1 paragraph + bullet list]
+[2 full paragraphs + bullet list with at least 5 items]
 
 ## [Challenges / Limitations / Criticisms]
-[1 paragraph + bullet list]
+[2 full paragraphs + bullet list with at least 4 items]
 
 ## [Future Outlook / Modern Relevance]
-[2 paragraphs]
+[3 full paragraphs]
 
 ## Conclusion
-[2-3 sentence wrap-up]
+[4-5 sentence complete wrap-up. Do NOT cut the conclusion short.]
 
-Important: Make it very comprehensive — at least 900 words. Use **bold** for all key terms. Never use LaTeX or math notation.`,
-        "You are an expert academic writer. Generate comprehensive, detailed, educational documents. Always follow the exact markdown format given. Use **bold** for key terms. Write at least 900 words."
+CRITICAL: Write every section fully. Do not truncate or summarize. Use **bold** for all key terms. Never use LaTeX or math notation. Minimum 1500 words.`,
+        "You are an expert academic writer. Generate very comprehensive, detailed educational documents of at least 1500 words. NEVER stop in the middle of a sentence or section — always complete the full document including the Conclusion section. Use **bold** for key terms. Never use LaTeX.",
+        [],
+        false,
+        4000
       );
       await bump();
       const parsed = parseMarkdown(res.text);
@@ -639,8 +649,9 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
 
   // ── Document view ───────────────────────────────────────────────────────────
   // Uses a 2-column sticky layout: left panel (AI suggestions) + right (scrollable doc)
+  // fixed inset pattern mirrors chat/whiteboard so the parent height is always resolved
   return (
-    <div className="flex h-full overflow-hidden bg-white">
+    <div className="fixed inset-x-0 bottom-0 top-14 lg:static lg:h-full flex overflow-hidden bg-white">
 
       {/* ── Left panel: AI Suggestions — sticky, does NOT scroll ── */}
       <div
@@ -737,7 +748,7 @@ Important: Make it very comprehensive — at least 900 words. Use **bold** for a
               const hasVisual = !!visuals[blockIdx];
 
               return (
-                <div key={blockIdx} className="flex">
+                <div key={blockIdx} className={`flex ${isH2 ? "mb-8" : isTitle ? "mb-4" : "mb-2"}`}>
                   {/* Left gutter (48px) — lightning bolt, scrolls with content so it stays aligned */}
                   <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
                     {isH2 && (
