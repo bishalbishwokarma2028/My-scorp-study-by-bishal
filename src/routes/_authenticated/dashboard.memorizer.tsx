@@ -476,10 +476,41 @@ CRITICAL: Write every section fully. Do not truncate or summarize. Use **bold** 
   }
 
   // ── Document from pasted text ───────────────────────────────────────────────
-  function handlePaste() {
+  async function handlePaste() {
     if (!pasteInput.trim()) return toast.error("Please paste some text first");
-    const firstLine = pasteInput.split("\n")[0].replace(/^#+\s*/, "").trim();
-    const parsed = parseMarkdown(pasteInput);
+
+    let text = pasteInput.trim();
+    const hasHeadings = /^## /m.test(text);
+
+    if (!hasHeadings) {
+      // No ## headings — use AI to add proper section structure
+      setGenerating(true);
+      try {
+        const firstLine = text.split("\n")[0].replace(/^#+\s*/, "").trim();
+        const res = await askAI(
+          `Organize the following text into a structured educational document with clear section headings. Keep ALL original content — do not remove or summarize any text.
+
+Format rules:
+- First line: # [title] (use "${firstLine}" if appropriate)
+- Each logical section starts with: ## [Section Heading]
+- Keep all paragraphs, bullet points, and numbered lists as they are under the appropriate section
+- Create at least 3-5 sections based on topic shifts in the text
+
+Text to structure:
+${text.slice(0, 4000)}`,
+          "You are a document organizer. Add proper markdown headings (# for title, ## for sections) to the given text. Preserve every word of original content — never delete or condense it. Return only the formatted markdown document.",
+          [], false, 3000
+        );
+        text = res.text.trim();
+      } catch {
+        // Fallback: parse as-is (will show without section bolts)
+      } finally {
+        setGenerating(false);
+      }
+    }
+
+    const firstLine = text.split("\n")[0].replace(/^#+\s*/, "").trim();
+    const parsed = parseMarkdown(text);
     setBlocks(parsed);
     setDocTitle(firstLine || "Your Document");
     setMode("document");
@@ -596,10 +627,12 @@ CRITICAL: Write every section fully. Do not truncate or summarize. Use **bold** 
             />
             <button
               onClick={handlePaste}
-              disabled={!pasteInput.trim()}
-              className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 py-3 font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-40"
+              disabled={!pasteInput.trim() || generating}
+              className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 py-3 font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
             >
-              Create Visual Document
+              {generating
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Structuring your document…</>
+                : "Create Visual Document"}
             </button>
           </div>
         </div>
