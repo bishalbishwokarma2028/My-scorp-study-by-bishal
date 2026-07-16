@@ -1,0 +1,821 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import React from "react";
+import {
+  Loader2, Zap, ClipboardList, Sparkles, X, Search,
+  ArrowLeft, RefreshCw, ChevronRight,
+} from "lucide-react";
+import { toast } from "sonner";
+import { askAI, askAIJSON } from "@/lib/aiProvider";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
+import { QuotaBadge } from "@/components/ai-ui";
+
+export const Route = createFileRoute("/_authenticated/dashboard/memorizer")({
+  component: MemorizerPage,
+});
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+type Mode = "landing" | "paste-input" | "describe-input" | "document";
+type VisualType = "mindmap" | "process" | "data" | "timeline" | "comparison" | "framework";
+
+type DocSection = {
+  id: number;
+  type: "title" | "h2" | "paragraph" | "bullet" | "numbered";
+  content: string;
+  items?: string[];
+};
+type DocBlock = { heading: DocSection; body: DocSection[] };
+
+type MindmapData   = { center: string; branches: { label: string; color: string; items: string[] }[] };
+type ProcessData   = { title: string; steps: { label: string; description: string }[] };
+type DataFactsData = { title: string; facts: { label: string; detail: string; color: string }[] };
+type TimelineData  = { title: string; events: { label: string; detail: string }[] };
+type ComparisonData = { title: string; left: { label: string; points: string[] }; right: { label: string; points: string[] } };
+type FrameworkData = { title: string; levels: { label: string; items: string[] }[] };
+
+type VisualData =
+  | { type: "mindmap";    data: MindmapData }
+  | { type: "process";    data: ProcessData }
+  | { type: "data";       data: DataFactsData }
+  | { type: "timeline";   data: TimelineData }
+  | { type: "comparison"; data: ComparisonData }
+  | { type: "framework";  data: FrameworkData };
+
+const VISUAL_CATEGORIES: { type: VisualType; label: string }[] = [
+  { type: "mindmap",    label: "Mindmap" },
+  { type: "process",    label: "Process" },
+  { type: "data",       label: "Data" },
+  { type: "timeline",   label: "Timelines" },
+  { type: "comparison", label: "Comparison" },
+  { type: "framework",  label: "Business Frameworks" },
+];
+
+// ── Markdown parser → blocks ───────────────────────────────────────────────────
+function parseMarkdown(text: string): DocBlock[] {
+  const lines = text.split("\n");
+  const raw: DocSection[] = [];
+  let id = 0, i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { i++; continue; }
+
+    if (line.startsWith("# ")) {
+      raw.push({ id: id++, type: "title", content: line.slice(2).trim() });
+      i++;
+    } else if (line.startsWith("## ")) {
+      raw.push({ id: id++, type: "h2", content: line.slice(3).trim() });
+      i++;
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      const items: string[] = [];
+      while (i < lines.length && (lines[i].trim().startsWith("- ") || lines[i].trim().startsWith("* "))) {
+        items.push(lines[i].trim().slice(2).trim());
+        i++;
+      }
+      if (items.length) raw.push({ id: id++, type: "bullet", content: "", items });
+    } else if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i].trim())) {
+        items.push(lines[i].trim().replace(/^\d+\.\s/, "").trim());
+        i++;
+      }
+      if (items.length) raw.push({ id: id++, type: "numbered", content: "", items });
+    } else {
+      const parts: string[] = [];
+      while (i < lines.length && lines[i].trim() && !lines[i].trim().startsWith("#")) {
+        parts.push(lines[i].trim());
+        i++;
+      }
+      const content = parts.join(" ");
+      if (content) raw.push({ id: id++, type: "paragraph", content });
+    }
+  }
+
+  // Group into blocks (heading + body)
+  const blocks: DocBlock[] = [];
+  let cur: DocBlock | null = null;
+  for (const sec of raw) {
+    if (sec.type === "title" || sec.type === "h2") {
+      if (cur) blocks.push(cur);
+      cur = { heading: sec, body: [] };
+    } else {
+      if (!cur) cur = { heading: { id: id++, type: "paragraph", content: "" }, body: [] };
+      cur.body.push(sec);
+    }
+  }
+  if (cur) blocks.push(cur);
+  return blocks;
+}
+
+// ── AI visual generation ───────────────────────────────────────────────────────
+async function generateVisual(context: string, heading: string, type: VisualType): Promise<VisualData | null> {
+  const sys = "Return ONLY raw valid JSON. No markdown fences, no prose. JSON only.";
+  const colors = ["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6"];
+
+  const prompts: Record<VisualType, string> = {
+    mindmap:    `Create a detailed educational mindmap for "${heading}" using context: "${context}". Return JSON: {"center":"${heading.slice(0,16)}","branches":[{"label":"Branch (max 12 chars)","color":"#6366f1","items":["item1","item2","item3"]}]}. Use 4-5 branches. Colors in order: ${colors.join(",")}. Items max 22 chars each.`,
+    process:    `Create a step-by-step process for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","steps":[{"label":"Step Name (max 15 chars)","description":"One clear sentence describing this step."}]}. Include 5-6 steps.`,
+    data:       `Create key facts visualization for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","facts":[{"label":"Fact Title (max 22 chars)","detail":"One-sentence explanation.","color":"#6366f1"}]}. Include 6 facts. Cycle colors: ${colors.join(",")}.`,
+    timeline:   `Create a timeline for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","events":[{"label":"Stage/Event Name","detail":"Brief one-sentence description."}]}. Include 5-6 events in logical order.`,
+    comparison: `Create a comparison for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","left":{"label":"Category A","points":["point1","point2","point3","point4"]},"right":{"label":"Category B","points":["point1","point2","point3","point4"]}}. 4 points per side.`,
+    framework:  `Create a hierarchical framework for "${heading}" using context: "${context}". Return JSON: {"title":"${heading}","levels":[{"label":"Level Name","items":["item1","item2","item3"]}]}. Include 3-4 levels, 2-3 items each.`,
+  };
+
+  try {
+    const { data } = await askAIJSON<any>(prompts[type], sys, [], false, 800);
+    if (!data) return null;
+    return { type, data } as VisualData;
+  } catch { return null; }
+}
+
+// ── Inline markdown → React ────────────────────────────────────────────────────
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith("**") && p.endsWith("**")
+          ? <strong key={i} className="font-semibold text-gray-900">{p.slice(2, -2)}</strong>
+          : <React.Fragment key={i}>{p}</React.Fragment>
+      )}
+    </>
+  );
+}
+
+// ── Visual renderers ───────────────────────────────────────────────────────────
+function MindmapVisual({ data }: { data: MindmapData }) {
+  const cx = 300, cy = 195, radius = 148;
+  const branches = (data.branches || []).slice(0, 6);
+  const n = branches.length || 1;
+
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
+      <div className="px-4 pt-4 pb-1 text-center">
+        <span className="text-white font-bold text-base">{data.center}</span>
+      </div>
+      <svg viewBox="0 0 600 390" className="w-full">
+        <circle cx={cx} cy={cy} r={54} fill="#2563eb" />
+        <circle cx={cx} cy={cy} r={49} fill="#1d4ed8" />
+        {data.center.split(" ").slice(0, 3).map((word, wi) => (
+          <text key={wi} x={cx} y={cy - 8 + wi * 14} textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">{word}</text>
+        ))}
+        {branches.map((b, i) => {
+          const angle = ((i * 360) / n - 90) * (Math.PI / 180);
+          const bx = cx + radius * Math.cos(angle);
+          const by = cy + radius * Math.sin(angle);
+          const mx = cx + (radius * 0.45) * Math.cos(angle);
+          const my = cy + (radius * 0.45) * Math.sin(angle);
+          return (
+            <g key={i}>
+              <path d={`M ${cx} ${cy} Q ${mx} ${my} ${bx} ${by}`} stroke={b.color} strokeWidth="1.8" fill="none" opacity="0.75" />
+              <rect x={bx - 47} y={by - 14} width={94} height={28} rx="14" fill={b.color} />
+              <text x={bx} y={by + 1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="9.5" fontWeight="bold">
+                {(b.label || "").slice(0, 14)}
+              </text>
+              {(b.items || []).slice(0, 3).map((item, j) => (
+                <text key={j} x={bx} y={by + 30 + j * 15} textAnchor="middle" fill="#bfdbfe" fontSize="8.5">
+                  ∙ {item.slice(0, 24)}
+                </text>
+              ))}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function ProcessVisual({ data }: { data: ProcessData }) {
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
+      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
+        <span className="text-white font-bold">{data.title}</span>
+      </div>
+      <div className="p-5 space-y-2">
+        {(data.steps || []).map((step, i) => (
+          <div key={i} className="flex items-start gap-3">
+            <div className="flex flex-col items-center flex-shrink-0">
+              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold shadow">{i + 1}</div>
+              {i < (data.steps.length - 1) && <div className="w-px h-4 bg-blue-400/40 mt-0.5" />}
+            </div>
+            <div className="flex-1 pb-1">
+              <div className="text-white font-semibold text-sm">{step.label}</div>
+              <div className="text-blue-200 text-xs mt-0.5 leading-relaxed">{step.description}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DataVisual({ data }: { data: DataFactsData }) {
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
+      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
+        <span className="text-white font-bold">{data.title}</span>
+      </div>
+      <div className="p-4 grid grid-cols-2 gap-2.5">
+        {(data.facts || []).map((fact, i) => (
+          <div key={i} className="rounded-xl p-3" style={{ background: (fact.color || "#6366f1") + "30", borderLeft: `3px solid ${fact.color || "#6366f1"}` }}>
+            <div className="text-white font-semibold text-xs mb-1">{fact.label}</div>
+            <div className="text-blue-200 text-xs leading-relaxed">{fact.detail}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimelineVisual({ data }: { data: TimelineData }) {
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
+      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
+        <span className="text-white font-bold">{data.title}</span>
+      </div>
+      <div className="p-5">
+        {(data.events || []).map((ev, i) => (
+          <div key={i} className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className="h-3 w-3 rounded-full bg-cyan-400 flex-shrink-0 mt-1.5" />
+              {i < (data.events.length - 1) && <div className="w-px flex-1 bg-blue-600 mt-1 min-h-[20px]" />}
+            </div>
+            <div className="pb-4">
+              <div className="text-white font-semibold text-sm">{ev.label}</div>
+              <div className="text-blue-200 text-xs mt-0.5 leading-relaxed">{ev.detail}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComparisonVisual({ data }: { data: ComparisonData }) {
+  const sides = [data.left, data.right];
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
+      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
+        <span className="text-white font-bold">{data.title}</span>
+      </div>
+      <div className="p-4 grid grid-cols-2 gap-4">
+        {sides.map((side, si) => (
+          <div key={si}>
+            <div className={`text-center font-bold text-xs mb-2.5 py-1.5 rounded-lg ${si === 0 ? "bg-blue-600" : "bg-indigo-600"} text-white`}>
+              {(side || {}).label || "Side"}
+            </div>
+            <ul className="space-y-2">
+              {((side || {}).points || []).map((pt, pi) => (
+                <li key={pi} className="flex items-start gap-1.5 text-xs text-blue-100">
+                  <span className="text-cyan-400 flex-shrink-0 mt-0.5">•</span>{pt}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FrameworkVisual({ data }: { data: FrameworkData }) {
+  const bgs = ["#1e40af","#1d4ed8","#2563eb","#3b82f6"];
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-xl" style={{ background: "#1e3a8a" }}>
+      <div className="px-4 pt-4 pb-2 border-b border-blue-700 text-center">
+        <span className="text-white font-bold">{data.title}</span>
+      </div>
+      <div className="p-4 space-y-2.5">
+        {(data.levels || []).map((level, i) => (
+          <div key={i} className="rounded-xl p-3" style={{ background: bgs[i % bgs.length] }}>
+            <div className="text-white font-bold text-xs mb-2">{level.label}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {(level.items || []).map((item, j) => (
+                <span key={j} className="px-2 py-0.5 rounded-full bg-white/15 text-blue-100 text-xs">{item}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VisualRenderer({ visual }: { visual: VisualData }) {
+  switch (visual.type) {
+    case "mindmap":    return <MindmapVisual    data={visual.data as MindmapData} />;
+    case "process":    return <ProcessVisual    data={visual.data as ProcessData} />;
+    case "data":       return <DataVisual       data={visual.data as DataFactsData} />;
+    case "timeline":   return <TimelineVisual   data={visual.data as TimelineData} />;
+    case "comparison": return <ComparisonVisual data={visual.data as ComparisonData} />;
+    case "framework":  return <FrameworkVisual  data={visual.data as FrameworkData} />;
+    default: return null;
+  }
+}
+
+// ── Thumbnail SVGs for AI Suggestions panel ────────────────────────────────────
+function VisualThumb({ type }: { type: VisualType }) {
+  const content: Record<VisualType, React.ReactNode> = {
+    mindmap: (
+      <svg viewBox="0 0 60 45" className="w-full h-full">
+        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        <circle cx="30" cy="22" r="7" fill="#2563eb"/>
+        {[[0,-14],[13,7],[-13,7],[10,-11],[-10,-11]].map(([dx,dy],i) => (
+          <g key={i}>
+            <line x1="30" y1="22" x2={30+(dx||0)} y2={22+(dy||0)} stroke="#60a5fa" strokeWidth="0.8"/>
+            <circle cx={30+(dx||0)} cy={22+(dy||0)} r="3.5" fill={["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6"][i]}/>
+          </g>
+        ))}
+      </svg>
+    ),
+    process: (
+      <svg viewBox="0 0 60 45" className="w-full h-full">
+        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        {[5,14,23,32].map((y,i) => (
+          <g key={i}>
+            <rect x="10" y={y} width="40" height="7" rx="2" fill="#2563eb"/>
+            {i < 3 && <line x1="30" y1={y+7} x2="30" y2={y+9} stroke="#60a5fa" strokeWidth="1"/>}
+          </g>
+        ))}
+      </svg>
+    ),
+    data: (
+      <svg viewBox="0 0 60 45" className="w-full h-full">
+        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        {[[5,5,"#6366f1"],[33,5,"#f59e0b"],[5,25,"#10b981"],[33,25,"#ef4444"]].map(([x,y,c],i) => (
+          <rect key={i} x={x} y={y} width="22" height="15" rx="2" fill={c as string} opacity="0.85"/>
+        ))}
+      </svg>
+    ),
+    timeline: (
+      <svg viewBox="0 0 60 45" className="w-full h-full">
+        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        <line x1="20" y1="4" x2="20" y2="41" stroke="#3b82f6" strokeWidth="1.5"/>
+        {[7,16,25,34].map((y,i) => (
+          <g key={i}>
+            <circle cx="20" cy={y} r="2.5" fill="#22d3ee"/>
+            <rect x="25" y={y-3} width="27" height="6" rx="1.5" fill="#2563eb"/>
+          </g>
+        ))}
+      </svg>
+    ),
+    comparison: (
+      <svg viewBox="0 0 60 45" className="w-full h-full">
+        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        <line x1="30" y1="4" x2="30" y2="41" stroke="#3b82f6" strokeWidth="0.8"/>
+        <rect x="3" y="4" width="24" height="7" rx="2" fill="#2563eb"/>
+        <rect x="33" y="4" width="24" height="7" rx="2" fill="#4f46e5"/>
+        {[15,22,29,36].map((y,i) => (
+          <g key={i}>
+            <rect x="4" y={y} width="22" height="4.5" rx="1" fill="#1d4ed8" opacity="0.8"/>
+            <rect x="34" y={y} width="22" height="4.5" rx="1" fill="#3730a3" opacity="0.8"/>
+          </g>
+        ))}
+      </svg>
+    ),
+    framework: (
+      <svg viewBox="0 0 60 45" className="w-full h-full">
+        <rect width="60" height="45" rx="4" fill="#1e3a8a"/>
+        <rect x="15" y="4"  width="30" height="9"  rx="2" fill="#1e40af"/>
+        <rect x="8"  y="16" width="44" height="9"  rx="2" fill="#1d4ed8"/>
+        <rect x="3"  y="28" width="54" height="9"  rx="2" fill="#2563eb"/>
+      </svg>
+    ),
+  };
+  return <div className="w-full aspect-[4/3] overflow-hidden rounded">{content[type]}</div>;
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+function MemorizerPage() {
+  const [mode, setMode]                   = useState<Mode>("landing");
+  const [blocks, setBlocks]               = useState<DocBlock[]>([]);
+  const [docTitle, setDocTitle]           = useState("");
+  const [topicInput, setTopicInput]       = useState("");
+  const [pasteInput, setPasteInput]       = useState("");
+  const [generating, setGenerating]       = useState(false);
+  const [activeBlockIdx, setActiveBlockIdx] = useState<number | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [visuals, setVisuals]             = useState<Record<number, VisualData>>({});
+  const [generatingVisual, setGeneratingVisual] = useState<number | null>(null);
+  const [categorySearch, setCategorySearch] = useState("");
+  const { quota, bump } = useUsageLimit("memorizer");
+
+  // ── Document generation from topic ─────────────────────────────────────────
+  async function handleDescribe() {
+    if (!topicInput.trim()) return toast.error("Please describe your idea or topic");
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
+    setGenerating(true);
+    try {
+      const res = await askAI(
+        `Write a comprehensive, long-form educational document about: "${topicInput.trim()}"
+
+Use this EXACT markdown format:
+# ${topicInput.trim()}
+
+## Introduction
+[3-4 sentence introductory paragraph]
+
+## [Core Concept 1 — name it specifically for the topic]
+[2-3 paragraphs, 3-5 sentences each, key terms in **bold**]
+- Relevant bullet point 1
+- Relevant bullet point 2
+- Relevant bullet point 3
+
+## [Core Concept 2 — name it specifically for the topic]
+[2-3 paragraphs]
+1. Numbered item 1 with clear explanation
+2. Numbered item 2 with clear explanation
+3. Numbered item 3 with clear explanation
+
+## [Applications / Types / Examples relevant to the topic]
+[2-3 paragraphs]
+
+## [Benefits / Advantages / Impact]
+[1 paragraph + bullet list]
+
+## [Challenges / Limitations / Criticisms]
+[1 paragraph + bullet list]
+
+## [Future Outlook / Modern Relevance]
+[2 paragraphs]
+
+## Conclusion
+[2-3 sentence wrap-up]
+
+Important: Make it very comprehensive — at least 900 words. Use **bold** for all key terms. Never use LaTeX or math notation.`,
+        "You are an expert academic writer. Generate comprehensive, detailed, educational documents. Always follow the exact markdown format given. Use **bold** for key terms. Write at least 900 words."
+      );
+      await bump();
+      const parsed = parseMarkdown(res.text);
+      setBlocks(parsed);
+      setDocTitle(topicInput.trim());
+      setMode("document");
+    } catch {
+      toast.error("Failed to generate document. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  // ── Document from pasted text ───────────────────────────────────────────────
+  function handlePaste() {
+    if (!pasteInput.trim()) return toast.error("Please paste some text first");
+    const firstLine = pasteInput.split("\n")[0].replace(/^#+\s*/, "").trim();
+    const parsed = parseMarkdown(pasteInput);
+    setBlocks(parsed);
+    setDocTitle(firstLine || "Your Document");
+    setMode("document");
+  }
+
+  // ── Visual generation ───────────────────────────────────────────────────────
+  function openSuggestions(blockIdx: number) {
+    setActiveBlockIdx(blockIdx);
+    setShowSuggestions(true);
+  }
+
+  async function handleSelectVisualType(type: VisualType) {
+    if (activeBlockIdx === null) return;
+    const block = blocks[activeBlockIdx];
+    if (!block) return;
+
+    const heading = block.heading.content;
+    const bodyText = block.body.map(s =>
+      (s.type === "bullet" || s.type === "numbered") ? (s.items || []).join(". ") : s.content
+    ).join(" ").slice(0, 500);
+
+    setGeneratingVisual(activeBlockIdx);
+    setShowSuggestions(false);
+
+    try {
+      const visual = await generateVisual(bodyText, heading, type);
+      if (visual) {
+        setVisuals(prev => ({ ...prev, [activeBlockIdx]: visual }));
+        toast.success("Visual generated!");
+      } else {
+        toast.error("Could not generate visual. Try again.");
+      }
+    } catch {
+      toast.error("Visual generation failed.");
+    } finally {
+      setGeneratingVisual(null);
+    }
+  }
+
+  function reset() {
+    setMode("landing"); setBlocks([]); setVisuals({}); setTopicInput("");
+    setPasteInput(""); setDocTitle(""); setShowSuggestions(false); setActiveBlockIdx(null);
+  }
+
+  const filteredCats = VISUAL_CATEGORIES.filter(c =>
+    !categorySearch || c.label.toLowerCase().includes(categorySearch.toLowerCase())
+  );
+
+  // ── Landing ─────────────────────────────────────────────────────────────────
+  if (mode === "landing") {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">Memorizer</h1>
+            <p className="text-xs text-muted-foreground">Transform any content into rich visual study documents</p>
+          </div>
+          <QuotaBadge feature="memorizer" />
+        </div>
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="w-full max-w-xl">
+            <h2 className="text-center text-2xl font-bold text-gray-800 mb-1">How would you like to start?</h2>
+            <p className="text-center text-sm text-muted-foreground mb-8">Choose your method to create a visual memory document</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Paste */}
+              <button
+                onClick={() => setMode("paste-input")}
+                className="group relative overflow-hidden rounded-2xl p-6 text-left transition-transform hover:scale-[1.03] hover:shadow-xl focus:outline-none"
+                style={{ background: "linear-gradient(135deg,#e879f9 0%,#a855f7 55%,#9333ea 100%)" }}
+              >
+                <div className="pointer-events-none absolute right-3 top-3 h-20 w-20 rounded-full bg-white/15" />
+                <div className="pointer-events-none absolute right-8 top-8 h-10 w-10 rounded-full bg-white/10" />
+                <ClipboardList className="mb-4 h-10 w-10 text-white/90" />
+                <h3 className="text-white font-bold text-base mb-1">By pasting my text</h3>
+                <p className="text-purple-100 text-sm leading-snug">Create from notes, an outline or existing content.</p>
+              </button>
+              {/* Describe */}
+              <button
+                onClick={() => setMode("describe-input")}
+                className="group relative overflow-hidden rounded-2xl p-6 text-left transition-transform hover:scale-[1.03] hover:shadow-xl focus:outline-none"
+                style={{ background: "linear-gradient(135deg,#818cf8 0%,#7c3aed 55%,#6d28d9 100%)" }}
+              >
+                <div className="pointer-events-none absolute right-3 top-3 h-20 w-20 rounded-full bg-white/15" />
+                <div className="pointer-events-none absolute right-8 top-8 h-10 w-10 rounded-full bg-white/10" />
+                <Sparkles className="mb-4 h-10 w-10 text-white/90" />
+                <h3 className="text-white font-bold text-base mb-1">By describing my idea</h3>
+                <p className="text-purple-100 text-sm leading-snug">Describe what visual and text content you have in mind.</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Paste input ─────────────────────────────────────────────────────────────
+  if (mode === "paste-input") {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-3 border-b px-5 py-3">
+          <button onClick={() => setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+          <h1 className="text-base font-bold text-gray-900">Paste Your Text</h1>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center p-8">
+          <div className="w-full max-w-2xl space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Paste your notes, outline, or any text content
+            </label>
+            <textarea
+              value={pasteInput}
+              onChange={e => setPasteInput(e.target.value)}
+              placeholder={"Paste your text here…\n\nYou can use plain text or markdown (# Heading, ## Section, **bold**, - bullets).\nThe more structured your text, the better the document will look."}
+              className="w-full h-64 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+            />
+            <button
+              onClick={handlePaste}
+              disabled={!pasteInput.trim()}
+              className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 py-3 font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-40"
+            >
+              Create Visual Document
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Describe input ──────────────────────────────────────────────────────────
+  if (mode === "describe-input") {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-3 border-b px-5 py-3">
+          <button onClick={() => setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+          <h1 className="text-base font-bold text-gray-900">Describe Your Idea</h1>
+          <div className="ml-auto"><QuotaBadge feature="memorizer" /></div>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center p-8">
+          <div className="w-full max-w-2xl space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              What topic or idea would you like to explore?
+            </label>
+            <textarea
+              value={topicInput}
+              onChange={e => setTopicInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !generating) handleDescribe(); }}
+              placeholder={"e.g. 'The impact of globalization on developing economies'\ne.g. 'How photosynthesis works'\ne.g. 'Machine learning fundamentals'\ne.g. 'The causes of World War I'"}
+              className="w-full h-36 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+              disabled={generating}
+            />
+            <button
+              onClick={handleDescribe}
+              disabled={generating || !topicInput.trim()}
+              className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-3 font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {generating
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating comprehensive document…</>
+                : <><Sparkles className="h-4 w-4" /> Generate Document</>}
+            </button>
+            <p className="text-center text-xs text-muted-foreground">Tip: Press Ctrl+Enter to generate</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Document view ───────────────────────────────────────────────────────────
+  return (
+    <div className="flex h-full overflow-hidden">
+
+      {/* AI Suggestions sidebar */}
+      {showSuggestions && (
+        <div className="w-72 flex-shrink-0 border-r bg-white flex flex-col overflow-hidden shadow-2xl z-20">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2 font-semibold text-sm text-cyan-600">
+              <Zap className="h-4 w-4" /> AI Suggestions
+            </div>
+            <button onClick={() => setShowSuggestions(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Thumbnail grid */}
+          <div className="p-3 border-b">
+            <div className="grid grid-cols-2 gap-2">
+              {VISUAL_CATEGORIES.map(cat => (
+                <button
+                  key={cat.type}
+                  onClick={() => handleSelectVisualType(cat.type)}
+                  className="group overflow-hidden rounded-lg border border-border hover:border-blue-400 hover:shadow-md transition-all focus:outline-none"
+                  title={cat.label}
+                >
+                  <VisualThumb type={cat.type} />
+                  <div className="py-1 text-center text-[10px] text-muted-foreground group-hover:text-blue-600 font-medium transition-colors">
+                    {cat.label}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Category list */}
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="text-sm font-semibold text-gray-700 mb-2.5">⊞ Categories</div>
+            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 mb-3 bg-gray-50">
+              <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <input
+                value={categorySearch}
+                onChange={e => setCategorySearch(e.target.value)}
+                placeholder="Search (e.g. Mindmap...)"
+                className="flex-1 bg-transparent text-xs text-gray-700 focus:outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="space-y-0.5">
+              {filteredCats.map(cat => (
+                <button
+                  key={cat.type}
+                  onClick={() => handleSelectVisualType(cat.type)}
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                >
+                  <span>{cat.label}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document area */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between border-b px-4 py-2 bg-white flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={reset} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
+            </button>
+            <span className="text-sm font-semibold text-gray-700 truncate">{docTitle}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1">
+              Click <Zap className="inline h-3 w-3 text-cyan-500" /> to visualize a section
+            </span>
+            <button onClick={reset} className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent transition-colors">
+              <RefreshCw className="h-3 w-3" /> New
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable document */}
+        <div className="flex-1 overflow-y-auto bg-white">
+          <div className="max-w-3xl mx-auto py-8 px-2">
+            {blocks.map((block, blockIdx) => {
+              const isTitle    = block.heading.type === "title";
+              const isH2       = block.heading.type === "h2";
+              const isLoading  = generatingVisual === blockIdx;
+              const hasVisual  = !!visuals[blockIdx];
+
+              return (
+                <div key={blockIdx} className="flex">
+                  {/* Left gutter (48px) — holds lightning bolt */}
+                  <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
+                    {isH2 && (
+                      <button
+                        onClick={() => openSuggestions(blockIdx)}
+                        className="mt-4 flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500 text-white shadow-md hover:bg-cyan-600 active:scale-95 transition-all z-10"
+                        title="Generate visual for this section"
+                      >
+                        {isLoading
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Zap className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Content with blue left border on h2 blocks */}
+                  <div className={`flex-1 pb-7 pr-8 ${isH2 ? "border-l-2 border-blue-400 pl-5" : "pl-2"}`}>
+                    {/* Heading */}
+                    {isTitle && block.heading.content && (
+                      <h1 className="text-3xl font-bold text-gray-900 mb-4 mt-2 flex items-center gap-3">
+                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-xl select-none">🧠</span>
+                        {block.heading.content}
+                      </h1>
+                    )}
+                    {isH2 && (
+                      <h2 className="text-xl font-bold text-gray-800 mt-1 mb-3">{block.heading.content}</h2>
+                    )}
+
+                    {/* Body sections */}
+                    {block.body.map(sec => {
+                      if (sec.type === "paragraph") return (
+                        <p key={sec.id} className="text-gray-700 text-sm leading-relaxed mb-3">
+                          <Inline text={sec.content} />
+                        </p>
+                      );
+                      if (sec.type === "bullet") return (
+                        <ul key={sec.id} className="list-disc pl-5 mb-3 space-y-1.5">
+                          {(sec.items || []).map((item, ii) => (
+                            <li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item} /></li>
+                          ))}
+                        </ul>
+                      );
+                      if (sec.type === "numbered") return (
+                        <ol key={sec.id} className="list-decimal pl-5 mb-3 space-y-1.5">
+                          {(sec.items || []).map((item, ii) => (
+                            <li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item} /></li>
+                          ))}
+                        </ol>
+                      );
+                      return null;
+                    })}
+
+                    {/* Visual loading state */}
+                    {isH2 && isLoading && (
+                      <div className="mt-4 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                        <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+                        Generating visual from AI…
+                      </div>
+                    )}
+
+                    {/* Visual embed */}
+                    {isH2 && hasVisual && !isLoading && (
+                      <div className="mt-4 max-w-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">AI Generated Visual</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openSuggestions(blockIdx)}
+                              className="text-[10px] text-blue-500 hover:text-blue-700 font-medium transition-colors"
+                            >
+                              Change type
+                            </button>
+                            <button
+                              onClick={() => setVisuals(prev => { const n = {...prev}; delete n[blockIdx]; return n; })}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <VisualRenderer visual={visuals[blockIdx]} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

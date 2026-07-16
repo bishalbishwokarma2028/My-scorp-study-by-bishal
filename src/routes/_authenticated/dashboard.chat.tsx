@@ -935,7 +935,7 @@ Return STRICT JSON only (no prose, no markdown fences):
             className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition-all sm:gap-1.5 sm:px-3 ${selectedText ? "border-fuchsia-400 bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white shadow-md" : "border-border bg-white text-muted-foreground hover:bg-fuchsia-50 hover:border-fuchsia-300 hover:text-fuchsia-700"}`}
           >
             {visualLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5 flex-shrink-0" />}
-            <span className="hidden sm:inline">{selectedText ? "✦ Visual" : "Visual"}</span>
+            <span className="hidden sm:inline">{selectedText ? "✦ Deeper Explanation" : "Deeper Explanation"}</span>
           </button>
           <button onClick={newChat} className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent sm:gap-1.5 sm:px-3">
             <Plus className="h-3.5 w-3.5 flex-shrink-0" /><span className="hidden sm:inline">New</span>

@@ -29,6 +29,7 @@ import { Route as AuthenticatedDashboardPdfChatRouteImport } from './routes/_aut
 import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
 import { Route as AuthenticatedDashboardMockTestRouteImport } from './routes/_authenticated/dashboard.mock-test'
 import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
+import { Route as AuthenticatedDashboardMemorizerRouteImport } from './routes/_authenticated/dashboard.memorizer'
 import { Route as AuthenticatedDashboardMathRouteImport } from './routes/_authenticated/dashboard.math'
 import { Route as AuthenticatedDashboardImageSolverRouteImport } from './routes/_authenticated/dashboard.image-solver'
 import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
@@ -159,6 +160,12 @@ const AuthenticatedDashboardMindmapRoute =
     path: '/dashboard/mindmap',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardMemorizerRoute =
+  AuthenticatedDashboardMemorizerRouteImport.update({
+    id: '/dashboard/memorizer',
+    path: '/dashboard/memorizer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardMathRoute =
   AuthenticatedDashboardMathRouteImport.update({
     id: '/dashboard/math',
@@ -279,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/dashboard/math': typeof AuthenticatedDashboardMathRoute
+  '/dashboard/memorizer': typeof AuthenticatedDashboardMemorizerRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
@@ -316,6 +324,7 @@ export interface FileRoutesByTo {
   '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/dashboard/math': typeof AuthenticatedDashboardMathRoute
+  '/dashboard/memorizer': typeof AuthenticatedDashboardMemorizerRoute
   '/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
@@ -356,6 +365,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/_authenticated/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/_authenticated/dashboard/math': typeof AuthenticatedDashboardMathRoute
+  '/_authenticated/dashboard/memorizer': typeof AuthenticatedDashboardMemorizerRoute
   '/_authenticated/dashboard/mindmap': typeof AuthenticatedDashboardMindmapRoute
   '/_authenticated/dashboard/mock-test': typeof AuthenticatedDashboardMockTestRoute
   '/_authenticated/dashboard/notes': typeof AuthenticatedDashboardNotesRoute
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/dashboard/image-gen'
     | '/dashboard/image-solver'
     | '/dashboard/math'
+    | '/dashboard/memorizer'
     | '/dashboard/mindmap'
     | '/dashboard/mock-test'
     | '/dashboard/notes'
@@ -432,6 +443,7 @@ export interface FileRouteTypes {
     | '/dashboard/image-gen'
     | '/dashboard/image-solver'
     | '/dashboard/math'
+    | '/dashboard/memorizer'
     | '/dashboard/mindmap'
     | '/dashboard/mock-test'
     | '/dashboard/notes'
@@ -471,6 +483,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/image-gen'
     | '/_authenticated/dashboard/image-solver'
     | '/_authenticated/dashboard/math'
+    | '/_authenticated/dashboard/memorizer'
     | '/_authenticated/dashboard/mindmap'
     | '/_authenticated/dashboard/mock-test'
     | '/_authenticated/dashboard/notes'
@@ -638,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardMindmapRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/memorizer': {
+      id: '/_authenticated/dashboard/memorizer'
+      path: '/dashboard/memorizer'
+      fullPath: '/dashboard/memorizer'
+      preLoaderRoute: typeof AuthenticatedDashboardMemorizerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/math': {
       id: '/_authenticated/dashboard/math'
       path: '/dashboard/math'
@@ -794,6 +814,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
   AuthenticatedDashboardImageSolverRoute: typeof AuthenticatedDashboardImageSolverRoute
   AuthenticatedDashboardMathRoute: typeof AuthenticatedDashboardMathRoute
+  AuthenticatedDashboardMemorizerRoute: typeof AuthenticatedDashboardMemorizerRoute
   AuthenticatedDashboardMindmapRoute: typeof AuthenticatedDashboardMindmapRoute
   AuthenticatedDashboardMockTestRoute: typeof AuthenticatedDashboardMockTestRoute
   AuthenticatedDashboardNotesRoute: typeof AuthenticatedDashboardNotesRoute
@@ -827,6 +848,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardImageSolverRoute:
     AuthenticatedDashboardImageSolverRoute,
   AuthenticatedDashboardMathRoute: AuthenticatedDashboardMathRoute,
+  AuthenticatedDashboardMemorizerRoute: AuthenticatedDashboardMemorizerRoute,
   AuthenticatedDashboardMindmapRoute: AuthenticatedDashboardMindmapRoute,
   AuthenticatedDashboardMockTestRoute: AuthenticatedDashboardMockTestRoute,
   AuthenticatedDashboardNotesRoute: AuthenticatedDashboardNotesRoute,
