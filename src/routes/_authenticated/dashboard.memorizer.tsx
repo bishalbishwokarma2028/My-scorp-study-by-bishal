@@ -1098,6 +1098,7 @@ function ScanAnimation() {
 // Main Page Component
 // ══════════════════════════════════════════════════════════════════════════════
 function MemorizerPage() {
+  const { user }                    = Route.useRouteContext();
   const [mode, setMode]             = useState<Mode>("landing");
   const [blocks, setBlocks]         = useState<DocBlock[]>([]);
   const [docTitle, setDocTitle]     = useState("");
@@ -1111,7 +1112,7 @@ function MemorizerPage() {
   const [palettes, setPalettes]     = useState<Record<number, number>>({});
   const [generatingVisual, setGeneratingVisual] = useState<number | null>(null);
   const [templatePage, setTemplatePage] = useState(0);
-  const { quota, bump }             = useUsageLimit("memorizer");
+  const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   const visibleTemplates = TEMPLATES.slice(0, (templatePage + 1) * PAGE_SIZE);
   const hasMore = visibleTemplates.length < TEMPLATES.length;
@@ -1248,7 +1249,7 @@ Text:\n${text.slice(0,4000)}`,
             <h1 className="text-lg font-bold text-gray-900">Memorizer</h1>
             <p className="text-xs text-muted-foreground">Transform any content into rich visual study documents</p>
           </div>
-          <QuotaBadge feature="memorizer"/>
+          <QuotaBadge quota={quota} loading={quotaLoading}/>
         </div>
         <div className="flex flex-1 items-center justify-center p-8 overflow-y-auto">
           <div className="w-full max-w-xl">
@@ -1302,7 +1303,7 @@ Text:\n${text.slice(0,4000)}`,
         <div className="flex items-center gap-3 border-b px-5 py-3 flex-shrink-0">
           <button onClick={()=>setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4"/> Back</button>
           <h1 className="text-base font-bold text-gray-900">Describe Your Idea</h1>
-          <div className="ml-auto"><QuotaBadge feature="memorizer"/></div>
+          <div className="ml-auto"><QuotaBadge quota={quota} loading={quotaLoading}/></div>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center p-8 overflow-y-auto">
           <div className="w-full max-w-2xl space-y-3">
