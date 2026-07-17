@@ -366,33 +366,53 @@ function parseMarkdown(text: string): DocBlock[] {
   return blocks;
 }
 
+// ── Text-wrap helper: splits long text into SVG-safe lines ───────────────────
+function svgLines(text: string, cpl: number, maxL = 3): string[] {
+  const words = (text || '').trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (next.length <= cpl) { cur = next; }
+    else { if (cur) lines.push(cur); cur = w.length > cpl ? w.slice(0, cpl) : w; }
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0, maxL);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
-// Visual Renderers — palette-aware, clean text layout, no overlaps
+// Visual Renderers — palette-aware, complete text, visually distinct types
 // ══════════════════════════════════════════════════════════════════════════════
 
 function MindmapVisual({ data, p }: { data: MindmapData; p: Palette }) {
   const branches = (data.branches || []).slice(0, 6);
   const n = branches.length || 1;
-  const cx = 310, cy = 200, r = 150;
+  const cx = 350, cy = 240, r = 172, CW = 120, CH = 68;
+  const cols = [p.accent, p.accent2, p.accent3, p.accent, p.accent2, p.accent3];
   return (
-    <svg viewBox="0 0 620 400" className="w-full" style={{ background:p.bg }}>
-      <text x={cx} y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{data.center}</text>
-      <circle cx={cx} cy={cy} r={50} fill={p.surface2} stroke={p.accent} strokeWidth="2"/>
-      {data.center.split(" ").slice(0,3).map((w,wi) => (
-        <text key={wi} x={cx} y={cy - 10 + wi*15} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="10" fontWeight="bold">{w}</text>
+    <svg viewBox="0 0 700 480" className="w-full" style={{ background: p.bg }}>
+      <text x={cx} y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{(data.center || '').slice(0, 42)}</text>
+      <circle cx={cx} cy={cy} r={52} fill={p.surface2} stroke={p.accent} strokeWidth="2"/>
+      {svgLines(data.center || '', 11, 3).map((w, wi) => (
+        <text key={wi} x={cx} y={cy - 14 + wi * 14} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9.5" fontWeight="bold">{w}</text>
       ))}
       {branches.map((b, i) => {
-        const angle = ((i/n)*360 - 90) * Math.PI/180;
-        const bx = cx + r*Math.cos(angle), by = cy + r*Math.sin(angle);
-        const col = [p.accent, p.accent2, p.accent3, p.accent, p.accent2, p.accent3][i];
-        const lx = bx + (bx>cx?48:-48), ly = by;
+        const angle = ((i / n) * 360 - 90) * Math.PI / 180;
+        const bx = cx + r * Math.cos(angle), by = cy + r * Math.sin(angle);
+        const col = cols[i % cols.length];
+        const lbl = svgLines(b.label || '', 15, 2);
+        const items = (b.items || []).slice(0, 3);
         return (
           <g key={i}>
-            <line x1={cx + 50*Math.cos(angle)} y1={cy + 50*Math.sin(angle)} x2={bx - 40*Math.cos(angle)} y2={by - 40*Math.sin(angle)} stroke={col} strokeWidth="1.5" opacity="0.6"/>
-            <rect x={bx-44} y={by-16} width={88} height={32} rx="14" fill={p.surface} stroke={col} strokeWidth="1.5"/>
-            <text x={bx} y={by+1} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{(b.label||"").slice(0,14)}</text>
-            {(b.items||[]).slice(0,3).map((item,j) => (
-              <text key={j} x={bx} y={by+34+j*13} textAnchor="middle" fill={p.textSecondary} fontSize="8">· {item.slice(0,24)}</text>
+            <line x1={cx + 52 * Math.cos(angle)} y1={cy + 52 * Math.sin(angle)}
+                  x2={bx - 60 * Math.cos(angle)} y2={by - 34 * Math.sin(angle)}
+                  stroke={col} strokeWidth="1.5" opacity="0.5"/>
+            <rect x={bx - CW / 2} y={by - CH / 2} width={CW} height={CH} rx="12" fill={p.surface} stroke={col} strokeWidth="1.5"/>
+            {lbl.map((ln, j) => (
+              <text key={j} x={bx} y={by - CH / 2 + 14 + j * 13} textAnchor="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{ln}</text>
+            ))}
+            {items.map((item, j) => (
+              <text key={j} x={bx} y={by - CH / 2 + 14 + lbl.length * 13 + 6 + j * 12} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">· {(item || '').slice(0, 20)}</text>
             ))}
           </g>
         );
@@ -402,25 +422,22 @@ function MindmapVisual({ data, p }: { data: MindmapData; p: Palette }) {
 }
 
 function ProcessVisual({ data, p, variant }: { data: ProcessData; p: Palette; variant?: number }) {
-  const steps = (data.steps||[]).slice(0,6);
+  const steps = (data.steps || []).slice(0, 6);
   if (variant === 2) {
-    // Horizontal cards
     return (
-      <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-        <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-          <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+      <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+        <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+          <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
         </div>
         <div className="p-3 flex gap-2 overflow-x-auto">
           {steps.map((step, i) => (
-            <div key={i} className="flex-shrink-0 flex flex-col items-center gap-1 w-28">
-              <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background:i===0?p.accent:p.surface2, color:p.bg }}>
-                {i+1}
+            <div key={i} className="flex-shrink-0 flex flex-col items-center gap-1 w-32">
+              <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: i === 0 ? p.accent : p.surface2, color: p.bg }}>{i + 1}</div>
+              <div className="text-center px-2 py-1.5 rounded-lg w-full" style={{ background: p.surface, border: `1px solid ${p.line}` }}>
+                <div className="text-xs font-semibold" style={{ color: p.accent2 }}>{step.label}</div>
+                <div className="text-[10px] mt-0.5 leading-tight" style={{ color: p.textSecondary }}>{step.description}</div>
               </div>
-              <div className="text-center px-2 py-1.5 rounded-lg w-full" style={{ background:p.surface, border:`1px solid ${p.line}` }}>
-                <div className="text-xs font-semibold" style={{ color:p.accent2 }}>{step.label}</div>
-                <div className="text-[10px] mt-0.5 leading-tight" style={{ color:p.textSecondary }}>{step.description.slice(0,40)}</div>
-              </div>
-              {i < steps.length-1 && <div className="text-xs" style={{ color:p.accent }}>→</div>}
+              {i < steps.length - 1 && <div className="text-xs" style={{ color: p.accent }}>→</div>}
             </div>
           ))}
         </div>
@@ -428,20 +445,20 @@ function ProcessVisual({ data, p, variant }: { data: ProcessData; p: Palette; va
     );
   }
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-      <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-        <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
       </div>
       <div className="p-4 space-y-2">
-        {steps.map((step,i) => (
+        {steps.map((step, i) => (
           <div key={i} className="flex items-start gap-3">
             <div className="flex flex-col items-center flex-shrink-0">
-              <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background:i===0?p.accent:p.surface2, color:p.bg }}>{i+1}</div>
-              {i < steps.length-1 && <div className="w-px h-3 mt-0.5" style={{ background:p.line }}/>}
+              <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: i === 0 ? p.accent : p.surface2, color: p.bg }}>{i + 1}</div>
+              {i < steps.length - 1 && <div className="w-px h-3 mt-0.5" style={{ background: p.line }}/>}
             </div>
             <div className="flex-1 min-w-0 pb-1">
-              <div className="font-semibold text-sm" style={{ color:p.accent2 }}>{step.label}</div>
-              <div className="text-xs mt-0.5 leading-relaxed" style={{ color:p.textSecondary }}>{step.description}</div>
+              <div className="font-semibold text-sm" style={{ color: p.accent2 }}>{step.label}</div>
+              <div className="text-xs mt-0.5 leading-relaxed" style={{ color: p.textSecondary }}>{step.description}</div>
             </div>
           </div>
         ))}
@@ -451,33 +468,43 @@ function ProcessVisual({ data, p, variant }: { data: ProcessData; p: Palette; va
 }
 
 function CycleVisual({ data, p }: { data: CycleData; p: Palette }) {
-  const stages = (data.stages||[]).slice(0,6);
-  const n = Math.max(stages.length,1);
-  const cx=210, cy=155, r=105;
-  const cols = [p.accent,p.accent2,p.accent3,p.accent,p.accent2,p.accent3];
+  const stages = (data.stages || []).slice(0, 6);
+  const n = Math.max(stages.length, 1);
+  const cx = 350, cy = 235, r = 158, CW = 148, CH = 80;
+  const cols = [p.accent, p.accent2, p.accent3, p.accent, p.accent2, p.accent3];
   return (
-    <svg viewBox="0 0 420 310" className="w-full" style={{ background:p.bg }}>
-      <text x={cx} y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      <defs><marker id={`ca${p.id}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill={p.accent2}/></marker></defs>
-      {stages.map((_,i) => {
-        const a1=((-90+(360/n)*i)*Math.PI/180), a2=((-90+(360/n)*((i+1)%n))*Math.PI/180);
-        const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
-        const qx=(x1+x2)/2+(cx-(x1+x2)/2)*0.18,qy=(y1+y2)/2+(cy-(y1+y2)/2)*0.18;
-        return <path key={i} d={`M ${x1} ${y1} Q ${qx} ${qy} ${x2} ${y2}`} stroke={p.accent} strokeWidth="1.8" fill="none" markerEnd={`url(#ca${p.id})`}/>;
+    <svg viewBox="0 0 700 470" className="w-full" style={{ background: p.bg }}>
+      <text x={cx} y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{(data.title || '').slice(0, 52)}</text>
+      <defs>
+        <marker id={`ca${p.id}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill={p.accent2}/>
+        </marker>
+      </defs>
+      {stages.map((_, i) => {
+        const a1 = ((-90 + (360 / n) * i) * Math.PI / 180);
+        const a2 = ((-90 + (360 / n) * ((i + 1) % n)) * Math.PI / 180);
+        const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+        const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+        const qx = (x1 + x2) / 2 + (cx - (x1 + x2) / 2) * 0.22;
+        const qy = (y1 + y2) / 2 + (cy - (y1 + y2) / 2) * 0.22;
+        return <path key={i} d={`M ${x1} ${y1} Q ${qx} ${qy} ${x2} ${y2}`} stroke={p.accent2} strokeWidth="1.8" fill="none" markerEnd={`url(#ca${p.id})`} opacity="0.45"/>;
       })}
-      <circle cx={cx} cy={cy} r={22} fill={p.surface2} stroke={p.accent} strokeWidth="1.5"/>
-      <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle" fill={p.accent2} fontSize="8" fontWeight="bold">cycle</text>
-      {stages.map((stage,i) => {
-        const angle=((-90+(360/n)*i)*Math.PI/180);
-        const x=cx+r*Math.cos(angle), y=cy+r*Math.sin(angle);
-        const col=cols[i%cols.length];
+      <circle cx={cx} cy={cy} r={27} fill={p.surface2} stroke={p.accent} strokeWidth="2"/>
+      <text x={cx} y={cy + 4} textAnchor="middle" dominantBaseline="middle" fill={p.accent2} fontSize="9" fontWeight="bold">↻</text>
+      {stages.map((stage, i) => {
+        const angle = ((-90 + (360 / n) * i) * Math.PI / 180);
+        const sx = cx + r * Math.cos(angle), sy = cy + r * Math.sin(angle);
+        const col = cols[i % cols.length];
+        const lbl = svgLines(stage.label || '', 18, 2);
+        const desc = svgLines(stage.description || '', 22, 3);
+        const textY = sy - CH / 2 + 16;
         return (
           <g key={i}>
-            <rect x={x-52} y={y-20} width={104} height={40} rx="10" fill={p.surface} stroke={col} strokeWidth="1.5"/>
-            <text x={x} y={y-6} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{(stage.label||"").slice(0,16)}</text>
-            <text x={x} y={y+10} textAnchor="middle" dominantBaseline="middle" fill={p.textSecondary} fontSize="7.5">{(stage.description||"").slice(0,22)}</text>
-            <circle cx={x+44} cy={y-18} r="8" fill={col}/>
-            <text x={x+44} y={y-18} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="8" fontWeight="bold">{i+1}</text>
+            <rect x={sx - CW / 2} y={sy - CH / 2} width={CW} height={CH} rx="10" fill={p.surface} stroke={col} strokeWidth="1.5"/>
+            <circle cx={sx + CW / 2 - 11} cy={sy - CH / 2 + 11} r="11" fill={col}/>
+            <text x={sx + CW / 2 - 11} y={sy - CH / 2 + 12} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="8" fontWeight="bold">{i + 1}</text>
+            {lbl.map((ln, j) => <text key={j} x={sx} y={textY + j * 13} textAnchor="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{ln}</text>)}
+            {desc.map((ln, j) => <text key={j} x={sx} y={textY + lbl.length * 13 + 5 + j * 11} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">{ln}</text>)}
           </g>
         );
       })}
@@ -486,24 +513,26 @@ function CycleVisual({ data, p }: { data: CycleData; p: Palette }) {
 }
 
 function TimelineVisual({ data, p, variant }: { data: TimelineData; p: Palette; variant?: number }) {
-  const events = (data.events||[]).slice(0,7);
+  const events = (data.events || []).slice(0, 7);
   if (variant === 1) {
-    // Horizontal
-    const n = Math.max(events.length,1);
-    const W=580, railY=85, sp=(W-60)/n;
+    const n = Math.max(events.length, 1);
+    const W = 640, railY = 105, sp = (W - 60) / n;
     return (
-      <svg viewBox={`0 0 ${W} 200`} className="w-full" style={{ background:p.bg }}>
-        <text x={W/2} y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-        <line x1="30" y1={railY} x2={W-30} y2={railY} stroke={p.line} strokeWidth="2.5" strokeLinecap="round"/>
-        {events.map((ev,i) => {
-          const x=30+sp*i+sp/2, above=i%2===0;
+      <svg viewBox={`0 0 ${W} 250`} className="w-full" style={{ background: p.bg }}>
+        <text x={W / 2} y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+        <line x1="30" y1={railY} x2={W - 30} y2={railY} stroke={p.line} strokeWidth="2.5" strokeLinecap="round"/>
+        {events.map((ev, i) => {
+          const x = 30 + sp * i + sp / 2, above = i % 2 === 0;
+          const lbl = svgLines(ev.label || '', 14, 2);
+          const det = svgLines(ev.detail || '', 16, 2);
+          const labelBase = above ? railY - 46 : railY + 46;
           return (
             <g key={i}>
-              <circle cx={x} cy={railY} r="8" fill={p.accent}/>
-              <text x={x} y={railY+1} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="7" fontWeight="bold">{i+1}</text>
-              <line x1={x} y1={railY+(above?-8:8)} x2={x} y2={above?railY-28:railY+28} stroke={p.accent} strokeWidth="1.2" strokeDasharray="3,2"/>
-              <text x={x} y={above?railY-36:railY+38} textAnchor="middle" fill={p.textPrimary} fontSize="8.5" fontWeight="bold">{ev.label.slice(0,16)}</text>
-              <text x={x} y={above?railY-49:railY+51} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">{ev.detail.slice(0,20)}</text>
+              <circle cx={x} cy={railY} r="9" fill={p.accent}/>
+              <text x={x} y={railY + 1} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="7" fontWeight="bold">{i + 1}</text>
+              <line x1={x} y1={above ? railY - 9 : railY + 9} x2={x} y2={above ? railY - 34 : railY + 34} stroke={p.accent} strokeWidth="1.2" strokeDasharray="3,2"/>
+              {lbl.map((ln, j) => <text key={j} x={x} y={labelBase + j * 12} textAnchor="middle" fill={p.textPrimary} fontSize="8" fontWeight="bold">{ln}</text>)}
+              {det.map((ln, j) => <text key={j} x={x} y={labelBase + lbl.length * 12 + 2 + j * 11} textAnchor="middle" fill={p.textSecondary} fontSize="7">{ln}</text>)}
             </g>
           );
         })}
@@ -511,20 +540,20 @@ function TimelineVisual({ data, p, variant }: { data: TimelineData; p: Palette; 
     );
   }
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-      <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-        <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
       </div>
       <div className="p-4">
-        {events.map((ev,i) => (
+        {events.map((ev, i) => (
           <div key={i} className="flex gap-3">
             <div className="flex flex-col items-center flex-shrink-0">
-              <div className="h-4 w-4 rounded-full mt-0.5 ring-2 flex-shrink-0" style={{ background:p.accent, ringColor:p.accent2 }}/>
-              {i<events.length-1 && <div className="w-px flex-1 mt-1 min-h-[20px]" style={{ background:p.line }}/>}
+              <div className="h-5 w-5 rounded-full mt-0.5 flex items-center justify-center text-[9px] font-bold flex-shrink-0" style={{ background: p.accent, color: p.bg }}>{i + 1}</div>
+              {i < events.length - 1 && <div className="w-px flex-1 mt-1 min-h-[20px]" style={{ background: p.line }}/>}
             </div>
             <div className="pb-3 min-w-0">
-              <div className="font-semibold text-sm" style={{ color:p.accent2 }}>{ev.label}</div>
-              <div className="text-xs mt-0.5 leading-relaxed" style={{ color:p.textSecondary }}>{ev.detail}</div>
+              <div className="font-semibold text-sm" style={{ color: p.accent2 }}>{ev.label}</div>
+              <div className="text-xs mt-0.5 leading-relaxed" style={{ color: p.textSecondary }}>{ev.detail}</div>
             </div>
           </div>
         ))}
@@ -534,33 +563,38 @@ function TimelineVisual({ data, p, variant }: { data: TimelineData; p: Palette; 
 }
 
 function TreeVisual({ data, p }: { data: TreeData; p: Palette }) {
-  const branches=(data.branches||[]).slice(0,5);
-  const nb=Math.max(branches.length,1);
-  const W=560, rootX=W/2, rootY=36, branchY=126, childY=218;
-  const bxs=branches.map((_,i)=>nb===1?rootX:60+((W-120)/(nb-1))*i);
-  const maxC=nb>=4?2:3, cSpacing=nb>=4?40:50;
-  const cols=[p.accent,p.accent2,p.accent3,p.accent,p.accent2];
+  const branches = (data.branches || []).slice(0, 5);
+  const nb = Math.max(branches.length, 1);
+  const W = 640, rootX = W / 2, rootY = 38, branchY = 132, childY = 226;
+  const bxs = branches.map((_, i) => nb === 1 ? rootX : 56 + ((W - 112) / (nb - 1)) * i);
+  const maxC = nb >= 4 ? 2 : 3, cSpacing = nb >= 4 ? 42 : 52;
+  const cols = [p.accent, p.accent2, p.accent3, p.accent, p.accent2];
   return (
-    <svg viewBox={`0 0 ${W} 270`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="18" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      <rect x={rootX-60} y={rootY-14} width={120} height={28} rx="8" fill={p.accent}/>
-      <text x={rootX} y={rootY+1} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="10" fontWeight="bold">{(data.root||"").slice(0,20)}</text>
-      {branches.map((branch,i) => {
-        const bx=bxs[i], col=cols[i%cols.length];
-        const children=(branch.children||[]).slice(0,maxC), nc=children.length;
+    <svg viewBox={`0 0 ${W} 285`} className="w-full" style={{ background: p.bg }}>
+      <text x={W / 2} y="18" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      <rect x={rootX - 70} y={rootY - 16} width={140} height={32} rx="8" fill={p.accent}/>
+      {svgLines(data.root || '', 20, 1).map((ln, j) => (
+        <text key={j} x={rootX} y={rootY + 2 + j * 13} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="10" fontWeight="bold">{ln}</text>
+      ))}
+      {branches.map((branch, i) => {
+        const bx = bxs[i], col = cols[i % cols.length];
+        const children = (branch.children || []).slice(0, maxC), nc = children.length;
+        const lbl = svgLines(branch.label || '', 14, 2);
         return (
           <g key={i}>
-            <line x1={rootX} y1={rootY+14} x2={bx} y2={branchY-14} stroke={p.line} strokeWidth="1.2"/>
-            <rect x={bx-48} y={branchY-14} width={96} height={28} rx="7" fill={p.surface} stroke={col} strokeWidth="1.5"/>
-            <text x={bx} y={branchY+1} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{(branch.label||"").slice(0,14)}</text>
-            {children.map((child,ci) => {
-              const off=nc===1?0:(ci-(nc-1)/2)*cSpacing*2;
-              const cx2=Math.max(24,Math.min(W-24,bx+off));
+            <line x1={rootX} y1={rootY + 16} x2={bx} y2={branchY - 16} stroke={p.line} strokeWidth="1.2"/>
+            <rect x={bx - 54} y={branchY - 16} width={108} height={32 + Math.max(lbl.length - 1, 0) * 12} rx="7" fill={p.surface} stroke={col} strokeWidth="1.5"/>
+            {lbl.map((ln, j) => <text key={j} x={bx} y={branchY - 1 + j * 13} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{ln}</text>)}
+            {children.map((child, ci) => {
+              const off = nc === 1 ? 0 : (ci - (nc - 1) / 2) * cSpacing * 2;
+              const cx2 = Math.max(30, Math.min(W - 30, bx + off));
+              const cLbl = svgLines(child || '', 13, 2);
+              const cH = 24 + Math.max(cLbl.length - 1, 0) * 11;
               return (
                 <g key={ci}>
-                  <line x1={bx} y1={branchY+14} x2={cx2} y2={childY-12} stroke={p.line} strokeWidth="1"/>
-                  <rect x={cx2-42} y={childY-12} width={84} height={24} rx="6" fill={p.surface2}/>
-                  <text x={cx2} y={childY+1} textAnchor="middle" dominantBaseline="middle" fill={p.textSecondary} fontSize="8">{(child||"").slice(0,13)}</text>
+                  <line x1={bx} y1={branchY + 16} x2={cx2} y2={childY - cH / 2} stroke={p.line} strokeWidth="1"/>
+                  <rect x={cx2 - 46} y={childY - cH / 2} width={92} height={cH + 4} rx="6" fill={p.surface2}/>
+                  {cLbl.map((ln, j) => <text key={j} x={cx2} y={childY - cH / 2 + 13 + j * 11} textAnchor="middle" dominantBaseline="middle" fill={p.textSecondary} fontSize="8">{ln}</text>)}
                 </g>
               );
             })}
@@ -573,18 +607,18 @@ function TreeVisual({ data, p }: { data: TreeData; p: Palette }) {
 
 function ComparisonVisual({ data, p }: { data: ComparisonData; p: Palette }) {
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-      <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-        <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
       </div>
       <div className="p-4 grid grid-cols-2 gap-4">
-        {[data.left, data.right].map((side,si) => (
-          <div key={si} className="rounded-lg overflow-hidden" style={{ border:`1px solid ${si===0?p.accent:p.line}` }}>
-            <div className="text-center font-bold text-xs py-2" style={{ background:si===0?p.accent:p.surface2, color:si===0?p.bg:p.textPrimary }}>{(side||{}).label||"Side"}</div>
+        {[data.left, data.right].map((side, si) => (
+          <div key={si} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${si === 0 ? p.accent : p.line}` }}>
+            <div className="text-center font-bold text-xs py-2" style={{ background: si === 0 ? p.accent : p.surface2, color: si === 0 ? p.bg : p.textPrimary }}>{(side || {}).label || 'Side'}</div>
             <div className="p-2.5 space-y-1.5">
-              {((side||{}).points||[]).map((pt,pi) => (
-                <div key={pi} className="flex items-start gap-1.5 text-xs" style={{ color:p.textSecondary }}>
-                  <span style={{ color:p.accent }} className="font-bold flex-shrink-0">•</span>
+              {((side || {}).points || []).map((pt, pi) => (
+                <div key={pi} className="flex items-start gap-1.5 text-xs" style={{ color: p.textSecondary }}>
+                  <span style={{ color: p.accent }} className="font-bold flex-shrink-0">•</span>
                   <span>{pt}</span>
                 </div>
               ))}
@@ -597,45 +631,52 @@ function ComparisonVisual({ data, p }: { data: ComparisonData; p: Palette }) {
 }
 
 function VennVisual({ data, p }: { data: VennData; p: Palette }) {
-  const li=(data.left?.items||[]).slice(0,3), ri=(data.right?.items||[]).slice(0,3), ov=(data.overlap||[]).slice(0,3);
+  const li = (data.left?.items || []).slice(0, 4), ri = (data.right?.items || []).slice(0, 4), ov = (data.overlap || []).slice(0, 3);
   return (
-    <svg viewBox="0 0 560 260" className="w-full" style={{ background:p.bg }}>
-      <text x="280" y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{data.title}</text>
-      <circle cx="195" cy="140" r="104" fill={p.accent} fillOpacity="0.45" stroke={p.accent} strokeWidth="2"/>
-      <circle cx="365" cy="140" r="104" fill={p.accent2} fillOpacity="0.35" stroke={p.accent2} strokeWidth="2"/>
-      {/* Left label + items — positioned well inside left circle */}
-      <text x="130" y="75" textAnchor="middle" fill={p.textPrimary} fontSize="10" fontWeight="bold">{(data.left?.label||"").slice(0,14)}</text>
-      {li.map((item,i) => <text key={i} x="130" y={95+i*18} textAnchor="middle" fill={p.textPrimary} fontSize="8.5">{item.slice(0,18)}</text>)}
-      {/* Right label + items */}
-      <text x="430" y="75" textAnchor="middle" fill={p.textPrimary} fontSize="10" fontWeight="bold">{(data.right?.label||"").slice(0,14)}</text>
-      {ri.map((item,i) => <text key={i} x="430" y={95+i*18} textAnchor="middle" fill={p.textPrimary} fontSize="8.5">{item.slice(0,18)}</text>)}
-      {/* Center overlap items */}
-      <text x="280" y="118" textAnchor="middle" fill={p.textPrimary} fontSize="8" fontStyle="italic" opacity="0.8">shared</text>
-      {ov.map((item,i) => <text key={i} x="280" y={133+i*16} textAnchor="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{item.slice(0,18)}</text>)}
+    <svg viewBox="0 0 600 280" className="w-full" style={{ background: p.bg }}>
+      <text x="300" y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{data.title}</text>
+      <circle cx="210" cy="150" r="110" fill={p.accent} fillOpacity="0.38" stroke={p.accent} strokeWidth="2"/>
+      <circle cx="390" cy="150" r="110" fill={p.accent2} fillOpacity="0.32" stroke={p.accent2} strokeWidth="2"/>
+      <text x="133" y="70" textAnchor="middle" fill={p.textPrimary} fontSize="10" fontWeight="bold">{(data.left?.label || '').slice(0, 14)}</text>
+      {li.map((item, i) => {
+        const lines = svgLines(item, 14, 2);
+        return lines.map((ln, j) => <text key={`${i}-${j}`} x="133" y={88 + i * 26 + j * 13} textAnchor="middle" fill={p.textPrimary} fontSize="8.5">{ln}</text>);
+      })}
+      <text x="467" y="70" textAnchor="middle" fill={p.textPrimary} fontSize="10" fontWeight="bold">{(data.right?.label || '').slice(0, 14)}</text>
+      {ri.map((item, i) => {
+        const lines = svgLines(item, 14, 2);
+        return lines.map((ln, j) => <text key={`${i}-${j}`} x="467" y={88 + i * 26 + j * 13} textAnchor="middle" fill={p.textPrimary} fontSize="8.5">{ln}</text>);
+      })}
+      <text x="300" y="118" textAnchor="middle" fill={p.textPrimary} fontSize="8" fontStyle="italic" opacity="0.75">both</text>
+      {ov.map((item, i) => {
+        const lines = svgLines(item, 13, 2);
+        return lines.map((ln, j) => <text key={`${i}-${j}`} x="300" y={132 + i * 26 + j * 13} textAnchor="middle" fill={p.textPrimary} fontSize="8.5" fontWeight="bold">{ln}</text>);
+      })}
     </svg>
   );
 }
 
+// Pyramid: triangular wedge shape, widening toward base — labels INSIDE each band
 function PyramidVisual({ data, p }: { data: PyramidData; p: Palette }) {
-  const levels=(data.levels||[]).slice(0,5);
-  const n=Math.max(levels.length,1);
-  const W=440, totalH=240, padTop=28;
-  const levelH=totalH/n, maxW=W-40;
+  const levels = (data.levels || []).slice(0, 5);
+  const n = Math.max(levels.length, 1);
+  const W = 520, totalH = 260, padTop = 30, levelH = totalH / n, maxW = W - 60;
   return (
-    <svg viewBox={`0 0 ${W} ${totalH+padTop+28}`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      {levels.map((level,i) => {
-        const topW=i===0?50:maxW*(i/n), botW=maxW*((i+1)/n);
-        const y=padTop+i*levelH;
-        const lT=(W-topW)/2,rT=(W+topW)/2,lB=(W-botW)/2,rB=(W+botW)/2;
-        const pts=`${lT},${y} ${rT},${y} ${rB},${y+levelH-2} ${lB},${y+levelH-2}`;
-        const opacity=1-i*0.12, midY=y+levelH/2;
+    <svg viewBox={`0 0 ${W} ${totalH + padTop + 30}`} className="w-full" style={{ background: p.bg }}>
+      <text x={W / 2} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      {levels.map((level, i) => {
+        const topW = i === 0 ? 60 : maxW * (i / n), botW = maxW * ((i + 1) / n);
+        const y = padTop + i * levelH;
+        const lT = (W - topW) / 2, rT = (W + topW) / 2, lB = (W - botW) / 2, rB = (W + botW) / 2;
+        const opacity = 0.95 - i * 0.11, midY = y + levelH / 2;
+        const lbl = svgLines(level.label || '', 24, 1);
+        const desc = svgLines(level.description || '', 34, 2);
         return (
           <g key={i}>
-            <polygon points={pts} fill={p.accent} opacity={opacity}/>
+            <polygon points={`${lT},${y} ${rT},${y} ${rB},${y + levelH - 2} ${lB},${y + levelH - 2}`} fill={p.accent} opacity={opacity}/>
             <line x1={lT} y1={y} x2={rT} y2={y} stroke={p.bg} strokeWidth="1.5"/>
-            <text x={W/2} y={midY-3} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9.5" fontWeight="bold">{(level.label||"").slice(0,22)}</text>
-            <text x={W/2} y={midY+11} textAnchor="middle" fill="rgba(255,255,255,0.72)" fontSize="8">{(level.description||"").slice(0,30)}</text>
+            {lbl.map((ln, j) => <text key={j} x={W / 2} y={midY - 5 - (desc.length - 1) * 5 + j * 13} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9.5" fontWeight="bold">{ln}</text>)}
+            {desc.map((ln, j) => <text key={j} x={W / 2} y={midY + 9 + j * 11} textAnchor="middle" fill="rgba(255,255,255,0.78)" fontSize="8">{ln}</text>)}
           </g>
         );
       })}
@@ -643,45 +684,55 @@ function PyramidVisual({ data, p }: { data: PyramidData; p: Palette }) {
   );
 }
 
+// Funnel: visually DISTINCT from Pyramid — labels outside on the RIGHT with leader lines; spout at bottom
 function FunnelVisual({ data, p }: { data: FunnelData; p: Palette }) {
-  const stages=(data.stages||[]).slice(0,6);
-  const n=Math.max(stages.length,1);
-  const W=440, totalH=240, padTop=28, lH=totalH/n, maxW=W-40, minW=50;
+  const stages = (data.stages || []).slice(0, 6);
+  const n = Math.max(stages.length, 1);
+  const fX = 28, fW = 210, padTop = 30, lH = 44, totalH = lH * n, minW = 34;
+  const W = 600;
+  const cols = [p.accent, p.accent2, p.accent3, p.accent, p.accent2, p.accent3];
   return (
-    <svg viewBox={`0 0 ${W} ${totalH+padTop+20}`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      {stages.map((stage,i) => {
-        const topW=Math.max(maxW*(n-i)/n,minW), botW=Math.max(maxW*(n-i-1)/n,minW);
-        const y=padTop+i*lH;
-        const lT=(W-topW)/2,rT=(W+topW)/2,lB=(W-botW)/2,rB=(W+botW)/2;
-        const pts=`${lT},${y} ${rT},${y} ${rB},${y+lH-2} ${lB},${y+lH-2}`;
-        const opacity=1-i*0.12, midY=y+lH/2;
+    <svg viewBox={`0 0 ${W} ${totalH + padTop + 28}`} className="w-full" style={{ background: p.bg }}>
+      <text x={W / 2} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      {stages.map((stage, i) => {
+        const topW = Math.max(fW - i * (fW - minW) / n, minW);
+        const botW = Math.max(fW - (i + 1) * (fW - minW) / n, minW);
+        const y = padTop + i * lH;
+        const lT = fX + (fW - topW) / 2, rT = fX + (fW + topW) / 2;
+        const lB = fX + (fW - botW) / 2, rB = fX + (fW + botW) / 2;
+        const midY = y + lH / 2, col = cols[i % cols.length];
+        const lbl = svgLines(stage.label || '', 22, 2);
+        const det = svgLines(stage.detail || '', 26, 2);
         return (
           <g key={i}>
-            <polygon points={pts} fill={p.accent} opacity={opacity}/>
-            <line x1={lT} y1={y} x2={rT} y2={y} stroke={p.bg} strokeWidth="1"/>
-            <text x={W/2} y={midY-3} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9.5" fontWeight="bold">{(stage.label||"").slice(0,22)}</text>
-            <text x={W/2} y={midY+11} textAnchor="middle" fill="rgba(255,255,255,0.72)" fontSize="8">{(stage.detail||"").slice(0,28)}</text>
+            <polygon points={`${lT},${y} ${rT},${y} ${rB},${y + lH - 1} ${lB},${y + lH - 1}`} fill={col} opacity={0.78 - i * 0.06}/>
+            <text x={lT + 10} y={midY + 4} dominantBaseline="middle" fill={p.bg} fontSize="8" fontWeight="bold" opacity="0.9">{i + 1}</text>
+            <line x1={rT} y1={midY} x2={fX + fW + 14} y2={midY} stroke={col} strokeWidth="1" opacity="0.65"/>
+            {lbl.map((ln, j) => <text key={j} x={fX + fW + 18} y={midY - 4 + j * 12} fill={p.textPrimary} fontSize="9" fontWeight="bold">{ln}</text>)}
+            {det.map((ln, j) => <text key={j} x={fX + fW + 18} y={midY - 4 + lbl.length * 12 + 4 + j * 11} fill={p.textSecondary} fontSize="7.5">{ln}</text>)}
           </g>
         );
       })}
+      <line x1={fX + fW / 2 - 17} y1={padTop + totalH} x2={fX + fW / 2 - 9} y2={padTop + totalH + 14} stroke={p.accent2} strokeWidth="1.5"/>
+      <line x1={fX + fW / 2 + 17} y1={padTop + totalH} x2={fX + fW / 2 + 9} y2={padTop + totalH + 14} stroke={p.accent2} strokeWidth="1.5"/>
+      <circle cx={fX + fW / 2} cy={padTop + totalH + 20} r="7" fill={p.accent2}/>
     </svg>
   );
 }
 
 function FrameworkVisual({ data, p }: { data: FrameworkData; p: Palette }) {
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-      <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-        <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
       </div>
       <div className="p-3 space-y-2">
-        {(data.levels||[]).map((level,i) => (
-          <div key={i} className="rounded-lg px-3 py-2.5 border" style={{ background:p.surface, borderColor:i===0?p.accent:p.line }}>
-            <div className="font-bold text-xs mb-1.5" style={{ color:p.accent2 }}>{level.label}</div>
+        {(data.levels || []).map((level, i) => (
+          <div key={i} className="rounded-lg px-3 py-2.5 border" style={{ background: p.surface, borderColor: i === 0 ? p.accent : p.line }}>
+            <div className="font-bold text-xs mb-1.5" style={{ color: p.accent2 }}>{level.label}</div>
             <div className="flex flex-wrap gap-1.5">
-              {(level.items||[]).map((item,j) => (
-                <span key={j} className="px-2 py-0.5 rounded-full text-xs" style={{ background:p.surface2, color:p.textSecondary }}>{item}</span>
+              {(level.items || []).map((item, j) => (
+                <span key={j} className="px-2 py-0.5 rounded-full text-xs" style={{ background: p.surface2, color: p.textSecondary }}>{item}</span>
               ))}
             </div>
           </div>
@@ -693,24 +744,22 @@ function FrameworkVisual({ data, p }: { data: FrameworkData; p: Palette }) {
 
 function DataVisual({ data, p, variant }: { data: DataFactsData; p: Palette; variant?: number }) {
   if (variant === 5) {
-    // Horizontal bars
-    const max = Math.max(...(data.facts||[]).map((_,i)=>100-i*8),1);
     return (
-      <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-        <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-          <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+      <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+        <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+          <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
         </div>
         <div className="p-4 space-y-3">
-          {(data.facts||[]).slice(0,6).map((fact,i) => {
-            const pct=Math.max(20,100-i*12);
+          {(data.facts || []).slice(0, 6).map((fact, i) => {
+            const pct = Math.max(20, 100 - i * 12);
             return (
               <div key={i}>
                 <div className="flex justify-between mb-1">
-                  <span className="text-xs font-semibold" style={{ color:p.textPrimary }}>{fact.label}</span>
-                  <span className="text-xs" style={{ color:p.textSecondary }}>{fact.detail.slice(0,20)}</span>
+                  <span className="text-xs font-semibold" style={{ color: p.textPrimary }}>{fact.label}</span>
+                  <span className="text-xs" style={{ color: p.textSecondary }}>{fact.detail.slice(0, 28)}</span>
                 </div>
-                <div className="h-2 rounded-full overflow-hidden" style={{ background:p.surface2 }}>
-                  <div className="h-full rounded-full transition-all" style={{ width:`${pct}%`, background:i%2===0?p.accent:p.accent2 }}/>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: p.surface2 }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: i % 2 === 0 ? p.accent : p.accent2 }}/>
                 </div>
               </div>
             );
@@ -720,15 +769,15 @@ function DataVisual({ data, p, variant }: { data: DataFactsData; p: Palette; var
     );
   }
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-      <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-        <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
       </div>
       <div className="p-3 grid grid-cols-2 gap-2">
-        {(data.facts||[]).map((fact,i) => (
-          <div key={i} className="rounded-lg p-3 border-l-2" style={{ background:p.surface, borderLeftColor:i%2===0?p.accent:p.accent2 }}>
-            <div className="font-semibold text-xs mb-1" style={{ color:p.accent2 }}>{fact.label}</div>
-            <div className="text-xs leading-relaxed" style={{ color:p.textSecondary }}>{fact.detail}</div>
+        {(data.facts || []).map((fact, i) => (
+          <div key={i} className="rounded-lg p-3 border-l-2" style={{ background: p.surface, borderLeftColor: i % 2 === 0 ? p.accent : p.accent2 }}>
+            <div className="font-semibold text-xs mb-1" style={{ color: p.accent2 }}>{fact.label}</div>
+            <div className="text-xs leading-relaxed" style={{ color: p.textSecondary }}>{fact.detail}</div>
           </div>
         ))}
       </div>
@@ -737,42 +786,48 @@ function DataVisual({ data, p, variant }: { data: DataFactsData; p: Palette; var
 }
 
 function CauseEffectVisual({ data, p }: { data: CauseEffectData; p: Palette }) {
-  const causes=(data.causes||[]).slice(0,6);
-  const top=causes.filter((_,i)=>i%2===0).slice(0,3);
-  const bot=causes.filter((_,i)=>i%2===1).slice(0,3);
-  const spY=140, anchorsT=[140,265,390], anchorsB=[195,320,445], bLen=65;
+  const causes = (data.causes || []).slice(0, 6);
+  const top = causes.filter((_, i) => i % 2 === 0).slice(0, 3);
+  const bot = causes.filter((_, i) => i % 2 === 1).slice(0, 3);
+  const spY = 152, anchT = [110, 270, 430], anchB = [190, 350, 490], bLen = 60;
   return (
-    <svg viewBox="0 0 560 290" className="w-full" style={{ background:p.bg }}>
-      <text x="280" y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+    <svg viewBox="0 0 620 310" className="w-full" style={{ background: p.bg }}>
+      <text x="310" y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
       <defs><marker id={`fe${p.id}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill={p.accent}/></marker></defs>
-      <line x1="28" y1={spY} x2="478" y2={spY} stroke={p.accent} strokeWidth="2.5" markerEnd={`url(#fe${p.id})`}/>
-      <rect x="482" y={spY-28} width="72" height="56" rx="8" fill={p.surface} stroke={p.accent} strokeWidth="1.5"/>
-      {(data.effect||"Effect").split(" ").slice(0,3).map((w,j)=>(
-        <text key={j} x="518" y={spY-10+j*14} textAnchor="middle" fill={p.accent2} fontSize="9" fontWeight="bold">{w.slice(0,10)}</text>
+      <line x1="26" y1={spY} x2="518" y2={spY} stroke={p.accent} strokeWidth="2.5" markerEnd={`url(#fe${p.id})`}/>
+      <rect x="522" y={spY - 34} width="92" height="68" rx="8" fill={p.surface} stroke={p.accent} strokeWidth="1.5"/>
+      {svgLines(data.effect || 'Effect', 11, 3).map((w, j) => (
+        <text key={j} x="568" y={spY - 15 + j * 16} textAnchor="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{w}</text>
       ))}
-      {top.map((cause,i) => {
-        const ax=anchorsT[i]??200, bx=ax-bLen, by=spY-bLen;
+      {top.map((cat, i) => {
+        const ax = anchT[i] ?? 110, bx = ax, by = spY - bLen;
+        const lbl = svgLines(cat.category || '', 14, 2);
+        const items = (cat.items || []).slice(0, 2);
         return (
           <g key={i}>
             <line x1={bx} y1={by} x2={ax} y2={spY} stroke={p.line} strokeWidth="1.5"/>
-            <rect x={bx-48} y={by-18} width={96} height={36} rx="8" fill={p.surface} stroke={p.accent2} strokeWidth="1"/>
-            <text x={bx} y={by-5} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{(cause.category||"").slice(0,14)}</text>
-            {(cause.items||[]).slice(0,2).map((item,j)=>(
-              <text key={j} x={bx} y={by-36-j*14} textAnchor="middle" fill={p.textSecondary} fontSize="8">· {item.slice(0,16)}</text>
-            ))}
+            <rect x={bx - 56} y={by - 46 - Math.max(lbl.length - 1, 0) * 12} width={112} height={46 + Math.max(lbl.length - 1, 0) * 12} rx="7" fill={p.surface} stroke={p.accent2} strokeWidth="1"/>
+            {lbl.map((ln, j) => <text key={j} x={bx} y={by - 32 + j * 13} textAnchor="middle" fill={p.accent2} fontSize="8.5" fontWeight="bold">{ln}</text>)}
+            {items.map((it, j) => {
+              const il = svgLines(it, 16, 1);
+              return il.map((ln, k) => <text key={`${j}-${k}`} x={bx} y={by - 13 + j * 12 + k * 12} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">· {ln}</text>);
+            })}
           </g>
         );
       })}
-      {bot.map((cause,i) => {
-        const ax=anchorsB[i]??250, bx=ax-bLen, by=spY+bLen;
+      {bot.map((cat, i) => {
+        const ax = anchB[i] ?? 190, bx = ax, by = spY + bLen;
+        const lbl = svgLines(cat.category || '', 14, 2);
+        const items = (cat.items || []).slice(0, 2);
         return (
           <g key={i}>
             <line x1={bx} y1={by} x2={ax} y2={spY} stroke={p.line} strokeWidth="1.5"/>
-            <rect x={bx-48} y={by-18} width={96} height={36} rx="8" fill={p.surface} stroke={p.accent2} strokeWidth="1"/>
-            <text x={bx} y={by-5} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{(cause.category||"").slice(0,14)}</text>
-            {(cause.items||[]).slice(0,2).map((item,j)=>(
-              <text key={j} x={bx} y={by+28+j*13} textAnchor="middle" fill={p.textSecondary} fontSize="8">· {item.slice(0,16)}</text>
-            ))}
+            <rect x={bx - 56} y={by} width={112} height={46 + Math.max(lbl.length - 1, 0) * 12} rx="7" fill={p.surface} stroke={p.accent2} strokeWidth="1"/>
+            {lbl.map((ln, j) => <text key={j} x={bx} y={by + 14 + j * 13} textAnchor="middle" fill={p.accent2} fontSize="8.5" fontWeight="bold">{ln}</text>)}
+            {items.map((it, j) => {
+              const il = svgLines(it, 16, 1);
+              return il.map((ln, k) => <text key={`${j}-${k}`} x={bx} y={by + 30 + lbl.length * 13 + j * 12 + k * 12} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">· {ln}</text>);
+            })}
           </g>
         );
       })}
@@ -781,28 +836,32 @@ function CauseEffectVisual({ data, p }: { data: CauseEffectData; p: Palette }) {
 }
 
 function RoadmapVisual({ data, p }: { data: RoadmapData; p: Palette }) {
-  const ms=(data.milestones||[]).slice(0,5);
-  const n=Math.max(ms.length,1);
-  const W=560, railY=100, sp=(W-80)/n;
+  const ms = (data.milestones || []).slice(0, 5);
+  const n = Math.max(ms.length, 1);
+  const W = 640, railY = 110, sp = (W - 60) / n;
   return (
-    <svg viewBox={`0 0 ${W} 240`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{data.title}</text>
-      <line x1="40" y1={railY} x2={W-40} y2={railY} stroke={p.line} strokeWidth="3" strokeLinecap="round"/>
-      {ms.map((m,i) => {
-        const x=40+sp*i+sp/2, above=i%2===0;
-        const topY=above?railY-72:railY+72;
-        const lineY2=above?railY-14:railY+14;
+    <svg viewBox={`0 0 ${W} 290`} className="w-full" style={{ background: p.bg }}>
+      <text x={W / 2} y="22" textAnchor="middle" fill={p.accent2} fontSize="12" fontWeight="bold">{data.title}</text>
+      <line x1="30" y1={railY} x2={W - 30} y2={railY} stroke={p.line} strokeWidth="3" strokeLinecap="round"/>
+      {ms.map((m, i) => {
+        const x = 30 + sp * i + sp / 2, above = i % 2 === 0;
+        const phase = svgLines(m.phase || '', 10, 1);
+        const lbl = svgLines(m.label || '', 15, 2);
+        const items = (m.items || []).slice(0, 2);
+        const boxH = 18 + phase.length * 11 + lbl.length * 12 + items.length * 12;
+        const boxY = above ? railY - boxH - 14 : railY + 14;
         return (
           <g key={i}>
-            <line x1={x} y1={railY} x2={x} y2={lineY2} stroke={p.accent} strokeWidth="1.5" strokeDasharray="4,3"/>
-            <circle cx={x} cy={railY} r="12" fill={p.accent}/>
-            <text x={x} y={railY+1} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="8" fontWeight="bold">{i+1}</text>
-            <rect x={x-52} y={topY-32} width={104} height={64} rx="8" fill={p.surface} stroke={p.accent} strokeWidth="1"/>
-            <text x={x} y={topY-16} textAnchor="middle" fill={p.accent2} fontSize="8.5" fontWeight="bold">{(m.phase||"").slice(0,12)}</text>
-            <text x={x} y={topY} textAnchor="middle" fill={p.textPrimary} fontSize="8.5">{(m.label||"").slice(0,16)}</text>
-            {(m.items||[]).slice(0,2).map((it,j)=>(
-              <text key={j} x={x} y={topY+14+j*12} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">· {it.slice(0,14)}</text>
-            ))}
+            <circle cx={x} cy={railY} r="12" fill={i % 2 === 0 ? p.accent : p.accent2} stroke={p.bg} strokeWidth="2"/>
+            <text x={x} y={railY + 1} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="8" fontWeight="bold">{i + 1}</text>
+            <line x1={x} y1={above ? railY - 12 : railY + 12} x2={x} y2={above ? boxY + boxH : boxY} stroke={p.line} strokeWidth="1" strokeDasharray="3,2"/>
+            <rect x={x - 62} y={boxY} width={124} height={boxH} rx="8" fill={p.surface} stroke={i % 2 === 0 ? p.accent : p.accent2} strokeWidth="1.5"/>
+            {phase.map((ln, j) => <text key={j} x={x} y={boxY + 12 + j * 11} textAnchor="middle" fill={i % 2 === 0 ? p.accent : p.accent2} fontSize="7.5" fontWeight="bold">{ln}</text>)}
+            {lbl.map((ln, j) => <text key={j} x={x} y={boxY + 12 + phase.length * 11 + 2 + j * 12} textAnchor="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{ln}</text>)}
+            {items.map((it, j) => {
+              const il = svgLines(it, 17, 1);
+              return il.map((ln, k) => <text key={`${j}-${k}`} x={x} y={boxY + 12 + phase.length * 11 + 2 + lbl.length * 12 + 4 + j * 12 + k * 12} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">· {ln}</text>);
+            })}
           </g>
         );
       })}
@@ -811,58 +870,69 @@ function RoadmapVisual({ data, p }: { data: RoadmapData; p: Palette }) {
 }
 
 function MatrixVisual({ data, p }: { data: MatrixData; p: Palette }) {
-  const qs=(data.quadrants||[]).slice(0,4);
+  const qs = (data.quadrants || []).slice(0, 4);
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background:p.bg }}>
-      <div className="px-4 py-3 text-center border-b" style={{ borderColor:p.line }}>
-        <span className="font-bold text-sm" style={{ color:p.accent2 }}>{data.title}</span>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-3 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
       </div>
       <div className="p-3">
-        <div className="grid grid-cols-2 gap-px rounded-lg overflow-hidden" style={{ background:p.line }}>
-          {[{q:qs[0],pos:"TL"},{q:qs[1],pos:"TR"},{q:qs[2],pos:"BL"},{q:qs[3],pos:"BR"}].map(({q,pos},i)=>(
-            <div key={i} className="p-3 min-h-[80px]" style={{ background:i%2===0?p.surface:p.surface2 }}>
-              <div className="font-bold text-xs mb-2" style={{ color:[p.accent2,p.accent,p.textSecondary,p.accent3][i] }}>{q?.label||`Q${i+1}`}</div>
-              {(q?.items||[]).slice(0,3).map((item,j)=>(
-                <div key={j} className="text-[10px] mb-0.5" style={{ color:p.textSecondary }}>· {item}</div>
+        <div className="grid grid-cols-2 gap-px rounded-lg overflow-hidden" style={{ background: p.line }}>
+          {[{ q: qs[0] }, { q: qs[1] }, { q: qs[2] }, { q: qs[3] }].map(({ q }, i) => (
+            <div key={i} className="p-3 min-h-[90px]" style={{ background: i % 2 === 0 ? p.surface : p.surface2 }}>
+              <div className="font-bold text-xs mb-2" style={{ color: [p.accent2, p.accent, p.textSecondary, p.accent3][i] }}>{q?.label || `Q${i + 1}`}</div>
+              {(q?.items || []).map((item, j) => (
+                <div key={j} className="text-[10px] mb-0.5 leading-snug" style={{ color: p.textSecondary }}>· {item}</div>
               ))}
             </div>
           ))}
         </div>
         <div className="flex justify-between mt-2 px-1">
-          <span className="text-[9px]" style={{ color:p.textSecondary }}>← {(data.xAxis||"").split("→")[0]?.trim()}</span>
-          <span className="text-[9px]" style={{ color:p.textSecondary }}>{(data.xAxis||"").split("→")[1]?.trim()||""} →</span>
+          <span className="text-[9px]" style={{ color: p.textSecondary }}>← {(data.xAxis || '').split('→')[0]?.trim()}</span>
+          <span className="text-[9px]" style={{ color: p.textSecondary }}>{(data.xAxis || '').split('→')[1]?.trim() || ''} →</span>
         </div>
       </div>
     </div>
   );
 }
 
+// Network: DISTINCT from MindMap — diamond center, square peripheral nodes, edge labels on connecting lines
 function NetworkVisual({ data, p }: { data: NetworkData; p: Palette }) {
-  const nodes=(data.nodes||[]).slice(0,7);
-  const n=Math.max(nodes.length,1);
-  const cx=280, cy=155, r=115;
+  const nodes = (data.nodes || []).slice(0, 7);
+  const n = Math.max(nodes.length, 1);
+  const cx = 300, cy = 162, r = 122;
+  const positions = nodes.map((_, i) => {
+    const angle = (i / n * 360 - 90) * Math.PI / 180;
+    const rv = r + (i % 2 === 0 ? 0 : 28);
+    return { x: cx + rv * Math.cos(angle), y: cy + rv * Math.sin(angle) };
+  });
   return (
-    <svg viewBox="0 0 560 310" className="w-full" style={{ background:p.bg }}>
-      <text x={cx} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      {nodes.map((_,i)=>{
-        const angle=((i/n)*360-90)*Math.PI/180;
-        const nx=cx+r*Math.cos(angle), ny=cy+r*Math.sin(angle);
-        return <line key={i} x1={cx} y1={cy} x2={nx} y2={ny} stroke={p.line} strokeWidth="1.5" strokeDasharray="5,3"/>;
-      })}
-      <circle cx={cx} cy={cy} r={42} fill={p.accent}/>
-      {data.center.split(" ").slice(0,2).map((w,j)=>(
-        <text key={j} x={cx} y={cy-5+j*14} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="10" fontWeight="bold">{w.slice(0,14)}</text>
-      ))}
-      {nodes.map((node,i)=>{
-        const angle=((i/n)*360-90)*Math.PI/180;
-        const nx=cx+r*Math.cos(angle), ny=cy+r*Math.sin(angle);
+    <svg viewBox="0 0 600 324" className="w-full" style={{ background: p.bg }}>
+      <text x={cx} y="20" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      {positions.map((pos, i) => {
+        const rel = svgLines(nodes[i].relation || '', 13, 1);
+        const mx = (cx + pos.x) / 2, my = (cy + pos.y) / 2;
         return (
           <g key={i}>
-            <circle cx={nx} cy={ny} r={26} fill={p.surface} stroke={p.accent2} strokeWidth="1.5"/>
-            {node.label.split(" ").slice(0,2).map((w,j)=>(
-              <text key={j} x={nx} y={ny-3+j*11} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="8.5" fontWeight="bold">{w.slice(0,10)}</text>
+            <line x1={cx} y1={cy} x2={pos.x} y2={pos.y} stroke={p.line} strokeWidth="1.5" strokeDasharray="4,3"/>
+            {rel.map((ln, j) => (
+              <text key={j} x={mx} y={my - 3 + j * 10} textAnchor="middle" fill={p.textSecondary} fontSize="7" opacity="0.85">{ln}</text>
             ))}
-            <text x={nx} y={ny+36} textAnchor="middle" fill={p.textSecondary} fontSize="7">{(node.relation||"").slice(0,18)}</text>
+          </g>
+        );
+      })}
+      {/* Center: diamond shape — visually distinct from MindMap's circle */}
+      <polygon points={`${cx},${cy - 38} ${cx + 38},${cy} ${cx},${cy + 38} ${cx - 38},${cy}`} fill={p.accent} stroke={p.bg} strokeWidth="2"/>
+      {svgLines(data.center || '', 10, 2).map((w, j) => (
+        <text key={j} x={cx} y={cy - 6 + j * 14} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="9" fontWeight="bold">{w}</text>
+      ))}
+      {/* Peripheral nodes: sharp-cornered rectangles — distinct from MindMap's rounded pill */}
+      {positions.map((pos, i) => {
+        const lbl = svgLines(nodes[i].label || '', 12, 2);
+        return (
+          <g key={i}>
+            <rect x={pos.x - 40} y={pos.y - 24} width={80} height={48} rx="4" fill={p.surface} stroke={p.accent2} strokeWidth="1.5"/>
+            {lbl.map((ln, j) => <text key={j} x={pos.x} y={pos.y - 7 + j * 14} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="8.5" fontWeight="bold">{ln}</text>)}
           </g>
         );
       })}
@@ -871,21 +941,23 @@ function NetworkVisual({ data, p }: { data: NetworkData; p: Palette }) {
 }
 
 function StaircaseVisual({ data, p }: { data: StaircaseData; p: Palette }) {
-  const steps=(data.steps||[]).slice(0,6);
-  const n=Math.max(steps.length,1);
-  const W=540, H=200, sW=W/n, sH=H/n;
+  const steps = (data.steps || []).slice(0, 6);
+  const n = Math.max(steps.length, 1);
+  const W = 600, H = 210, sW = W / n, sH = H / n;
   return (
-    <svg viewBox={`0 0 ${W} ${H+55}`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      {steps.map((step,i)=>{
-        const x=i*sW, y=H-(i+1)*sH+32, opacity=0.45+i*0.1;
+    <svg viewBox={`0 0 ${W} ${H + 70}`} className="w-full" style={{ background: p.bg }}>
+      <text x={W / 2} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      {steps.map((step, i) => {
+        const x = i * sW, y = H - (i + 1) * sH + 32, opacity = 0.42 + i * 0.11;
+        const lbl = svgLines(step.label || '', 13, 2);
+        const det = svgLines(step.detail || '', 15, 2);
         return (
           <g key={i}>
-            <rect x={x} y={y} width={sW*(n-i)} height={sH*(i+1)} fill={p.accent} opacity={opacity}/>
-            <rect x={x} y={y} width={sW} height={sH} fill={p.accent2} opacity={0.95}/>
-            <text x={x+sW/2} y={y+sH/2-4} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="9" fontWeight="bold">{(step.label||"").slice(0,13)}</text>
-            <text x={x+sW/2} y={y+sH/2+8} textAnchor="middle" fill={p.bg} fontSize="7" opacity="0.85">{(step.detail||"").slice(0,16)}</text>
-            <text x={x+sW/2} y={y-8} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">{i+1}</text>
+            <rect x={x} y={y} width={sW * (n - i)} height={sH * (i + 1)} fill={p.accent} opacity={opacity}/>
+            <rect x={x} y={y} width={sW} height={sH * (i + 1)} fill={p.accent2} opacity={0.90}/>
+            {lbl.map((ln, j) => <text key={j} x={x + sW / 2} y={y + sH / 2 - 8 + j * 13} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="8.5" fontWeight="bold">{ln}</text>)}
+            {det.map((ln, j) => <text key={j} x={x + sW / 2} y={y + sH / 2 + 12 + lbl.length * 4 + j * 11} textAnchor="middle" fill={p.bg} fontSize="7" opacity="0.85">{ln}</text>)}
+            <text x={x + sW / 2} y={y - 7} textAnchor="middle" fill={p.textSecondary} fontSize="8">{i + 1}</text>
           </g>
         );
       })}
@@ -893,31 +965,49 @@ function StaircaseVisual({ data, p }: { data: StaircaseData; p: Palette }) {
   );
 }
 
+// HexCluster: TRUE honeycomb grid — adjacent hexes touching, DISTINCT from Network hub-spoke
 function HexclusterVisual({ data, p }: { data: HexclusterData; p: Palette }) {
-  const hexes=(data.hexes||[]).slice(0,6);
-  const n=Math.max(hexes.length,1);
-  const cx=280, cy=155, r=108, hr=38;
-  function hexPts(hx:number,hy:number,hr:number){
-    return Array.from({length:6},(_,i)=>{const a=(Math.PI/180)*(60*i-30);return `${hx+hr*Math.cos(a)},${hy+hr*Math.sin(a)}`;}).join(" L ");
+  const hexes = (data.hexes || []).slice(0, 6);
+  const HR = 46;
+  const hexH = HR * Math.sqrt(3);
+  function hexPts(hx: number, hy: number, hr: number) {
+    return Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i - Math.PI / 6;
+      return `${hx + hr * Math.cos(a)},${hy + hr * Math.sin(a)}`;
+    }).join(' ');
   }
+  const cx = 300, cy = 196;
+  const ring = [
+    { x: cx, y: cy },
+    { x: cx + HR * 1.5, y: cy - hexH / 2 },
+    { x: cx + HR * 1.5, y: cy + hexH / 2 },
+    { x: cx, y: cy - hexH },
+    { x: cx - HR * 1.5, y: cy - hexH / 2 },
+    { x: cx - HR * 1.5, y: cy + hexH / 2 },
+    { x: cx, y: cy + hexH },
+  ];
+  const centerPos = ring[0];
+  const periPos = ring.slice(1, hexes.length + 1);
   return (
-    <svg viewBox="0 0 560 310" className="w-full" style={{ background:p.bg }}>
+    <svg viewBox="0 0 600 392" className="w-full" style={{ background: p.bg }}>
       <text x={cx} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      <path d={`M ${hexPts(cx,cy,48)} Z`} fill={p.accent}/>
-      {data.center.split(" ").slice(0,2).map((w,j)=>(
-        <text key={j} x={cx} y={cy-4+j*13} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="10" fontWeight="bold">{w.slice(0,12)}</text>
+      <polygon points={hexPts(centerPos.x, centerPos.y, HR)} fill={p.accent} stroke={p.bg} strokeWidth="2"/>
+      {svgLines(data.center || '', 10, 2).map((w, j) => (
+        <text key={j} x={centerPos.x} y={centerPos.y - 5 + j * 14} textAnchor="middle" dominantBaseline="middle" fill={p.bg} fontSize="10" fontWeight="bold">{w}</text>
       ))}
-      {hexes.map((hex,i)=>{
-        const angle=((i/n)*360-90)*Math.PI/180;
-        const hx=cx+r*Math.cos(angle), hy=cy+r*Math.sin(angle);
+      {hexes.map((hex, i) => {
+        const pos = periPos[i];
+        if (!pos) return null;
+        const lbl = svgLines(hex.label || '', 10, 2);
+        const det = svgLines(hex.detail || '', 13, 2);
+        const col = i % 2 === 0 ? p.accent2 : p.surface2;
+        const textCol = i % 2 === 0 ? p.bg : p.textPrimary;
+        const detCol = i % 2 === 0 ? p.bg : p.textSecondary;
         return (
           <g key={i}>
-            <line x1={cx} y1={cy} x2={hx} y2={hy} stroke={p.line} strokeWidth="1.2"/>
-            <path d={`M ${hexPts(hx,hy,hr)} Z`} fill={p.surface} stroke={p.accent2} strokeWidth="1.5"/>
-            {hex.label.split(" ").slice(0,2).map((w,j)=>(
-              <text key={j} x={hx} y={hy-3+j*12} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{w.slice(0,10)}</text>
-            ))}
-            <text x={hx} y={hy+hr+12} textAnchor="middle" fill={p.textSecondary} fontSize="7.5">{(hex.detail||"").slice(0,18)}</text>
+            <polygon points={hexPts(pos.x, pos.y, HR)} fill={col} stroke={p.accent} strokeWidth="1.5"/>
+            {lbl.map((ln, j) => <text key={j} x={pos.x} y={pos.y - 8 + j * 13} textAnchor="middle" dominantBaseline="middle" fill={textCol} fontSize="8.5" fontWeight="bold">{ln}</text>)}
+            {det.map((ln, j) => <text key={j} x={pos.x} y={pos.y + 18 + j * 11} textAnchor="middle" fill={detCol} fontSize="7.5" opacity="0.88">{ln}</text>)}
           </g>
         );
       })}
@@ -926,37 +1016,32 @@ function HexclusterVisual({ data, p }: { data: HexclusterData; p: Palette }) {
 }
 
 function ConcentricVisual({ data, p }: { data: ConcentricData; p: Palette }) {
-  // FIXED: each ring has its label positioned at a DIFFERENT angle/side to prevent overlap
-  const rings=(data.rings||[]).slice(0,4);
-  const n=Math.max(rings.length,1);
-  const cx=230, cy=155, maxR=130;
-  // Directions for ring labels: right, left, right, left
-  const directions=[1,-1,1,-1];
+  const rings = (data.rings || []).slice(0, 4);
+  const n = Math.max(rings.length, 1);
+  const cx = 232, cy = 162, maxR = 130;
+  const directions = [1, -1, 1, -1];
   return (
-    <svg viewBox="0 0 560 310" className="w-full" style={{ background:p.bg }}>
-      <text x="280" y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      {/* Rings from outermost to innermost (so inner renders on top) */}
-      {[...rings].reverse().map((ring,ri)=>{
-        const i=n-1-ri;
-        const r=maxR*((i+1)/n);
-        const opacity=0.25+(i/n)*0.55;
-        return <circle key={i} cx={cx} cy={cy} r={r} fill={p.accent} opacity={opacity} stroke={p.bg} strokeWidth="1.5"/>;
+    <svg viewBox="0 0 590 324" className="w-full" style={{ background: p.bg }}>
+      <text x="295" y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      {[...rings].reverse().map((_, ri) => {
+        const i = n - 1 - ri;
+        const r = maxR * ((i + 1) / n);
+        return <circle key={i} cx={cx} cy={cy} r={r} fill={p.accent} opacity={0.20 + (i / n) * 0.60} stroke={p.bg} strokeWidth="1.5"/>;
       })}
-      {/* Labels — each ring at a distinct, non-overlapping position */}
-      {rings.map((ring,i)=>{
-        const r=maxR*((i+1)/n);
-        const dir=directions[i%directions.length];
-        // Label to the right or left of the circle, at different vertical offsets
-        const lx=cx+dir*(r+16);
-        const ly=cy + (i-Math.floor(n/2))*35;
-        // Leader line from ring edge to label
-        const lineX1=cx+dir*r, lineX2=cx+dir*(r+12);
+      {rings.map((ring, i) => {
+        const r = maxR * ((i + 1) / n);
+        const dir = directions[i % directions.length];
+        const lx = cx + dir * (r + 20);
+        const ly = cy + (i - Math.floor(n / 2)) * 44;
+        const lbl = svgLines(ring.label || '', 17, 2);
+        const desc = svgLines(ring.description || '', 20, 2);
+        const boxH = 14 + lbl.length * 12 + desc.length * 11;
         return (
           <g key={i}>
-            <line x1={lineX1} y1={cy} x2={lineX2} y2={ly} stroke={p.accent2} strokeWidth="1" opacity="0.6"/>
-            <rect x={dir>0?lx:lx-120} y={ly-22} width={120} height={44} rx="6" fill={p.surface} stroke={p.accent2} strokeWidth="0.8"/>
-            <text x={dir>0?lx+60:lx-60} y={ly-7} textAnchor="middle" fill={p.textPrimary} fontSize="9.5" fontWeight="bold">{(ring.label||"").slice(0,16)}</text>
-            <text x={dir>0?lx+60:lx-60} y={ly+8} textAnchor="middle" fill={p.textSecondary} fontSize="8">{(ring.description||"").slice(0,22)}</text>
+            <line x1={cx + dir * r} y1={cy} x2={cx + dir * (r + 16)} y2={ly} stroke={p.accent2} strokeWidth="1" opacity="0.55"/>
+            <rect x={dir > 0 ? lx : lx - 132} y={ly - boxH / 2} width={132} height={boxH} rx="6" fill={p.surface} stroke={p.accent2} strokeWidth="0.8"/>
+            {lbl.map((ln, j) => <text key={j} x={dir > 0 ? lx + 66 : lx - 66} y={ly - boxH / 2 + 12 + j * 12} textAnchor="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{ln}</text>)}
+            {desc.map((ln, j) => <text key={j} x={dir > 0 ? lx + 66 : lx - 66} y={ly - boxH / 2 + 12 + lbl.length * 12 + 4 + j * 11} textAnchor="middle" fill={p.textSecondary} fontSize="8">{ln}</text>)}
           </g>
         );
       })}
@@ -964,65 +1049,72 @@ function ConcentricVisual({ data, p }: { data: ConcentricData; p: Palette }) {
   );
 }
 
+// SwimlaneVisual: HTML table — full text, no SVG truncation
 function SwimlaneVisual({ data, p }: { data: SwimlaneData; p: Palette }) {
-  const lanes=(data.lanes||[]).slice(0,3);
-  const maxSteps=Math.max(...lanes.map(l=>(l.steps||[]).length),1);
-  const laneH=72, headerW=88, stepW=Math.min(110,(520-headerW)/maxSteps);
-  const W=headerW+stepW*maxSteps+20, H=24+laneH*lanes.length;
+  const lanes = (data.lanes || []).slice(0, 4);
+  const maxSteps = Math.max(...lanes.map(l => (l.steps || []).length), 1);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="16" textAnchor="middle" fill={p.accent2} fontSize="10" fontWeight="bold">{data.title}</text>
-      {lanes.map((lane,li)=>{
-        const y=24+li*laneH;
-        return (
-          <g key={li}>
-            <rect x={0} y={y} width={headerW} height={laneH} fill={li%2===0?p.accent:p.surface2}/>
-            {lane.actor.split(" ").slice(0,2).map((w,j)=>(
-              <text key={j} x={headerW/2} y={y+laneH/2-5+j*13} textAnchor="middle" dominantBaseline="middle" fill={li%2===0?p.bg:p.textPrimary} fontSize="9" fontWeight="bold">{w.slice(0,10)}</text>
+    <div className="rounded-xl overflow-hidden" style={{ background: p.bg }}>
+      <div className="px-4 py-2 text-center border-b" style={{ borderColor: p.line }}>
+        <span className="font-bold text-sm" style={{ color: p.accent2 }}>{data.title}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-xs" style={{ minWidth: 380 }}>
+          <tbody>
+            {lanes.map((lane, li) => (
+              <tr key={li} style={{ borderBottom: `1px solid ${p.line}` }}>
+                <td className="px-3 py-2 font-bold whitespace-nowrap" style={{ width: 96, background: li % 2 === 0 ? p.accent : p.surface2, color: li % 2 === 0 ? p.bg : p.textPrimary, verticalAlign: 'middle', fontSize: 11 }}>
+                  {lane.actor}
+                </td>
+                {Array.from({ length: maxSteps }).map((_, si) => {
+                  const step = (lane.steps || [])[si];
+                  return (
+                    <td key={si} className="px-2 py-2" style={{ background: li % 2 === 0 ? p.surface : p.bg, verticalAlign: 'top', borderLeft: `1px solid ${p.line}` }}>
+                      {step && (
+                        <div className="rounded px-2 py-1.5" style={{ background: p.surface2, border: `1px solid ${p.accent}30` }}>
+                          <span style={{ color: p.textPrimary, lineHeight: 1.4, fontSize: 11 }}>{step}</span>
+                        </div>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
             ))}
-            <rect x={headerW} y={y} width={W-headerW} height={laneH} fill={li%2===0?p.surface:p.bg}/>
-            <line x1={0} y1={y} x2={W} y2={y} stroke={p.line} strokeWidth="1"/>
-            {(lane.steps||[]).slice(0,maxSteps).map((step,si)=>{
-              const sx=headerW+10+si*stepW;
-              return (
-                <g key={si}>
-                  <rect x={sx} y={y+10} width={stepW-10} height={laneH-20} rx="6" fill={p.surface2} stroke={p.accent} strokeWidth="0.8"/>
-                  <text x={sx+(stepW-10)/2} y={y+laneH/2} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="8">{step.slice(0,14)}</text>
-                </g>
-              );
-            })}
-          </g>
-        );
-      })}
-      <line x1={0} y1={H} x2={W} y2={H} stroke={p.line} strokeWidth="1"/>
-    </svg>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
 function ChevronVisual({ data, p }: { data: ChevronData; p: Palette }) {
-  const steps=(data.steps||[]).slice(0,5);
-  const n=Math.max(steps.length,1);
-  const W=540, H=88, cW=W/n, overlap=18;
+  const steps = (data.steps || []).slice(0, 5);
+  const n = Math.max(steps.length, 1);
+  const W = 580, H = 96, cW = W / n, overlap = 20, y0 = 32;
   return (
-    <svg viewBox={`0 0 ${W} ${H+52}`} className="w-full" style={{ background:p.bg }}>
-      <text x={W/2} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
-      {steps.map((step,i)=>{
-        const x=i*(cW-overlap/n), half=H/2;
-        const opacity=0.55+(i/n)*0.42;
-        const pts=i===n-1
-          ? `${x},30 ${x+cW},30 ${x+cW},${30+H} ${x},${30+H}${i>0?` ${x+18},${30+half}`:""}`
-          : `${x},30 ${x+cW},30 ${x+cW+18},${30+half} ${x+cW},${30+H} ${x},${30+H}${i>0?` ${x+18},${30+half}`:""}`;
+    <svg viewBox={`0 0 ${W} ${H + 64}`} className="w-full" style={{ background: p.bg }}>
+      <text x={W / 2} y="22" textAnchor="middle" fill={p.accent2} fontSize="11" fontWeight="bold">{data.title}</text>
+      {steps.map((step, i) => {
+        const x = i * (cW - overlap / n), half = H / 2;
+        const opacity = 0.52 + (i / n) * 0.44;
+        const cx2 = x + cW / 2 + (i === 0 ? 0 : 11);
+        const pts = i === n - 1
+          ? `${x},${y0} ${x + cW},${y0} ${x + cW},${y0 + H} ${x},${y0 + H}${i > 0 ? ` ${x + 22},${y0 + half}` : ''}`
+          : `${x},${y0} ${x + cW},${y0} ${x + cW + 22},${y0 + half} ${x + cW},${y0 + H} ${x},${y0 + H}${i > 0 ? ` ${x + 22},${y0 + half}` : ''}`;
+        const lbl = svgLines(step.label || '', 12, 2);
+        const det = svgLines(step.detail || '', 14, 2);
         return (
           <g key={i}>
             <polygon points={pts} fill={p.accent} opacity={opacity}/>
-            <text x={x+cW/2+(i===0?0:9)} y={30+half-7} textAnchor="middle" dominantBaseline="middle" fill={p.textPrimary} fontSize="9" fontWeight="bold">{(step.label||"").slice(0,11)}</text>
-            <text x={x+cW/2+(i===0?0:9)} y={30+half+8} textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="7.5">{(step.detail||"").slice(0,13)}</text>
+            {lbl.map((ln, j) => <text key={j} x={cx2} y={y0 + half - 12 + j * 13} textAnchor="middle" fill={p.textPrimary} fontSize="8.5" fontWeight="bold">{ln}</text>)}
+            {det.map((ln, j) => <text key={j} x={cx2} y={y0 + half + 10 + lbl.length * 3 + j * 11} textAnchor="middle" fill="rgba(255,255,255,0.78)" fontSize="7.5">{ln}</text>)}
           </g>
         );
       })}
     </svg>
   );
 }
+
 
 function VisualRenderer({ visual, palette, variant }: { visual: VisualData; palette: Palette; variant?: number }) {
   const p = palette, v = variant ?? 0;
