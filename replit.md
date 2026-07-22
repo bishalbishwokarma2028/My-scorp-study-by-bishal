@@ -1,22 +1,49 @@
 # ScorpStudy
 
-## Overview
-ScorpStudy (by Bishal) is a study-companion web app built with TanStack Start (React 19 + Vite) and Supabase (auth/database/storage). It offers Q&A, problem solving, quiz generation, textbook summarization, and flashcards, powered by a multi-provider AI routing layer (Groq, Groq Compound, Cerebras, OpenRouter, Gemini, Hugging Face) with automatic fallback across pools, plus web search via Tavily/Serper.
+AI-powered study assistant by Bishal. Built with TanStack Start + React + Supabase, with a multi-provider AI routing system.
 
-Imported into Replit from a Lovable-connected zip export.
+## How to run
 
-## Running the project
-- Dev server: `bun run dev` (runs `vite dev`), bound to port 5000. Configured as the "Start application" workflow.
-- Build: `bun run build`; production start: `bun .output/server/index.mjs`.
-- Dependencies are managed with Bun (`bun install`).
+```
+bun run dev
+```
 
-## Environment / secrets
-All required keys are stored as Replit Secrets (not in `.env`, since Replit Secrets don't transfer across zip export/import — see `.env.example` for the full reference list and accepted alternate names). All of the below are configured as of this setup (re-added 2026-07-15 after zip re-import):
-- Supabase: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- AI providers: `GROQ_API_KEY_1..7`, `GROQ_COMPOUND_KEY_1..8`, `CEREBRAS_API_KEY_1..16`, `OPENROUTER_API_KEY`, `HUGGINGFACE_API_KEY`
-- Web search: `TAVILY_API_KEY` (+ `_2..4`), `SERPER_API_KEY`
+Workflow: **Start application** (`bun run dev`) — serves on port 5000.
 
-The app prints a startup warning listing any missing variables.
+## Stack
+
+- **Frontend/SSR**: TanStack Start (Vite + React 19)
+- **Database & Auth**: Supabase (PostgREST, Auth, Storage)
+- **AI providers**: Cerebras (primary) → Groq → OpenRouter → HuggingFace (fallback chain)
+- **Web search**: Tavily (primary) → Serper (fallback / YouTube)
+- **Styling**: Tailwind CSS v4 + shadcn/ui (Radix)
+
+## Environment variables
+
+All secrets are stored in Replit Secrets (never in code or `.env`). See `.env.example` for the full list. Required groups:
+
+| Group | Keys |
+|---|---|
+| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
+| Groq | `GROQ_API_KEY_1` … `GROQ_API_KEY_7` |
+| Groq Compound | `GROQ_COMPOUND_KEY_1` … `GROQ_COMPOUND_KEY_8` |
+| Cerebras | `CEREBRAS_API_KEY_1` … `CEREBRAS_API_KEY_16` |
+| Tavily | `TAVILY_API_KEY`, `TAVILY_API_KEY_2` … `TAVILY_API_KEY_4` |
+| Serper | `SERPER_API_KEY` |
+| HuggingFace | `HUGGINGFACE_API_KEY` |
+| OpenRouter | `OPENROUTER_API_KEY` |
+
+Config is read lazily at request time (not module load) — see `src/lib/config.ts`.
+
+## Key source files
+
+- `src/lib/config.ts` — central server-side config with multi-name env var fallbacks
+- `src/lib/aiProvider.functions.ts` — AI routing + fallback logic
+- `src/integrations/supabase/client.ts` — Supabase client (browser)
+- `src/integrations/supabase/client.server.ts` — Supabase client (server / service role)
+- `vite.config.ts` — runtime env injection plugin (keeps secrets server-side only)
 
 ## User preferences
-None recorded yet.
+
+- Never expose API keys or secrets to the frontend or chat.
+- All sensitive values must be stored in Replit Secrets only.
