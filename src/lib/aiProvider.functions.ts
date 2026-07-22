@@ -189,14 +189,26 @@ async function tryGeminiVision(
   }
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents }),
-      },
-    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
+    let res: Response;
+    try {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents,
+            // Disable extended thinking — adds 30-60 s latency with no benefit for OCR/solving.
+            generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+          }),
+        },
+      );
+    } finally {
+      clearTimeout(timer);
+    }
     const body = await res.text();
     if (!res.ok) {
       console.error(`[Vision] Gemini HTTP ${res.status}:`, body.slice(0, 400));

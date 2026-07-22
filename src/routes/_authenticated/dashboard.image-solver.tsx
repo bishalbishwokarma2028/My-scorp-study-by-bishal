@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import React, { useCallback, useEffect, useRef, isValidElement } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, isValidElement } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2, ImagePlus, ClipboardPaste, X, ScanText, Sparkles, Send, MessageCircle } from "lucide-react";
@@ -146,9 +146,62 @@ function ImageSolverPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const followupRef = useRef<HTMLTextAreaElement>(null);
 
+  // If a previous solve was interrupted mid-flight (e.g. user navigated away),
+  // usePageState will restore loading:true on remount — reset it immediately.
+  useLayoutEffect(() => {
+    if (state.loading)    setState({ loading: false });
+    if (state.followupLoading) setState({ followupLoading: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Compress an image to JPEG if its base64 would exceed ~1 MB.
+   * Uses an offscreen canvas — no extra dependencies.
+   */
+  async function compressImage(file: File): Promise<{ base64: string; mimeType: string; preview: string }> {
+    const MAX_SIDE = 1600; // px — enough for OCR quality
+    const MAX_B64  = 1_000_000; // ~750 KB file
+
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = url;
+      });
+
+      let { width, height } = img;
+      if (width > MAX_SIDE || height > MAX_SIDE) {
+        const ratio = Math.min(MAX_SIDE / width, MAX_SIDE / height);
+        width  = Math.round(width  * ratio);
+        height = Math.round(height * ratio);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width  = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+
+      // Try progressively lower quality until under the byte limit
+      for (const q of [0.85, 0.70, 0.55, 0.40]) {
+        const dataUrl = canvas.toDataURL("image/jpeg", q);
+        const b64 = dataUrl.split(",")[1];
+        if (b64.length <= MAX_B64 || q === 0.40) {
+          return { base64: b64, mimeType: "image/jpeg", preview: dataUrl };
+        }
+      }
+      // Fallback (never actually reached)
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.40);
+      return { base64: dataUrl.split(",")[1], mimeType: "image/jpeg", preview: dataUrl };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function loadFile(rawFile: File) {
     if (!isImageFile(rawFile)) return toast.error("Please upload or paste an image file");
-    if (rawFile.size > 8_000_000) return toast.error("Image too large — max 8 MB");
+    if (rawFile.size > 20_000_000) return toast.error("Image too large — max 20 MB");
     let file = rawFile;
     try {
       if (rawFile.name.toLowerCase().match(/\.(heic|heif)$/) || /heic|heif/i.test(rawFile.type)) {
@@ -159,15 +212,24 @@ function ImageSolverPage() {
       toast.error(err instanceof Error ? err.message : "Could not read this image");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
+
+    try {
+      const { base64, mimeType, preview } = await compressImage(file);
       setState({ answer: "", chatHistory: [], followupInput: "" });
-      setImgState({ image: { base64, mimeType: file.type || "image/jpeg", name: file.name || "pasted-image.png", preview: dataUrl } });
+      setImgState({ image: { base64, mimeType, name: file.name || "image.jpg", preview } });
       toast.success("Image loaded — click Solve");
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      // Fallback: read raw if canvas compression fails (e.g. cross-origin SVG)
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(",")[1];
+        setState({ answer: "", chatHistory: [], followupInput: "" });
+        setImgState({ image: { base64, mimeType: file.type || "image/jpeg", name: file.name || "pasted-image.png", preview: dataUrl } });
+        toast.success("Image loaded — click Solve");
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
