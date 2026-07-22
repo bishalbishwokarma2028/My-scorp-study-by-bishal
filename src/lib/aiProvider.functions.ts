@@ -154,6 +154,63 @@ async function tryGemini(
   }
 }
 
+async function tryGeminiVision(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  key: string,
+  history: VisionHistory = [],
+): Promise<string | null> {
+  // Build contents array: history turns (text-only) + final user turn with image
+  const contents: object[] = [];
+
+  if (history.length > 0) {
+    const [first, ...rest] = history;
+    // First history message includes the image
+    contents.push({
+      role: "user",
+      parts: [
+        { text: first.content },
+        { inlineData: { mimeType, data: imageBase64 } },
+      ],
+    });
+    for (const msg of rest) {
+      contents.push({ role: msg.role === "assistant" ? "model" : "user", parts: [{ text: msg.content }] });
+    }
+    contents.push({ role: "user", parts: [{ text: prompt }] });
+  } else {
+    contents.push({
+      role: "user",
+      parts: [
+        { text: prompt },
+        { inlineData: { mimeType, data: imageBase64 } },
+      ],
+    });
+  }
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents }),
+      },
+    );
+    const body = await res.text();
+    if (!res.ok) {
+      console.error(`[Vision] Gemini HTTP ${res.status}:`, body.slice(0, 400));
+      return null;
+    }
+    const data = JSON.parse(body);
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return (typeof text === "string" && text.trim()) ? text.trim() : null;
+  } catch (err) {
+    console.error("[Vision] Gemini exception:", err);
+    return null;
+  }
+}
+
 async function tryCerebras(
   prompt: string,
   system: string,
@@ -541,11 +598,15 @@ async function tryGroqVision(
       }),
     });
     const body = await res.text();
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[Vision] Groq ${model} HTTP ${res.status}:`, body.slice(0, 400));
+      return null;
+    }
     const parsed = JSON.parse(body);
     const text = parsed?.choices?.[0]?.message?.content;
     return (typeof text === "string" && text.trim()) ? text.trim() : null;
-  } catch {
+  } catch (err) {
+    console.error(`[Vision] Groq ${model} exception:`, err);
     return null;
   }
 }
@@ -574,11 +635,15 @@ async function tryOpenRouterVision(
       }),
     });
     const body = await res.text();
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[Vision] OpenRouter ${model} HTTP ${res.status}:`, body.slice(0, 400));
+      return null;
+    }
     const parsed = JSON.parse(body);
     const text = parsed?.choices?.[0]?.message?.content;
     return (typeof text === "string" && text.trim()) ? text.trim() : null;
-  } catch {
+  } catch (err) {
+    console.error(`[Vision] OpenRouter ${model} exception:`, err);
     return null;
   }
 }
@@ -604,13 +669,11 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result> => {
     const history: VisionHistory = data.history ?? [];
 
-    // Groq first — free tier, no billing required.
-    const groqKeys = rotatedKeys("groq-vision", serverConfig.ai.groqKeys);
-    for (const key of groqKeys) {
-      for (const model of GROQ_VISION_MODELS) {
-        const text = await tryGroqVision(data.prompt, data.imageBase64, data.mimeType, key, model, history);
-        if (text) return { text, provider: "Bishal's Assistant" };
-      }
+    // Primary — Gemini (free tier, multimodal, rotated across up to 5 keys).
+    // Groq no longer offers vision models; Gemini is the best free alternative.
+    for (const key of rotatedKeys("gemini-vision", serverConfig.ai.geminiKeys)) {
+      const text = await tryGeminiVision(data.prompt, data.imageBase64, data.mimeType, key, history);
+      if (text) return { text, provider: "Bishal's Assistant" };
     }
 
     // Fallback — OpenRouter (requires account credits).

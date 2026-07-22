@@ -52,9 +52,14 @@ export const serverConfig = {
     const cerebrasKeys = Array.from({ length: 16 }, (_, i) => getEnv(`CEREBRAS_API_KEY_${i + 1}`))
       .filter(Boolean);
 
+    // Gemini pool — up to 5 keys. Primary vision provider (free tier, multimodal).
+    const geminiKeys = Array.from({ length: 5 }, (_, i) => getEnv(`GEMINI_API_KEY_${i + 1}`))
+      .filter(Boolean);
+
     return {
       groqKeys,
       cerebrasKeys,
+      geminiKeys,
       openrouterKey: getEnv("OPENROUTER_API_KEY"),
       huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
     };
