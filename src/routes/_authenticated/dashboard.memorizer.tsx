@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useCallback } from "react";
 import React from "react";
 import {
-  Loader2, Zap, ClipboardList, Sparkles, X, ArrowLeft, RefreshCw, ChevronDown,
+  Loader2, Zap, ClipboardList, Sparkles, X, ArrowLeft, RefreshCw, ChevronDown, LayoutTemplate, ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAI, askAIJSON } from "@/lib/aiProvider";
@@ -1204,6 +1204,7 @@ function MemorizerPage() {
   const [palettes, setPalettes]     = useState<Record<number, number>>({});
   const [generatingVisual, setGeneratingVisual] = useState<number | null>(null);
   const [templatePage, setTemplatePage] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   const visibleTemplates = TEMPLATES.slice(0, (templatePage + 1) * PAGE_SIZE);
@@ -1332,31 +1333,111 @@ Text:\n${text.slice(0,4000)}`,
     setTopicInput(""); setPasteInput(""); setDocTitle(""); setActiveBlockIdx(null); setActiveTemplate(null);
   }
 
+  // ── Sidebar inner content (shared by desktop panel + mobile drawer) ─────────
+  function SidebarInner() {
+    return (
+      <>
+        {/* Active section info */}
+        <div className="px-3 py-2.5 border-b border-[#1e3a5f] flex-shrink-0">
+          {activeBlockIdx !== null && blocks[activeBlockIdx] ? (
+            <div>
+              <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Active section</div>
+              <div className="text-[11px] font-semibold text-slate-200 truncate">{blocks[activeBlockIdx].heading.content||"Untitled"}</div>
+              {activeTemplate && (
+                <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full border" style={{ background:"#2d1d5e", borderColor:"#6d28d9", color:"#c4b5fd" }}>
+                    {activeTemplate.icon} {activeTemplate.label}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] text-slate-500 leading-snug flex items-start gap-1.5 pt-1">
+              <Zap className="h-3 w-3 text-violet-500 flex-shrink-0 mt-0.5"/>
+              Tap ⚡ on any section below to generate a visual
+            </p>
+          )}
+        </div>
+
+        {/* Palette picker */}
+        {activeBlockIdx !== null && visuals[activeBlockIdx] && (
+          <div className="px-3 py-2 border-b border-[#1e3a5f] flex-shrink-0">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Color theme</div>
+            <div className="flex gap-2 flex-wrap">
+              {PALETTES.map(pal => (
+                <button key={pal.id} onClick={()=>setPalettes(prev=>({...prev,[activeBlockIdx!]:pal.id}))}
+                  className={`h-6 w-6 rounded-full transition-all ${palettes[activeBlockIdx!]===pal.id?"ring-2 ring-white ring-offset-1 ring-offset-[#0c1523] scale-125":"opacity-60 hover:opacity-100"}`}
+                  style={{ background:pal.swatch }} title={pal.name}/>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Template grid */}
+        <div className="flex-1 overflow-y-auto p-2 min-h-0">
+          <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2 px-1">
+            {activeBlockIdx !== null ? "Choose diagram type" : "All diagram types"} ({TEMPLATES.length})
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-2 gap-1.5">
+            {visibleTemplates.map(tmpl => {
+              const isActive = activeTemplate?.id === tmpl.id && activeBlockIdx !== null;
+              const isLoading = generatingVisual === activeBlockIdx && isActive;
+              return (
+                <button key={tmpl.id}
+                  onClick={()=>{
+                    if (activeBlockIdx === null) { toast("Tap ⚡ on a section first to target it."); return; }
+                    setActiveTemplate(tmpl);
+                    doGenerate(activeBlockIdx, tmpl);
+                    setSidebarOpen(false);
+                  }}
+                  disabled={generatingVisual !== null}
+                  className={`group relative overflow-hidden rounded-lg border transition-all focus:outline-none disabled:opacity-40 ${isActive?"border-violet-500 ring-1 ring-violet-400":"border-[#1e3a5f] hover:border-violet-600"}`}
+                  title={tmpl.label}
+                >
+                  <VisualThumb type={tmpl.baseType} active={isActive}/>
+                  <div className={`py-1 text-center text-[8px] font-medium leading-tight px-0.5 ${isActive?"text-violet-300 bg-violet-950":"text-slate-400 group-hover:text-violet-300"}`}>
+                    {isLoading ? <Loader2 className="h-3 w-3 animate-spin mx-auto text-violet-400"/> : tmpl.label}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {hasMore && (
+            <button onClick={()=>setTemplatePage(p=>p+1)}
+              className="mt-3 w-full text-center text-[10px] text-slate-400 hover:text-violet-300 py-2 border border-dashed border-[#1e3a5f] rounded-lg transition-colors flex items-center justify-center gap-1">
+              <ChevronDown className="h-3 w-3"/> More ({TEMPLATES.length - visibleTemplates.length} remaining)
+            </button>
+          )}
+        </div>
+      </>
+    );
+  }
+
   // ── Landing ───────────────────────────────────────────────────────────────
   if (mode === "landing") {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between border-b px-5 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between border-b px-4 py-3 flex-shrink-0">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Memorizer</h1>
+            <h1 className="text-base font-bold text-gray-900">Memorizer</h1>
             <p className="text-xs text-muted-foreground">Transform any content into rich visual study documents</p>
           </div>
           <QuotaBadge quota={quota} loading={quotaLoading}/>
         </div>
-        <div className="flex flex-1 items-center justify-center p-8 overflow-y-auto">
+        <div className="flex flex-1 items-center justify-center p-4 sm:p-8 overflow-y-auto">
           <div className="w-full max-w-xl">
-            <h2 className="text-center text-2xl font-bold text-gray-800 mb-1">How would you like to start?</h2>
-            <p className="text-center text-sm text-muted-foreground mb-8">Choose your method to create a visual memory document</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <button onClick={()=>setMode("paste-input")} className="group relative overflow-hidden rounded-2xl p-6 text-left transition-transform hover:scale-[1.03] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#e879f9 0%,#a855f7 55%,#9333ea 100%)" }}>
-                <div className="pointer-events-none absolute right-3 top-3 h-20 w-20 rounded-full bg-white/15"/>
-                <ClipboardList className="mb-4 h-10 w-10 text-white/90"/>
+            <h2 className="text-center text-xl sm:text-2xl font-bold text-gray-800 mb-1">How would you like to start?</h2>
+            <p className="text-center text-sm text-muted-foreground mb-6">Choose your method to create a visual memory document</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button onClick={()=>setMode("paste-input")} className="group relative overflow-hidden rounded-2xl p-5 text-left transition-transform active:scale-95 hover:scale-[1.02] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#e879f9 0%,#a855f7 55%,#9333ea 100%)" }}>
+                <div className="pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full bg-white/15"/>
+                <ClipboardList className="mb-3 h-9 w-9 text-white/90"/>
                 <h3 className="text-white font-bold text-base mb-1">By pasting my text</h3>
                 <p className="text-purple-100 text-sm leading-snug">Create from notes, an outline or existing content.</p>
               </button>
-              <button onClick={()=>setMode("describe-input")} className="group relative overflow-hidden rounded-2xl p-6 text-left transition-transform hover:scale-[1.03] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#818cf8 0%,#7c3aed 55%,#6d28d9 100%)" }}>
-                <div className="pointer-events-none absolute right-3 top-3 h-20 w-20 rounded-full bg-white/15"/>
-                <Sparkles className="mb-4 h-10 w-10 text-white/90"/>
+              <button onClick={()=>setMode("describe-input")} className="group relative overflow-hidden rounded-2xl p-5 text-left transition-transform active:scale-95 hover:scale-[1.02] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#818cf8 0%,#7c3aed 55%,#6d28d9 100%)" }}>
+                <div className="pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full bg-white/15"/>
+                <Sparkles className="mb-3 h-9 w-9 text-white/90"/>
                 <h3 className="text-white font-bold text-base mb-1">By describing my idea</h3>
                 <p className="text-purple-100 text-sm leading-snug">Describe what visual and text content you have in mind.</p>
               </button>
@@ -1371,14 +1452,21 @@ Text:\n${text.slice(0,4000)}`,
   if (mode === "paste-input") {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 border-b px-5 py-3 flex-shrink-0">
-          <button onClick={()=>setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4"/> Back</button>
-          <h1 className="text-base font-bold text-gray-900">Paste Your Text</h1>
+        <div className="flex items-center gap-3 border-b px-4 py-3 flex-shrink-0">
+          <button onClick={()=>setMode("landing")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground flex-shrink-0">
+            <ArrowLeft className="h-4 w-4"/> Back
+          </button>
+          <h1 className="text-base font-bold text-gray-900 truncate">Paste Your Text</h1>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center p-8 overflow-y-auto">
-          <div className="w-full max-w-2xl space-y-3">
+        <div className="flex flex-1 flex-col items-center justify-start sm:justify-center p-4 sm:p-8 overflow-y-auto">
+          <div className="w-full max-w-2xl space-y-3 py-2">
             <label className="block text-sm font-medium text-gray-700">Paste your notes, outline, or any text content</label>
-            <textarea value={pasteInput} onChange={e=>setPasteInput(e.target.value)} placeholder="Paste your text here…\n\nYou can use plain text or markdown (# Heading, ## Section, **bold**, - bullets)." className="w-full h-64 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"/>
+            <textarea
+              value={pasteInput}
+              onChange={e=>setPasteInput(e.target.value)}
+              placeholder={"Paste your text here…\n\nYou can use plain text or markdown:\n# Heading\n## Section\n**bold**, - bullets"}
+              className="w-full h-48 sm:h-64 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+            />
             <button onClick={handlePaste} disabled={!pasteInput.trim()||generating} className="w-full rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 px-6 py-3 font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2">
               {generating?<><Loader2 className="h-4 w-4 animate-spin"/>Structuring your document…</>:"Create Visual Document"}
             </button>
@@ -1392,15 +1480,24 @@ Text:\n${text.slice(0,4000)}`,
   if (mode === "describe-input") {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 border-b px-5 py-3 flex-shrink-0">
-          <button onClick={()=>setMode("landing")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4"/> Back</button>
-          <h1 className="text-base font-bold text-gray-900">Describe Your Idea</h1>
-          <div className="ml-auto"><QuotaBadge quota={quota} loading={quotaLoading}/></div>
+        <div className="flex items-center gap-3 border-b px-4 py-3 flex-shrink-0">
+          <button onClick={()=>setMode("landing")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground flex-shrink-0">
+            <ArrowLeft className="h-4 w-4"/> Back
+          </button>
+          <h1 className="text-base font-bold text-gray-900 truncate">Describe Your Idea</h1>
+          <div className="ml-auto flex-shrink-0"><QuotaBadge quota={quota} loading={quotaLoading}/></div>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center p-8 overflow-y-auto">
-          <div className="w-full max-w-2xl space-y-3">
+        <div className="flex flex-1 flex-col items-center justify-start sm:justify-center p-4 sm:p-8 overflow-y-auto">
+          <div className="w-full max-w-2xl space-y-3 py-2">
             <label className="block text-sm font-medium text-gray-700">What topic or idea would you like to explore?</label>
-            <textarea value={topicInput} onChange={e=>setTopicInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&!generating)handleDescribe();}} placeholder={"e.g. 'The impact of globalization on developing economies'\ne.g. 'How photosynthesis works'\ne.g. 'Machine learning fundamentals'"} className="w-full h-36 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none" disabled={generating}/>
+            <textarea
+              value={topicInput}
+              onChange={e=>setTopicInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&!generating)handleDescribe();}}
+              placeholder={"e.g. The impact of globalization on developing economies\ne.g. How photosynthesis works\ne.g. Machine learning fundamentals"}
+              className="w-full h-36 sm:h-44 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+              disabled={generating}
+            />
             <button onClick={handleDescribe} disabled={generating||!topicInput.trim()} className="w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 px-6 py-3 font-semibold text-white shadow-md transition hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2">
               {generating?<><Loader2 className="h-4 w-4 animate-spin"/>Generating comprehensive document…</>:<><Sparkles className="h-4 w-4"/>Generate Document</>}
             </button>
@@ -1411,119 +1508,74 @@ Text:\n${text.slice(0,4000)}`,
     );
   }
 
-  // ── Document view — two columns: left sidebar + scrollable doc ─────────────
+  // ── Document view ──────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-x-0 bottom-0 top-14 lg:static lg:h-full flex overflow-hidden bg-gray-50">
 
-      {/* ── LEFT SIDEBAR: Template picker — always inside memorizer ── */}
-      <div className="w-60 flex-shrink-0 border-r flex flex-col overflow-hidden" style={{ background:"#0c1523" }}>
-
-        {/* Sidebar header */}
+      {/* ── DESKTOP LEFT SIDEBAR ── */}
+      <div className="hidden lg:flex w-60 flex-shrink-0 border-r flex-col overflow-hidden" style={{ background:"#0c1523" }}>
         <div className="flex items-center gap-2 px-3 py-3 border-b border-[#1e3a5f] flex-shrink-0">
           <Zap className="h-4 w-4 text-violet-400 flex-shrink-0"/>
           <span className="font-bold text-sm text-violet-200">AI Suggestions</span>
           {generatingVisual !== null && <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400 ml-auto"/>}
         </div>
-
-        {/* Active section info */}
-        <div className="px-3 py-2.5 border-b border-[#1e3a5f] flex-shrink-0" style={{ minHeight:60 }}>
-          {activeBlockIdx !== null && blocks[activeBlockIdx] ? (
-            <div>
-              <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Section</div>
-              <div className="text-[11px] font-semibold text-slate-200 truncate">{blocks[activeBlockIdx].heading.content||"Untitled"}</div>
-              {activeTemplate && (
-                <div className="mt-1.5 flex items-center gap-1">
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full border" style={{ background:"#2d1d5e", borderColor:"#6d28d9", color:"#c4b5fd" }}>
-                    {activeTemplate.icon} {activeTemplate.label}
-                  </span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-[11px] text-slate-500 leading-snug flex items-start gap-1.5 pt-1">
-              <Zap className="h-3 w-3 text-violet-500 flex-shrink-0 mt-0.5"/>
-              Click ⚡ on any section to generate a visual
-            </p>
-          )}
-        </div>
-
-        {/* Palette picker — shown once a visual exists */}
-        {activeBlockIdx !== null && visuals[activeBlockIdx] && (
-          <div className="px-3 py-2 border-b border-[#1e3a5f] flex-shrink-0">
-            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Color theme</div>
-            <div className="flex gap-1.5 flex-wrap">
-              {PALETTES.map(pal => (
-                <button key={pal.id} onClick={()=>setPalettes(prev=>({...prev,[activeBlockIdx!]:pal.id}))}
-                  className={`h-5 w-5 rounded-full transition-all ${palettes[activeBlockIdx!]===pal.id?"ring-2 ring-white ring-offset-1 ring-offset-[#0c1523] scale-125":"opacity-60 hover:opacity-100"}`}
-                  style={{ background:pal.swatch }} title={pal.name}/>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Template grid — scrollable */}
-        <div className="flex-1 overflow-y-auto p-2 min-h-0">
-          <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2 px-1">
-            {activeBlockIdx !== null ? "Choose diagram type" : "All diagram types"} ({TEMPLATES.length} total)
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {visibleTemplates.map(tmpl => {
-              const isActive = activeTemplate?.id === tmpl.id && activeBlockIdx !== null;
-              const isLoading = generatingVisual === activeBlockIdx && isActive;
-              return (
-                <button key={tmpl.id}
-                  onClick={()=>{
-                    if (activeBlockIdx === null) { toast("Click ⚡ on a section first to target it."); return; }
-                    setActiveTemplate(tmpl);
-                    doGenerate(activeBlockIdx, tmpl);
-                  }}
-                  disabled={generatingVisual !== null}
-                  className={`group relative overflow-hidden rounded-lg border transition-all focus:outline-none disabled:opacity-40 ${isActive?"border-violet-500 ring-1 ring-violet-400":"border-[#1e3a5f] hover:border-violet-600"}`}
-                  title={tmpl.label}
-                >
-                  <VisualThumb type={tmpl.baseType} active={isActive}/>
-                  <div className={`py-1 text-center text-[8px] font-medium leading-tight px-0.5 ${isActive?"text-violet-300 bg-violet-950":"text-slate-400 group-hover:text-violet-300"}`}>
-                    {isLoading ? <Loader2 className="h-3 w-3 animate-spin mx-auto text-violet-400"/> : tmpl.label}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* More button */}
-          {hasMore && (
-            <button onClick={()=>setTemplatePage(p=>p+1)}
-              className="mt-3 w-full text-center text-[10px] text-slate-400 hover:text-violet-300 py-2 border border-dashed border-[#1e3a5f] rounded-lg transition-colors flex items-center justify-center gap-1">
-              <ChevronDown className="h-3 w-3"/> ... More ({TEMPLATES.length - visibleTemplates.length} remaining)
-            </button>
-          )}
-        </div>
+        <SidebarInner/>
       </div>
 
+      {/* ── MOBILE BOTTOM DRAWER ── */}
+      {sidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Scrim */}
+          <div className="absolute inset-0 bg-black/60" onClick={()=>setSidebarOpen(false)}/>
+          {/* Sheet */}
+          <div className="relative flex flex-col rounded-t-2xl overflow-hidden" style={{ background:"#0c1523", maxHeight:"78vh" }}>
+            {/* Sheet handle + header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#1e3a5f] flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-violet-400"/>
+                <span className="font-bold text-sm text-violet-200">AI Diagram Templates</span>
+                {generatingVisual !== null && <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400"/>}
+              </div>
+              <button onClick={()=>setSidebarOpen(false)} className="rounded-full p-1 hover:bg-white/10">
+                <X className="h-5 w-5 text-slate-300"/>
+              </button>
+            </div>
+            <SidebarInner/>
+          </div>
+        </div>
+      )}
+
       {/* ── RIGHT: Scrollable document ── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
 
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b px-4 py-2 bg-white flex-shrink-0 z-10">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-between border-b px-3 sm:px-4 py-2 bg-white flex-shrink-0 z-10 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <button onClick={reset} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground flex-shrink-0">
-              <ArrowLeft className="h-3.5 w-3.5"/> Back
+              <ArrowLeft className="h-3.5 w-3.5"/>
+              <span className="hidden sm:inline">Back</span>
             </button>
             <span className="text-sm font-semibold text-gray-700 truncate">{docTitle}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1">
-              Click <Zap className="inline h-3 w-3 text-violet-500"/> on any section to visualize
-            </span>
+            {/* Mobile-only: open templates drawer */}
+            <button
+              onClick={()=>setSidebarOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100 active:scale-95 transition-all"
+            >
+              <LayoutTemplate className="h-3.5 w-3.5"/>
+              Templates
+            </button>
             <button onClick={reset} className="flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent">
-              <RefreshCw className="h-3 w-3"/> New
+              <RefreshCw className="h-3 w-3"/>
+              <span className="hidden sm:inline">New</span>
             </button>
           </div>
         </div>
 
         {/* Document scroll area */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto py-8 px-4 lg:px-6">
+          <div className="max-w-3xl mx-auto py-5 sm:py-8 px-3 sm:px-6">
             {blocks.map((block, blockIdx) => {
               const isTitle  = block.heading.type === "title";
               const isH2     = block.heading.type === "h2";
@@ -1534,84 +1586,108 @@ Text:\n${text.slice(0,4000)}`,
               const tmpl     = templates[blockIdx];
 
               return (
-                <div key={blockIdx} className={`flex ${isH2?"mb-10":isTitle?"mb-4":"mb-2"}`}>
-                  {/* ⚡ gutter */}
-                  <div className="flex-shrink-0 flex flex-col items-center" style={{ width:52 }}>
-                    {isH2 && (
-                      <button onClick={()=>openSection(blockIdx)} disabled={generatingVisual!==null}
-                        className={`mt-4 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md active:scale-95 transition-all disabled:opacity-60 ${isActive?"bg-violet-700 ring-2 ring-violet-300 ring-offset-1":"bg-violet-600 hover:bg-violet-700"}`}
-                        title="Auto-generate best visual for this section">
-                        {isLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Zap className="h-4 w-4"/>}
-                      </button>
-                    )}
-                  </div>
+                <div key={blockIdx} className={`${isH2?"mb-8":isTitle?"mb-4":"mb-2"}`}>
 
-                  {/* Content */}
-                  <div className={`flex-1 pr-4 ${isH2?`border-l-2 pl-5 pb-6 ${isActive?"border-violet-500":"border-violet-300"}`:"pl-2"}`}>
+                  {/* Title block */}
+                  {isTitle && block.heading.content && (
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 mt-2 flex items-center gap-3 flex-wrap">
+                      <span className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-50 text-xl select-none">🧠</span>
+                      <span className="flex-1 min-w-0">{block.heading.content}</span>
+                    </h1>
+                  )}
 
-                    {/* Title */}
-                    {isTitle && block.heading.content && (
-                      <h1 className="text-3xl font-bold text-gray-900 mb-4 mt-2 flex items-center gap-3">
-                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-50 text-xl select-none">🧠</span>
-                        {block.heading.content}
-                      </h1>
-                    )}
-                    {isH2 && (
-                      <h2 className="text-xl font-bold text-gray-800 mt-1 mb-3">{block.heading.content}</h2>
-                    )}
+                  {/* Section (H2) block */}
+                  {isH2 && (
+                    <div className={`rounded-xl border-l-4 px-3 sm:px-4 pt-3 pb-5 ${isActive?"border-violet-500 bg-violet-50/60":"border-violet-300 bg-white"}`}>
 
-                    {/* Body text — ALWAYS fully displayed above the visual */}
-                    {block.body.map(sec=>{
-                      if (sec.type==="paragraph") return (
-                        <p key={sec.id} className="text-gray-700 text-sm leading-relaxed mb-3"><Inline text={sec.content}/></p>
-                      );
-                      if (sec.type==="bullet") return (
-                        <ul key={sec.id} className="list-disc pl-5 mb-3 space-y-1.5">
-                          {(sec.items||[]).map((item,ii)=><li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item}/></li>)}
-                        </ul>
-                      );
-                      if (sec.type==="numbered") return (
-                        <ol key={sec.id} className="list-decimal pl-5 mb-3 space-y-1.5">
-                          {(sec.items||[]).map((item,ii)=><li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item}/></li>)}
-                        </ol>
-                      );
-                      return null;
-                    })}
-
-                    {/* Scanning animation — appears BELOW text while loading */}
-                    {isH2 && isLoading && <ScanAnimation/>}
-
-                    {/* Visual block — BELOW all section text, never overlapping */}
-                    {isH2 && hasVisual && !isLoading && (
-                      <div className="mt-4 rounded-xl overflow-hidden shadow-xl border border-[#1e3a5f]">
-                        {/* Visual header bar */}
-                        <div className="flex items-center justify-between px-3 py-2" style={{ background:"#0c1523", borderBottom:"1px solid #1e3a5f" }}>
-                          <span className="text-[10px] font-medium uppercase tracking-widest flex items-center gap-1.5" style={{ color:"#64748b" }}>
-                            {tmpl?.icon} {tmpl?.label || visuals[blockIdx].type}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {/* Inline palette dots */}
-                            <div className="flex gap-1">
-                              {PALETTES.map(pal=>(
-                                <button key={pal.id} onClick={()=>setPalettes(prev=>({...prev,[blockIdx]:pal.id}))}
-                                  className={`h-3.5 w-3.5 rounded-full transition-all ${palettes[blockIdx]===pal.id?"ring-1 ring-white scale-110":"opacity-40 hover:opacity-90"}`}
-                                  style={{ background:pal.swatch }} title={pal.name}/>
-                              ))}
-                            </div>
-                            <button onClick={()=>openSection(blockIdx)} className="text-[10px] font-medium transition-colors" style={{ color:"#a78bfa" }}>Regen</button>
-                            <button onClick={()=>setVisuals(prev=>{const n={...prev};delete n[blockIdx];return n;})} className="transition-colors text-[#64748b] hover:text-red-400">
-                              <X className="h-3.5 w-3.5"/>
-                            </button>
-                          </div>
-                        </div>
-                        {/* Visual — full width, clear */}
-                        <VisualRenderer visual={visuals[blockIdx]} palette={palette} variant={tmpl?.variant}/>
+                      {/* Section heading + ⚡ button on same row */}
+                      <div className="flex items-start gap-2 mb-3">
+                        <button
+                          onClick={()=>{ openSection(blockIdx); setSidebarOpen(false); }}
+                          disabled={generatingVisual!==null}
+                          className={`flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-white shadow active:scale-95 transition-all disabled:opacity-60 ${isActive?"bg-violet-700 ring-2 ring-violet-300 ring-offset-1":"bg-violet-600 hover:bg-violet-700"}`}
+                          title="Auto-generate visual for this section"
+                        >
+                          {isLoading?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<Zap className="h-3.5 w-3.5"/>}
+                        </button>
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">{block.heading.content}</h2>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Body text */}
+                      {block.body.map(sec=>{
+                        if (sec.type==="paragraph") return (
+                          <p key={sec.id} className="text-gray-700 text-sm leading-relaxed mb-3"><Inline text={sec.content}/></p>
+                        );
+                        if (sec.type==="bullet") return (
+                          <ul key={sec.id} className="list-disc pl-5 mb-3 space-y-1.5">
+                            {(sec.items||[]).map((item,ii)=><li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item}/></li>)}
+                          </ul>
+                        );
+                        if (sec.type==="numbered") return (
+                          <ol key={sec.id} className="list-decimal pl-5 mb-3 space-y-1.5">
+                            {(sec.items||[]).map((item,ii)=><li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item}/></li>)}
+                          </ol>
+                        );
+                        return null;
+                      })}
+
+                      {/* Scanning animation */}
+                      {isLoading && <ScanAnimation/>}
+
+                      {/* Visual block */}
+                      {hasVisual && !isLoading && (
+                        <div className="mt-3 rounded-xl overflow-hidden shadow-lg border border-[#1e3a5f]">
+                          <div className="flex items-center justify-between px-3 py-2" style={{ background:"#0c1523", borderBottom:"1px solid #1e3a5f" }}>
+                            <span className="text-[10px] font-medium uppercase tracking-widest flex items-center gap-1.5" style={{ color:"#64748b" }}>
+                              {tmpl?.icon} {tmpl?.label || visuals[blockIdx].type}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-1">
+                                {PALETTES.map(pal=>(
+                                  <button key={pal.id} onClick={()=>setPalettes(prev=>({...prev,[blockIdx]:pal.id}))}
+                                    className={`h-3.5 w-3.5 rounded-full transition-all ${palettes[blockIdx]===pal.id?"ring-1 ring-white scale-110":"opacity-40 hover:opacity-90"}`}
+                                    style={{ background:pal.swatch }} title={pal.name}/>
+                                ))}
+                              </div>
+                              <button onClick={()=>openSection(blockIdx)} className="text-[10px] font-medium transition-colors" style={{ color:"#a78bfa" }}>Regen</button>
+                              <button onClick={()=>setVisuals(prev=>{const n={...prev};delete n[blockIdx];return n;})} className="transition-colors text-[#64748b] hover:text-red-400">
+                                <X className="h-3.5 w-3.5"/>
+                              </button>
+                            </div>
+                          </div>
+                          <VisualRenderer visual={visuals[blockIdx]} palette={palette} variant={tmpl?.variant}/>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Non-section (paragraph/bullet under title) */}
+                  {!isTitle && !isH2 && (
+                    <div className="pl-2">
+                      {block.body.map(sec=>{
+                        if (sec.type==="paragraph") return (
+                          <p key={sec.id} className="text-gray-700 text-sm leading-relaxed mb-3"><Inline text={sec.content}/></p>
+                        );
+                        if (sec.type==="bullet") return (
+                          <ul key={sec.id} className="list-disc pl-5 mb-3 space-y-1.5">
+                            {(sec.items||[]).map((item,ii)=><li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item}/></li>)}
+                          </ul>
+                        );
+                        if (sec.type==="numbered") return (
+                          <ol key={sec.id} className="list-decimal pl-5 mb-3 space-y-1.5">
+                            {(sec.items||[]).map((item,ii)=><li key={ii} className="text-gray-700 text-sm leading-relaxed"><Inline text={item}/></li>)}
+                          </ol>
+                        );
+                        return null;
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
+
+            {/* Bottom padding so last section isn't hidden behind nav */}
+            <div className="h-6"/>
           </div>
         </div>
       </div>
