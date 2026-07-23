@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef, useCallback } from "react";
+import { useState, useLayoutEffect, useRef, useCallback } from "react";
 import React from "react";
+import { usePageState } from "@/lib/pageState";
 import {
   Loader2, Zap, ClipboardList, Sparkles, X, ArrowLeft, RefreshCw, ChevronDown, LayoutTemplate, ChevronUp,
 } from "lucide-react";
@@ -1190,21 +1191,40 @@ function ScanAnimation() {
 // Main Page Component
 // ══════════════════════════════════════════════════════════════════════════════
 function MemorizerPage() {
-  const { user }                    = Route.useRouteContext();
-  const [mode, setMode]             = useState<Mode>("landing");
-  const [blocks, setBlocks]         = useState<DocBlock[]>([]);
-  const [docTitle, setDocTitle]     = useState("");
-  const [topicInput, setTopicInput] = useState("");
-  const [pasteInput, setPasteInput] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [activeBlockIdx, setActiveBlockIdx] = useState<number | null>(null);
-  const [activeTemplate, setActiveTemplate] = useState<VisualTemplate | null>(null);
-  const [visuals, setVisuals]       = useState<Record<number, VisualData>>({});
-  const [templates, setTemplates]   = useState<Record<number, VisualTemplate>>({});
-  const [palettes, setPalettes]     = useState<Record<number, number>>({});
+  const { user } = Route.useRouteContext();
+
+  // ── Persistent state — survives route changes within the same session ──────
+  const [doc, setDoc] = usePageState("memorizer", {
+    mode:            "landing" as Mode,
+    blocks:          [] as DocBlock[],
+    docTitle:        "",
+    topicInput:      "",
+    pasteInput:      "",
+    activeBlockIdx:  null as number | null,
+    activeTemplate:  null as VisualTemplate | null,
+    visuals:         {} as Record<number, VisualData>,
+    templates:       {} as Record<number, VisualTemplate>,
+    palettes:        {} as Record<number, number>,
+    templatePage:    0,
+  });
+
+  const {
+    mode, blocks, docTitle, topicInput, pasteInput,
+    activeBlockIdx, activeTemplate, visuals, templates, palettes, templatePage,
+  } = doc;
+
+  // ── Transient state — reset on every mount ────────────────────────────────
+  const [generating, setGenerating]             = useState(false);
   const [generatingVisual, setGeneratingVisual] = useState<number | null>(null);
-  const [templatePage, setTemplatePage] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen]           = useState(false);
+
+  // If the user navigated away while a generation was in flight, reset the spinners.
+  useLayoutEffect(() => {
+    if (generating)             setGenerating(false);
+    if (generatingVisual !== null) setGeneratingVisual(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "groq");
 
   const visibleTemplates = TEMPLATES.slice(0, (templatePage + 1) * PAGE_SIZE);
@@ -1262,9 +1282,7 @@ CRITICAL: Write every section FULLY. Minimum 1500 words. Never use LaTeX.`,
         [], false, 4000
       );
       await bump();
-      setBlocks(parseMarkdown(res.text));
-      setDocTitle(topicInput.trim());
-      setMode("document");
+      setDoc({ blocks: parseMarkdown(res.text), docTitle: topicInput.trim(), mode: "document" });
     } catch { toast.error("Failed to generate. Please try again."); }
     finally { setGenerating(false); }
   }
@@ -1275,7 +1293,6 @@ CRITICAL: Write every section FULLY. Minimum 1500 words. Never use LaTeX.`,
     if (!/^## /m.test(text)) {
       setGenerating(true);
       try {
-        const firstLine = text.split("\n")[0].replace(/^#+\s*/,"").trim();
         const res = await askAI(
           `Organize the following text into a structured educational document with headings. Keep ALL original content.
 Format: # [title]\n## [Section]\n[content]\n## [Section]\n...
@@ -1288,9 +1305,7 @@ Text:\n${text.slice(0,4000)}`,
       } catch {} finally { setGenerating(false); }
     }
     const firstLine = text.split("\n")[0].replace(/^#+\s*/,"").trim();
-    setBlocks(parseMarkdown(text));
-    setDocTitle(firstLine || "Your Document");
-    setMode("document");
+    setDoc({ blocks: parseMarkdown(text), docTitle: firstLine || "Your Document", mode: "document" });
   }
 
   // ── Visual generation ─────────────────────────────────────────────────────
@@ -1305,9 +1320,13 @@ Text:\n${text.slice(0,4000)}`,
     try {
       const visual = await generateVisual(bodyText, heading, tmpl.baseType);
       if (visual) {
-        setVisuals(prev=>({...prev,[blockIdx]:visual}));
-        setTemplates(prev=>({...prev,[blockIdx]:tmpl}));
-        setPalettes(prev=>({...prev,[blockIdx]:prev[blockIdx]??Math.floor(Math.random()*PALETTES.length)}));
+        // Only one visual generates at a time (buttons disabled during generation),
+        // so reading `visuals/templates/palettes` from the closure is safe.
+        setDoc({
+          visuals:   { ...visuals,   [blockIdx]: visual },
+          templates: { ...templates, [blockIdx]: tmpl  },
+          palettes:  { ...palettes,  [blockIdx]: palettes[blockIdx] ?? Math.floor(Math.random() * PALETTES.length) },
+        });
         toast.success("Visual generated!");
       } else { toast.error("Could not generate visual. Try again."); }
     } catch { toast.error("Visual generation failed."); }
@@ -1322,15 +1341,16 @@ Text:\n${text.slice(0,4000)}`,
       .map(s=>(s.type==="bullet"||s.type==="numbered")?(s.items||[]).join(". "):s.content)
       .join(" ").slice(0,600);
     const picked = autoPickTemplate(heading, bodyText);
-    setActiveBlockIdx(blockIdx);
-    setActiveTemplate(picked);
-    setTemplatePage(0);
+    setDoc({ activeBlockIdx: blockIdx, activeTemplate: picked, templatePage: 0 });
     doGenerate(blockIdx, picked);
   }
 
   function reset() {
-    setMode("landing"); setBlocks([]); setVisuals({}); setTemplates({}); setPalettes({});
-    setTopicInput(""); setPasteInput(""); setDocTitle(""); setActiveBlockIdx(null); setActiveTemplate(null);
+    setDoc({
+      mode: "landing", blocks: [], visuals: {}, templates: {}, palettes: {},
+      topicInput: "", pasteInput: "", docTitle: "",
+      activeBlockIdx: null, activeTemplate: null, templatePage: 0,
+    });
   }
 
   // ── Sidebar inner content (shared by desktop panel + mobile drawer) ─────────
@@ -1365,7 +1385,7 @@ Text:\n${text.slice(0,4000)}`,
             <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">Color theme</div>
             <div className="flex gap-2 flex-wrap">
               {PALETTES.map(pal => (
-                <button key={pal.id} onClick={()=>setPalettes(prev=>({...prev,[activeBlockIdx!]:pal.id}))}
+                <button key={pal.id} onClick={()=>setDoc({ palettes: { ...palettes, [activeBlockIdx!]: pal.id } })}
                   className={`h-6 w-6 rounded-full transition-all ${palettes[activeBlockIdx!]===pal.id?"ring-2 ring-white ring-offset-1 ring-offset-[#0c1523] scale-125":"opacity-60 hover:opacity-100"}`}
                   style={{ background:pal.swatch }} title={pal.name}/>
               ))}
@@ -1386,7 +1406,7 @@ Text:\n${text.slice(0,4000)}`,
                 <button key={tmpl.id}
                   onClick={()=>{
                     if (activeBlockIdx === null) { toast("Tap ⚡ on a section first to target it."); return; }
-                    setActiveTemplate(tmpl);
+                    setDoc({ activeTemplate: tmpl });
                     doGenerate(activeBlockIdx, tmpl);
                     setSidebarOpen(false);
                   }}
@@ -1403,7 +1423,7 @@ Text:\n${text.slice(0,4000)}`,
             })}
           </div>
           {hasMore && (
-            <button onClick={()=>setTemplatePage(p=>p+1)}
+            <button onClick={()=>setDoc({ templatePage: templatePage + 1 })}
               className="mt-3 w-full text-center text-[10px] text-slate-400 hover:text-violet-300 py-2 border border-dashed border-[#1e3a5f] rounded-lg transition-colors flex items-center justify-center gap-1">
               <ChevronDown className="h-3 w-3"/> More ({TEMPLATES.length - visibleTemplates.length} remaining)
             </button>
@@ -1429,13 +1449,13 @@ Text:\n${text.slice(0,4000)}`,
             <h2 className="text-center text-xl sm:text-2xl font-bold text-gray-800 mb-1">How would you like to start?</h2>
             <p className="text-center text-sm text-muted-foreground mb-6">Choose your method to create a visual memory document</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button onClick={()=>setMode("paste-input")} className="group relative overflow-hidden rounded-2xl p-5 text-left transition-transform active:scale-95 hover:scale-[1.02] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#e879f9 0%,#a855f7 55%,#9333ea 100%)" }}>
+              <button onClick={()=>setDoc({ mode:"paste-input" })} className="group relative overflow-hidden rounded-2xl p-5 text-left transition-transform active:scale-95 hover:scale-[1.02] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#e879f9 0%,#a855f7 55%,#9333ea 100%)" }}>
                 <div className="pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full bg-white/15"/>
                 <ClipboardList className="mb-3 h-9 w-9 text-white/90"/>
                 <h3 className="text-white font-bold text-base mb-1">By pasting my text</h3>
                 <p className="text-purple-100 text-sm leading-snug">Create from notes, an outline or existing content.</p>
               </button>
-              <button onClick={()=>setMode("describe-input")} className="group relative overflow-hidden rounded-2xl p-5 text-left transition-transform active:scale-95 hover:scale-[1.02] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#818cf8 0%,#7c3aed 55%,#6d28d9 100%)" }}>
+              <button onClick={()=>setDoc({ mode:"describe-input" })} className="group relative overflow-hidden rounded-2xl p-5 text-left transition-transform active:scale-95 hover:scale-[1.02] hover:shadow-xl focus:outline-none" style={{ background:"linear-gradient(135deg,#818cf8 0%,#7c3aed 55%,#6d28d9 100%)" }}>
                 <div className="pointer-events-none absolute right-3 top-3 h-16 w-16 rounded-full bg-white/15"/>
                 <Sparkles className="mb-3 h-9 w-9 text-white/90"/>
                 <h3 className="text-white font-bold text-base mb-1">By describing my idea</h3>
@@ -1453,7 +1473,7 @@ Text:\n${text.slice(0,4000)}`,
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-3 border-b px-4 py-3 flex-shrink-0">
-          <button onClick={()=>setMode("landing")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground flex-shrink-0">
+          <button onClick={()=>setDoc({ mode:"landing" })} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground flex-shrink-0">
             <ArrowLeft className="h-4 w-4"/> Back
           </button>
           <h1 className="text-base font-bold text-gray-900 truncate">Paste Your Text</h1>
@@ -1463,7 +1483,7 @@ Text:\n${text.slice(0,4000)}`,
             <label className="block text-sm font-medium text-gray-700">Paste your notes, outline, or any text content</label>
             <textarea
               value={pasteInput}
-              onChange={e=>setPasteInput(e.target.value)}
+              onChange={e=>setDoc({ pasteInput: e.target.value })}
               placeholder={"Paste your text here…\n\nYou can use plain text or markdown:\n# Heading\n## Section\n**bold**, - bullets"}
               className="w-full h-48 sm:h-64 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
             />
@@ -1481,7 +1501,7 @@ Text:\n${text.slice(0,4000)}`,
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-3 border-b px-4 py-3 flex-shrink-0">
-          <button onClick={()=>setMode("landing")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground flex-shrink-0">
+          <button onClick={()=>setDoc({ mode:"landing" })} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground flex-shrink-0">
             <ArrowLeft className="h-4 w-4"/> Back
           </button>
           <h1 className="text-base font-bold text-gray-900 truncate">Describe Your Idea</h1>
@@ -1492,7 +1512,7 @@ Text:\n${text.slice(0,4000)}`,
             <label className="block text-sm font-medium text-gray-700">What topic or idea would you like to explore?</label>
             <textarea
               value={topicInput}
-              onChange={e=>setTopicInput(e.target.value)}
+              onChange={e=>setDoc({ topicInput: e.target.value })}
               onKeyDown={e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&!generating)handleDescribe();}}
               placeholder={"e.g. The impact of globalization on developing economies\ne.g. How photosynthesis works\ne.g. Machine learning fundamentals"}
               className="w-full h-36 sm:h-44 rounded-xl border border-border bg-white px-4 py-3 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
@@ -1644,13 +1664,13 @@ Text:\n${text.slice(0,4000)}`,
                             <div className="flex items-center gap-2">
                               <div className="flex gap-1">
                                 {PALETTES.map(pal=>(
-                                  <button key={pal.id} onClick={()=>setPalettes(prev=>({...prev,[blockIdx]:pal.id}))}
+                                  <button key={pal.id} onClick={()=>setDoc({ palettes: { ...palettes, [blockIdx]: pal.id } })}
                                     className={`h-3.5 w-3.5 rounded-full transition-all ${palettes[blockIdx]===pal.id?"ring-1 ring-white scale-110":"opacity-40 hover:opacity-90"}`}
                                     style={{ background:pal.swatch }} title={pal.name}/>
                                 ))}
                               </div>
                               <button onClick={()=>openSection(blockIdx)} className="text-[10px] font-medium transition-colors" style={{ color:"#a78bfa" }}>Regen</button>
-                              <button onClick={()=>setVisuals(prev=>{const n={...prev};delete n[blockIdx];return n;})} className="transition-colors text-[#64748b] hover:text-red-400">
+                              <button onClick={()=>{ const n={...visuals}; delete n[blockIdx]; setDoc({ visuals: n }); }} className="transition-colors text-[#64748b] hover:text-red-400">
                                 <X className="h-3.5 w-3.5"/>
                               </button>
                             </div>
