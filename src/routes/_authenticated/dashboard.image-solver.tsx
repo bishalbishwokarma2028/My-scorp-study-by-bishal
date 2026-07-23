@@ -417,12 +417,8 @@ function ImageSolverPage() {
       // ── Per-question extracted text (📋) ──────────────────────────────────
       if (raw.includes("📋") || raw.toLowerCase().includes("question") && raw.toLowerCase().includes("from image")) {
         return (
-          <div className="my-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 overflow-hidden shadow-sm">
-            <div className="flex items-center gap-2 bg-amber-300 px-4 py-2">
-              <span className="text-base">📋</span>
-              <p className="text-xs font-black uppercase tracking-widest text-amber-950">Question from Image</p>
-            </div>
-            <div className="px-4 py-3 text-[14px] font-semibold leading-relaxed text-amber-950 [&_strong]:bg-amber-200 [&_strong]:text-amber-900 [&_strong]:px-0.5 [&_strong]:rounded [&_p]:my-1">
+          <div className="my-4 rounded-xl border-2 border-violet-300 bg-violet-50 overflow-hidden shadow-sm">
+            <div className="px-4 py-3 text-[14px] font-semibold leading-relaxed text-violet-900 [&_strong]:text-violet-900 [&_strong]:font-bold [&_p]:my-1">
               {children}
             </div>
           </div>
