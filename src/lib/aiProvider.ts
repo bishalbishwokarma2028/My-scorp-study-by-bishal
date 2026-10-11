@@ -53,6 +53,9 @@ export async function askAIJSON<T>(
 
   // First attempt
   const first = await askAI(prompt, systemPrompt || BASE_JSON_SYSTEM, history, preferCerebras, maxTokens);
+  if (first.provider === "none") {
+    return { data: null, provider: "none" };
+  }
   if (first.provider !== "none") {
     const parsed = extractJSON<T>(first.text);
     if (parsed !== null) return { data: parsed, provider: first.provider };

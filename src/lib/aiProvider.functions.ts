@@ -51,6 +51,16 @@ function isRateLimited(status: number, body: string): boolean {
   );
 }
 
+const providerFailureLoggedAt = new Map<string, number>();
+
+function logProviderFailure(provider: string, reason: string): void {
+  const now = Date.now();
+  const key = `${provider}:${reason}`;
+  if (now - (providerFailureLoggedAt.get(key) ?? 0) < 60_000) return;
+  providerFailureLoggedAt.set(key, now);
+  console.warn(`[ScorpStudy AI] ${provider} unavailable (${reason})`);
+}
+
 async function tryGroq(
   prompt: string,
   system: string,
@@ -64,13 +74,14 @@ async function tryGroq(
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "openai/gpt-oss-20b",
         messages,
         max_tokens: maxTokens, // Groq free tier: 6 000 TPM *total* (input + output); scale with request size
       }),
     });
     const body = await res.text();
     if (!res.ok) {
+      logProviderFailure("Groq", `HTTP ${res.status}`);
       if (isRateLimited(res.status, body)) return null;
       return null;
     }
@@ -79,6 +90,7 @@ async function tryGroq(
     if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
     return null;
   } catch {
+    logProviderFailure("Groq", "network error");
     return null;
   }
 }
@@ -108,6 +120,7 @@ async function tryOpenRouter(
     });
     const body = await res.text();
     if (!res.ok) {
+      logProviderFailure("OpenRouter", `HTTP ${res.status}`);
       if (isRateLimited(res.status, body)) return null;
       return null;
     }
@@ -116,6 +129,7 @@ async function tryOpenRouter(
     if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
     return null;
   } catch {
+    logProviderFailure("OpenRouter", "network error");
     return null;
   }
 }
@@ -125,23 +139,29 @@ async function tryGemini(
   system: string,
   key: string,
   history: Turn[],
+  maxTokens = 4096,
 ): Promise<Result | null> {
   try {
     const contextStr = history.length > 0
       ? history.map(m => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`).join("\n\n") + "\n\n"
       : "";
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: `${system}\n\n${contextStr}Student: ${prompt}` }] }],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       },
     );
     const body = await res.text();
     if (!res.ok) {
+      logProviderFailure("Gemini", `HTTP ${res.status}`);
       if (isRateLimited(res.status, body)) return null;
       return null;
     }
@@ -150,8 +170,22 @@ async function tryGemini(
     if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
     return null;
   } catch {
+    logProviderFailure("Gemini", "network error");
     return null;
   }
+}
+
+async function tryGeminiPool(
+  prompt: string,
+  system: string,
+  history: Turn[],
+  maxTokens: number,
+): Promise<Result | null> {
+  for (const key of rotatedKeys("gemini-text", serverConfig.ai.geminiKeys)) {
+    const result = await tryGemini(prompt, system, key, history, maxTokens);
+    if (result) return result;
+  }
+  return null;
 }
 
 async function tryGeminiVision(
@@ -242,6 +276,7 @@ async function tryCerebras(
     });
     const body = await res.text();
     if (!res.ok) {
+      logProviderFailure("Cerebras", `HTTP ${res.status}`);
       if (isRateLimited(res.status, body)) return null;
       return null;
     }
@@ -250,6 +285,7 @@ async function tryCerebras(
     if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
     return null;
   } catch {
+    logProviderFailure("Cerebras", "network error");
     return null;
   }
 }
@@ -269,6 +305,7 @@ async function tryHuggingFace(prompt: string, system: string, key: string): Prom
     );
     const body = await res.text();
     if (!res.ok) {
+      logProviderFailure("HuggingFace", `HTTP ${res.status}`);
       if (isRateLimited(res.status, body)) return null;
       return null;
     }
@@ -277,6 +314,7 @@ async function tryHuggingFace(prompt: string, system: string, key: string): Prom
     if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
     return null;
   } catch {
+    logProviderFailure("HuggingFace", "network error");
     return null;
   }
 }
@@ -353,7 +391,7 @@ const SolveInputSchema = z.object({
 
 /**
  * Dedicated solver used by the Step-by-Step Solver feature.
- * Cerebras 120B → Groq fallback. Retries once on unparseable JSON.
+ * Cerebras 120B → Groq → Gemini fallback. Retries once on unparseable JSON.
  * Returns { data: Solution, provider } or { data: null, provider: "none" }.
  */
 export const solveMathServer = createServerFn({ method: "POST" })
@@ -378,6 +416,11 @@ export const solveMathServer = createServerFn({ method: "POST" })
           const parsed = extractSolveJSON(r.text);
           if (parsed) return { data: parsed, provider: r.provider };
         }
+      }
+      const gemini = await tryGeminiPool(userMsg, SOLVE_SYSTEM, [], 6000);
+      if (gemini) {
+        const parsed = extractSolveJSON(gemini.text);
+        if (parsed) return { data: parsed, provider: gemini.provider };
       }
     }
 
@@ -437,6 +480,8 @@ async function verifyMathSolutionInternal(
     const r = await tryGroq(prompt, VERIFY_SYSTEM, key, [], 512);
     if (r) { const p = safeParseVerifyJSON(r.text); if (p) return p; }
   }
+  const gemini = await tryGeminiPool(prompt, VERIFY_SYSTEM, [], 512);
+  if (gemini) return safeParseVerifyJSON(gemini.text);
   return null;
 }
 
@@ -473,15 +518,38 @@ export const askAIServer = createServerFn({ method: "POST" })
         if (result) break;
       }
 
-      // Fallback 1 — OpenRouter
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
-      }
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
+      // Gemini 2.5 Flash is the reliable fallback when the Cerebras pool is
+      // out of quota. It is deliberately not routed through Groq.
+      if (!result) {
+        result = await tryGeminiPool(
+          data.prompt,
+          system,
+          history,
+          data.maxTokens ?? 4096,
+        );
       }
 
-      // Fallback 2 — HuggingFace
+      // Fallback 2 — current free OpenRouter models
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(
+          data.prompt,
+          system,
+          serverConfig.ai.openrouterKey,
+          "nvidia/nemotron-3.5-lightning:free",
+          history,
+        );
+      }
+      if (!result && serverConfig.ai.openrouterKey) {
+        result = await tryOpenRouter(
+          data.prompt,
+          system,
+          serverConfig.ai.openrouterKey,
+          "apodex/apodex-1.1-mini:free",
+          history,
+        );
+      }
+
+      // Fallback 3 — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }
@@ -494,7 +562,18 @@ export const askAIServer = createServerFn({ method: "POST" })
         if (result) break;
       }
 
-      // Fallback 1 — Cerebras
+      // The Gemini pool is kept ahead of the long-answer Cerebras pool so a
+      // temporary provider quota does not make every short-answer feature fail.
+      if (!result) {
+        result = await tryGeminiPool(
+          data.prompt,
+          system,
+          history,
+          data.maxTokens ?? 4096,
+        );
+      }
+
+      // Fallback 2 — Cerebras
       if (!result) {
         for (const key of rotatedKeys("cerebras", serverConfig.ai.cerebrasKeys)) {
           result = await tryCerebras(data.prompt, system, key, history);
@@ -502,15 +581,27 @@ export const askAIServer = createServerFn({ method: "POST" })
         }
       }
 
-      // Fallback 2 — OpenRouter
+      // Fallback 3 — current free OpenRouter models
       if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "anthropic/claude-3-haiku", history);
+        result = await tryOpenRouter(
+          data.prompt,
+          system,
+          serverConfig.ai.openrouterKey,
+          "nvidia/nemotron-3.5-lightning:free",
+          history,
+        );
       }
       if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(data.prompt, system, serverConfig.ai.openrouterKey, "openai/gpt-3.5-turbo", history);
+        result = await tryOpenRouter(
+          data.prompt,
+          system,
+          serverConfig.ai.openrouterKey,
+          "apodex/apodex-1.1-mini:free",
+          history,
+        );
       }
 
-      // Fallback 3 — HuggingFace
+      // Fallback 4 — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }
@@ -522,8 +613,8 @@ export const askAIServer = createServerFn({ method: "POST" })
     }
 
     return {
-      text: "AI is busy right now. Please try again tomorrow.",
-      provider: "Bishal's Assistant",
+      text: "AI is temporarily unavailable. Please try again shortly.",
+      provider: "none",
     };
   });
 

@@ -3,13 +3,14 @@ name: AI provider routing pools
 description: How preferCerebras vs default routing splits between Cerebras and Groq key pools, and how key rotation works.
 ---
 
-The `preferCerebras` flag on `askAIServer` (in `src/lib/aiProvider.functions.ts`) selects between two completely separate routing chains:
+Text AI routing preserves the preferred provider while keeping Gemini as an active fallback:
 
-- `preferCerebras: true` (long-answer features: Compare, Research, YouTube, CodeTutor, MockTest, PDFChat, Visual, FormulaSheet, Calculator, Grammar, Math, Science, Notes, Solver) → Cerebras key pool ONLY → OpenRouter → HuggingFace. Groq is never used on this path.
-- `preferCerebras: false`/default (all other features) → Groq key pool → Cerebras key pool → OpenRouter → HuggingFace.
+- `preferCerebras: true` (long-answer features) → Cerebras pool → Gemini pool → OpenRouter → HuggingFace. This path does not use Groq.
+- Default path → Groq pool → Gemini pool → Cerebras pool → OpenRouter → HuggingFace.
+- Image requests use Gemini 2.5 Flash first, with OpenRouter as fallback.
 
-**Why:** the user explicitly wants Cerebras-only features isolated from Groq rate limits, and wants the reverse (Groq-first) for everything else, with Cerebras as the shared fallback pool for both.
+**Why:** provider model IDs and free-tier availability change. A stale model ID can return 404 for every key, while billing or quota errors can disable an entire provider; these failures must not make all AI features unavailable when another configured pool works.
 
-**How to apply:** the Groq pool (`serverConfig.ai.groqKeys`) is a single merged pool of the original GROQ_API_KEY_N keys and the former GROQ_COMPOUND_KEY_N keys — do not reintroduce a separate "compound-mini" special path; that concept (and `compoundOnly`) was removed entirely. The Cerebras pool (`serverConfig.ai.cerebrasKeys`) supports up to 16 keys (CEREBRAS_API_KEY_1..16).
+**How to apply:** verify model IDs against current provider catalogs and a small live request before changing them. Keep Gemini's configured text fallback on `gemini-2.5-flash`, preserve Groq-first routing for default requests, and never route `preferCerebras` requests through Groq. Do not silently treat a provider/model error as a user daily quota limit.
 
-Key rotation: `rotatedKeys(poolName, keys)` in `aiProvider.functions.ts` keeps a module-level round-robin pointer per pool name so consecutive requests spread across all keys instead of always starting at key 1. On failure/rate-limit within a request, it still falls through the rest of that request's rotated key order before moving to the next provider.
+The Groq pool is a merged pool of `GROQ_API_KEY_N` and former `GROQ_COMPOUND_KEY_N` keys; do not restore a separate compound-mini path. Cerebras supports up to 16 keys, Gemini up to 5. Rotation advances per pool on each request and still tries the rest of that pool after a per-key failure.
