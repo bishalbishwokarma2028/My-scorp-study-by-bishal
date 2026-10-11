@@ -48,19 +48,20 @@ export const serverConfig = {
       ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => getEnv(`GROQ_COMPOUND_KEY_${i}`)),
     ].filter(Boolean);
 
-    // Cerebras pool — up to 16 keys, rotated for load balancing.
-    const cerebrasKeys = Array.from({ length: 16 }, (_, i) => getEnv(`CEREBRAS_API_KEY_${i + 1}`))
-      .filter(Boolean);
-
     // Gemini pool — up to 5 keys. Primary vision provider (free tier, multimodal).
     const geminiKeys = Array.from({ length: 5 }, (_, i) => getEnv(`GEMINI_API_KEY_${i + 1}`))
       .filter(Boolean);
 
+    // OpenRouter pool — the original unsuffixed key plus up to 9 additional keys.
+    const openrouterKeys = [
+      getEnv("OPENROUTER_API_KEY", "OPENROUTER_API_KEY_1"),
+      ...Array.from({ length: 9 }, (_, i) => getEnv(`OPENROUTER_API_KEY_${i + 2}`)),
+    ].filter(Boolean);
+
     return {
       groqKeys,
-      cerebrasKeys,
       geminiKeys,
-      openrouterKey: getEnv("OPENROUTER_API_KEY"),
+      openrouterKeys,
       huggingfaceKey: getEnv("HUGGINGFACE_API_KEY"),
     };
   },
@@ -91,13 +92,13 @@ export function validateConfig(): string[] {
   const ai = serverConfig.ai;
   const hasAnyAI =
     ai.groqKeys.length > 0 ||
-    !!ai.openrouterKey ||
-    ai.cerebrasKeys.length > 0 ||
+    ai.openrouterKeys.length > 0 ||
+    ai.geminiKeys.length > 0 ||
     !!ai.huggingfaceKey;
 
   if (!hasAnyAI)
     missing.push(
-      "at least one AI key — GROQ_API_KEY_1, CEREBRAS_API_KEY_1, OPENROUTER_API_KEY, or HUGGINGFACE_API_KEY",
+      "at least one AI key — GROQ_API_KEY_1, OPENROUTER_API_KEY, GEMINI_API_KEY_1, or HUGGINGFACE_API_KEY",
     );
 
   if (missing.length > 0) {

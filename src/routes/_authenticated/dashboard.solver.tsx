@@ -265,9 +265,8 @@ function SolverPage() {
     setLoading(true);
     set({ solution: null, revealed: [] });
     try {
-      // solveMathServer (Cerebras 120B → Groq fallback) puts the full JSON schema
-      // in the system context, leaving the entire 6 000-token output budget for
-      // the solution. Two retries per provider for resilience.
+      // solveMathServer prioritizes OpenRouter's long-answer model and keeps the
+      // full JSON schema in system context, with a 16k output budget.
       const { data: rawData, provider: prov } = await solveMathServer({
         data: { problem, subject },
       });
@@ -288,7 +287,7 @@ function SolverPage() {
       }
 
       // ── Server-side verification pass ─────────────────────────────────────
-      // Independently re-solves the same problem (Cerebras → Groq fallback).
+      // Independently re-solves the same problem (OpenRouter → Groq fallback).
       // Corrects final_answer if wrong; marks solution as server-verified.
       try {
         const vr = await verifyMathServer({

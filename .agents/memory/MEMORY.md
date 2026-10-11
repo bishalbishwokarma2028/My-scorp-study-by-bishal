@@ -4,7 +4,7 @@
 - [Feature state persistence](feature-state.md) — module-level cache in `src/lib/pageState.ts`; usePageState hook applied to compare, research, visual-explainer, code-tutor; survives route changes, resets on refresh
 - [MindMap SVG layout](mindmap-svg-fix.md) — viewBox must be 1500×1300 (CX=750,CY=650), BRANCH_R=270, SUB_R=480; R=545 causes top/bottom nodes to clip outside viewBox
 - [usePageState migration pitfall](usepagestate-migration.md) — after converting useState to usePageState, grep whole file for old setter names; stale calls only surface as runtime ReferenceErrors, not always caught by a quick read
-- [AI provider routing pools](ai-provider-routing.md) — keep preferred-provider order, but include Gemini fallback; verify live model IDs because provider catalogs retire models
+- [AI provider routing pools](ai-provider-routing.md) — long answers use OpenRouter; verify live model IDs and remember keys from one account share its credits
 - [No direct Supabase DB/DDL access](supabase-ddl-access.md) — only SUPABASE_URL/ANON/SERVICE_ROLE_KEY available (PostgREST, not Postgres); schema changes need user to run SQL manually in Supabase SQL Editor
 - [Credit limit resolution priority](credit-limit-resolution.md) — resolveLimit() checks unlimited_credits > per-user override column > global pool_limits row > hardcoded constant; any new check must survive missing-column pre-migration state
 - [PDF popup export](pdf-popup-export.md) — browser print popup is the only reliable PDF path; html2canvas compresses text

@@ -10,10 +10,10 @@ const Input = z.object({
   prompt: z.string().min(1).max(50000),
   systemPrompt: z.string().max(44000).optional(),
   history: z.array(HistoryMsg).max(6).optional(),
-  /** When true: route through the Cerebras-first path (long-answer features). */
-  preferCerebras: z.boolean().optional(),
-  /** Override the Groq max_tokens cap (default 1024). Use for bulk-generation (quiz / flashcards). */
-  maxTokens: z.number().int().min(256).max(6000).optional(),
+  /** When true: prioritize the long-answer OpenRouter model before other providers. */
+  preferLongAnswer: z.boolean().optional(),
+  /** Per-request output cap. Long-answer requests default to 16k tokens. */
+  maxTokens: z.number().int().min(256).max(24000).optional(),
 });
 
 /**
@@ -101,6 +101,8 @@ async function tryOpenRouter(
   key: string,
   model: string,
   history: Turn[],
+  maxTokens = 6000,
+  verbosity?: "low" | "medium" | "high",
 ): Promise<Result | null> {
   try {
     const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
@@ -115,7 +117,8 @@ async function tryOpenRouter(
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: 6000,
+        max_tokens: maxTokens,
+        ...(verbosity ? { verbosity } : {}),
       }),
     });
     const body = await res.text();
@@ -132,6 +135,25 @@ async function tryOpenRouter(
     logProviderFailure("OpenRouter", "network error");
     return null;
   }
+}
+
+const OPENROUTER_LONG_ANSWER_MODEL = "anthropic/claude-sonnet-5.5";
+const OPENROUTER_LONG_ANSWER_BACKUP_MODEL = "deepseek/deepseek-v4.1-flash";
+const LONG_ANSWER_MAX_TOKENS = 16000;
+
+async function tryOpenRouterPool(
+  prompt: string,
+  system: string,
+  model: string,
+  history: Turn[],
+  maxTokens: number,
+  verbosity?: "low" | "medium" | "high",
+): Promise<Result | null> {
+  for (const key of rotatedKeys("openrouter", serverConfig.ai.openrouterKeys)) {
+    const result = await tryOpenRouter(prompt, system, key, model, history, maxTokens, verbosity);
+    if (result) return result;
+  }
+  return null;
 }
 
 async function tryGemini(
@@ -257,39 +279,6 @@ async function tryGeminiVision(
   }
 }
 
-async function tryCerebras(
-  prompt: string,
-  system: string,
-  key: string,
-  history: Turn[],
-): Promise<Result | null> {
-  try {
-    const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
-    const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: "gpt-oss-120b",
-        messages,
-        max_tokens: 6000,
-      }),
-    });
-    const body = await res.text();
-    if (!res.ok) {
-      logProviderFailure("Cerebras", `HTTP ${res.status}`);
-      if (isRateLimited(res.status, body)) return null;
-      return null;
-    }
-    const data = JSON.parse(body);
-    const text = data?.choices?.[0]?.message?.content;
-    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
-    return null;
-  } catch {
-    logProviderFailure("Cerebras", "network error");
-    return null;
-  }
-}
-
 async function tryHuggingFace(prompt: string, system: string, key: string): Promise<Result | null> {
   try {
     const res = await fetch(
@@ -323,7 +312,7 @@ async function tryHuggingFace(prompt: string, system: string, key: string): Prom
 // Keeps the JSON schema in the SYSTEM context and sends only the problem as the
 // USER message. This frees the full 6 000-token output budget for the solution
 // instead of wasting input tokens on a schema description embedded in the prompt.
-// Cerebras 120B first → Groq fallback (same key pools, separate rotation pointers).
+// OpenRouter's long-answer model first → Groq fallback.
 
 const SOLVE_SYSTEM = `You are a world-class mathematics and science tutor. Solve the given problem with maximum detail and return ONLY a valid JSON object — no markdown fences, no prose before or after the JSON.
 
@@ -391,7 +380,7 @@ const SolveInputSchema = z.object({
 
 /**
  * Dedicated solver used by the Step-by-Step Solver feature.
- * Cerebras 120B → Groq → Gemini fallback. Retries once on unparseable JSON.
+ * OpenRouter long-answer model → Groq → Gemini fallback. Retries once on unparseable JSON.
  * Returns { data: Solution, provider } or { data: null, provider: "none" }.
  */
 export const solveMathServer = createServerFn({ method: "POST" })
@@ -401,13 +390,31 @@ export const solveMathServer = createServerFn({ method: "POST" })
 
     // Two attempts per provider so a one-off JSON slip gets a retry.
     for (let attempt = 0; attempt < 2; attempt++) {
-      // Cerebras 120B — highest quality for multi-step JSON
-      for (const key of rotatedKeys("cerebras-solve", serverConfig.ai.cerebrasKeys)) {
-        const r = await tryCerebras(userMsg, SOLVE_SYSTEM, key, []);
-        if (r) {
-          const parsed = extractSolveJSON(r.text);
-          if (parsed) return { data: parsed, provider: r.provider };
-        }
+      // Claude Sonnet 5.5 — detailed explanations, strict JSON, 16k output budget.
+      const longAnswer = await tryOpenRouterPool(
+        userMsg,
+        SOLVE_SYSTEM,
+        OPENROUTER_LONG_ANSWER_MODEL,
+        [],
+        LONG_ANSWER_MAX_TOKENS,
+        "high",
+      );
+      if (longAnswer) {
+        const parsed = extractSolveJSON(longAnswer.text);
+        if (parsed) return { data: parsed, provider: longAnswer.provider };
+      }
+
+      // OpenRouter's high-output backup, in case the primary model is unavailable.
+      const longAnswerBackup = await tryOpenRouterPool(
+        userMsg,
+        SOLVE_SYSTEM,
+        OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
+        [],
+        LONG_ANSWER_MAX_TOKENS,
+      );
+      if (longAnswerBackup) {
+        const parsed = extractSolveJSON(longAnswerBackup.text);
+        if (parsed) return { data: parsed, provider: longAnswerBackup.provider };
       }
       // Groq fallback — handles shorter/simpler problems well
       for (const key of rotatedKeys("groq-solve", serverConfig.ai.groqKeys)) {
@@ -460,7 +467,7 @@ const VERIFY_SYSTEM =
 
 /**
  * Independently verifies a proposed math/science answer.
- * Uses Cerebras (strongest model in pool) → Groq fallback.
+ * Uses the OpenRouter long-answer model → Groq fallback.
  * Returns null if all providers are rate-limited (caller keeps original answer).
  */
 async function verifyMathSolutionInternal(
@@ -472,9 +479,27 @@ async function verifyMathSolutionInternal(
     `PROPOSED ANSWER: ${proposedAnswer.slice(0, 400)}\n\n` +
     "Solve the problem independently from scratch. Compare with the proposed answer. Return JSON only.";
 
-  for (const key of rotatedKeys("cerebras-verify", serverConfig.ai.cerebrasKeys)) {
-    const r = await tryCerebras(prompt, VERIFY_SYSTEM, key, []);
-    if (r) { const p = safeParseVerifyJSON(r.text); if (p) return p; }
+  const longAnswer = await tryOpenRouterPool(
+    prompt,
+    VERIFY_SYSTEM,
+    OPENROUTER_LONG_ANSWER_MODEL,
+    [],
+    2048,
+  );
+  if (longAnswer) {
+    const parsed = safeParseVerifyJSON(longAnswer.text);
+    if (parsed) return parsed;
+  }
+  const longAnswerBackup = await tryOpenRouterPool(
+    prompt,
+    VERIFY_SYSTEM,
+    OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
+    [],
+    2048,
+  );
+  if (longAnswerBackup) {
+    const parsed = safeParseVerifyJSON(longAnswerBackup.text);
+    if (parsed) return parsed;
   }
   for (const key of rotatedKeys("groq-verify", serverConfig.ai.groqKeys)) {
     const r = await tryGroq(prompt, VERIFY_SYSTEM, key, [], 512);
@@ -507,49 +532,52 @@ export const askAIServer = createServerFn({ method: "POST" })
 
     let result: Result | null = null;
 
-    if (data.preferCerebras) {
-      // ── Cerebras-first path (long-answer features) ───────────────────────
-      // Solver, PDFChat, YouTube, Grammar, Math, Science, CodeTutor, Compare,
-      // Research, VisualExplainer, Notes, FormulaSheet, MockTest, Calculator
-      // Uses ONLY the Cerebras key pool (rotated for load balancing) — Groq
-      // is never used for these features.
-      for (const key of rotatedKeys("cerebras", serverConfig.ai.cerebrasKeys)) {
-        result = await tryCerebras(data.prompt, system, key, history);
-        if (result) break;
+    if (data.preferLongAnswer) {
+      // Long-answer features get the paid high-output model first. Its 16k
+      // default budget and high-verbosity setting let tutors explain fully.
+      const longTokens = data.maxTokens ?? LONG_ANSWER_MAX_TOKENS;
+      result = await tryOpenRouterPool(
+        data.prompt,
+        system,
+        OPENROUTER_LONG_ANSWER_MODEL,
+        history,
+        longTokens,
+        "high",
+      );
+
+      // Keep an OpenRouter long-output backup before falling back to Gemini.
+      if (!result) {
+        result = await tryOpenRouterPool(
+          data.prompt,
+          system,
+          OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
+          history,
+          longTokens,
+        );
       }
 
-      // Gemini 2.5 Flash is the reliable fallback when the Cerebras pool is
-      // out of quota. It is deliberately not routed through Groq.
       if (!result) {
         result = await tryGeminiPool(
           data.prompt,
           system,
           history,
-          data.maxTokens ?? 4096,
+          longTokens,
         );
       }
 
-      // Fallback 2 — current free OpenRouter models
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(
+      // Free OpenRouter models remain a fallback for account-credit issues.
+      for (const model of ["nvidia/nemotron-3.5-lightning:free", "apodex/apodex-1.1-mini:free"]) {
+        if (result) break;
+        result = await tryOpenRouterPool(
           data.prompt,
           system,
-          serverConfig.ai.openrouterKey,
-          "nvidia/nemotron-3.5-lightning:free",
+          model,
           history,
-        );
-      }
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(
-          data.prompt,
-          system,
-          serverConfig.ai.openrouterKey,
-          "apodex/apodex-1.1-mini:free",
-          history,
+          Math.min(longTokens, 6000),
         );
       }
 
-      // Fallback 3 — HuggingFace
+      // Final fallback — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }
@@ -562,8 +590,7 @@ export const askAIServer = createServerFn({ method: "POST" })
         if (result) break;
       }
 
-      // The Gemini pool is kept ahead of the long-answer Cerebras pool so a
-      // temporary provider quota does not make every short-answer feature fail.
+      // Gemini stays ahead of OpenRouter fallbacks for default short-answer requests.
       if (!result) {
         result = await tryGeminiPool(
           data.prompt,
@@ -573,35 +600,19 @@ export const askAIServer = createServerFn({ method: "POST" })
         );
       }
 
-      // Fallback 2 — Cerebras
-      if (!result) {
-        for (const key of rotatedKeys("cerebras", serverConfig.ai.cerebrasKeys)) {
-          result = await tryCerebras(data.prompt, system, key, history);
-          if (result) break;
-        }
-      }
-
-      // Fallback 3 — current free OpenRouter models
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(
+      // Fallback 2 — current free OpenRouter models, rotated across the key pool.
+      for (const model of ["nvidia/nemotron-3.5-lightning:free", "apodex/apodex-1.1-mini:free"]) {
+        if (result) break;
+        result = await tryOpenRouterPool(
           data.prompt,
           system,
-          serverConfig.ai.openrouterKey,
-          "nvidia/nemotron-3.5-lightning:free",
+          model,
           history,
-        );
-      }
-      if (!result && serverConfig.ai.openrouterKey) {
-        result = await tryOpenRouter(
-          data.prompt,
-          system,
-          serverConfig.ai.openrouterKey,
-          "apodex/apodex-1.1-mini:free",
-          history,
+          data.maxTokens ?? 6000,
         );
       }
 
-      // Fallback 4 — HuggingFace
+      // Fallback 3 — HuggingFace
       if (!result && serverConfig.ai.huggingfaceKey) {
         result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
       }
@@ -628,10 +639,9 @@ const VisionInput = z.object({
   history: z.array(VisionMsg).max(20).optional(),
 });
 
-// Claude 3 Haiku first — significantly more accurate for maths/science problems
-// than the Llama vision model. GPT-4o-mini as second fallback.
+// Current multimodal OpenRouter models, reached only after the Gemini vision pool.
 const OPENROUTER_VISION_MODELS = [
-  "anthropic/claude-3-haiku",
+  "anthropic/claude-sonnet-5.5",
   "openai/gpt-4o-mini",
   "meta-llama/llama-3.2-11b-vision-instruct",
 ];
@@ -779,14 +789,14 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
       if (text) return { text, provider: "Bishal's Assistant" };
     }
 
-    // Fallback — OpenRouter (requires account credits).
-    if (serverConfig.ai.openrouterKey) {
-      for (const model of OPENROUTER_VISION_MODELS) {
+    // Fallback — rotate through configured OpenRouter keys and vision models.
+    for (const model of OPENROUTER_VISION_MODELS) {
+      for (const key of rotatedKeys("openrouter", serverConfig.ai.openrouterKeys)) {
         const text = await tryOpenRouterVision(
           data.prompt,
           data.imageBase64,
           data.mimeType,
-          serverConfig.ai.openrouterKey,
+          key,
           model,
           history,
         );

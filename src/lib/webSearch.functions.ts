@@ -16,6 +16,14 @@ function currentDateStr(): string {
 }
 
 type SourcedResult = { context: string; sourceCount: number } | null;
+let openRouterSearchPointer = 0;
+
+function rotatedOpenRouterSearchKeys(keys: string[]): string[] {
+  if (keys.length === 0) return keys;
+  const start = openRouterSearchPointer % keys.length;
+  openRouterSearchPointer = (start + 1) % keys.length;
+  return [...keys.slice(start), ...keys.slice(0, start)];
+}
 
 // Tavily — real-time search engine, tried first with each configured key
 // in order (falls to the next key if one is rate-limited/exhausted).
@@ -181,7 +189,7 @@ export const webSearchServer = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ context: string; used: boolean }> => {
     const today = currentDateStr();
     const { tavilyKeys, serperKey } = serverConfig.search;
-    const { openrouterKey } = serverConfig.ai;
+    const { openrouterKeys } = serverConfig.ai;
 
     // 1) Tavily — try every configured key before giving up on it
     for (const key of tavilyKeys) {
@@ -196,8 +204,8 @@ export const webSearchServer = createServerFn({ method: "POST" })
     }
 
     // 3) Perplexity via OpenRouter — AI model with live browsing
-    if (openrouterKey) {
-      const result = await tryPerplexity(data.query, openrouterKey);
+    for (const key of rotatedOpenRouterSearchKeys(openrouterKeys)) {
+      const result = await tryPerplexity(data.query, key);
       if (result) return { context: result.context, used: true };
     }
 

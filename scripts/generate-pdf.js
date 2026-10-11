@@ -214,7 +214,7 @@ doc.moveDown(2.5);
 
 qBox(
   "Tell me about your project in one minute.",
-  "ScorpStudy is an AI-powered learning platform I built to solve a real problem — students in Nepal and similar developing countries don't have affordable access to quality tutors. The platform provides 10+ learning modules: an AI chat tutor, math and science lessons with structured content, grammar reference, quiz generator, flashcard maker, mind maps, mock tests, PDF analysis, smart notes, and a translator. It's built on React with TypeScript, uses Supabase as the backend database and auth provider, and integrates with multiple AI APIs including Groq and Cerebras for fast responses. The app is live at scorpstudy.in.net and is completely free for students.",
+  "ScorpStudy is an AI-powered learning platform I built to solve a real problem — students in Nepal and similar developing countries don't have affordable access to quality tutors. The platform provides 10+ learning modules: an AI chat tutor, math and science lessons with structured content, grammar reference, quiz generator, flashcard maker, mind maps, mock tests, PDF analysis, smart notes, and a translator. It's built on React with TypeScript, uses Supabase as the backend database and auth provider, and routes AI requests through OpenRouter, Groq, and Gemini. The app is live at scorpstudy.in.net and is completely free for students.",
   "Speak slowly, make eye contact, and pause after the first sentence to let it land."
 );
 
@@ -242,9 +242,9 @@ tableRow("Meta-Framework", "TanStack Start", "SSR support, file-based routing, S
 tableRow("Styling", "Tailwind CSS", "Utility-first, fast to build, consistent design");
 tableRow("Database", "Supabase (PostgreSQL)", "Open-source, real-time, auth built-in, free tier");
 tableRow("Runtime/Build", "Bun", "3× faster than Node.js for builds and server");
-tableRow("AI — Primary", "Groq API (Llama 3)", "Extremely fast inference, free tier available");
-tableRow("AI — Secondary", "Cerebras API", "Ultra-fast chip-level inference, fallback provider");
-tableRow("AI — Tertiary", "OpenRouter API", "Routes to 100+ models, ultimate fallback");
+tableRow("AI — Long answers", "OpenRouter (Claude Sonnet 5.5)", "High-verbosity answers with a 16k-token output cap");
+tableRow("AI — Long-answer backup", "OpenRouter (DeepSeek V4.1 Flash)", "High-output fallback model");
+tableRow("AI — General fallback", "Groq + Gemini", "Separate provider pools for availability");
 tableRow("Auth", "Supabase Auth", "JWT-based, email/password, session management");
 tableRow("PDF Parsing", "pdfjs-dist", "Mozilla's PDF.js, client-side text extraction");
 tableRow("Markdown", "react-markdown + remark-gfm", "Renders AI responses with proper formatting");
@@ -290,7 +290,7 @@ para("Here is the step-by-step flow when a student asks a question in Bishal's A
 const flow = [
   "1. User types a message and clicks Send.",
   "2. The React component calls the askAI() function in src/lib/aiProvider.ts.",
-  "3. askAI() checks which AI provider is available (Groq → Cerebras → OpenRouter).",
+  "3. Long-answer requests try OpenRouter Claude Sonnet 5.5, then DeepSeek V4.1 Flash and Gemini; default requests try Groq, Gemini, then OpenRouter.",
   "4. The message is formatted with a system prompt and conversation history.",
   "5. An HTTP POST request is sent to the selected AI provider's API endpoint.",
   "6. The AI API returns a streamed or complete response.",
@@ -538,7 +538,7 @@ qBox(
 heading1("Section 6: AI Integration & Provider System");
 
 heading2("Multi-Provider Architecture");
-para("ScorpStudy uses a provider rotation system to ensure high availability. If one AI provider is rate-limited or unavailable, the system automatically tries the next one. The order is: Groq → Cerebras → OpenRouter (which itself routes to multiple models).");
+para("ScorpStudy routes long-answer requests through OpenRouter Claude Sonnet 5.5 first, with DeepSeek V4.1 Flash and Gemini as fallbacks. Default requests use Groq first, then Gemini and OpenRouter. Configured keys rotate, and the remaining keys are tried when one fails.");
 
 heading2("How the AI Provider System Works");
 bullet([
@@ -552,7 +552,7 @@ bullet([
 
 qBox(
   "What AI models does the app use?",
-  "The primary model is Llama 3.3 70B running on Groq's infrastructure — Groq uses specialized Language Processing Units (LPUs) that make inference extremely fast, typically under 1 second per response. The secondary provider is Cerebras, which uses their own Wafer-Scale Engine chips. The fallback is OpenRouter, which routes to various models including Mistral and Claude. All models are Large Language Models (LLMs) — transformer-based neural networks trained on massive text datasets."
+  "Long-answer features use Anthropic Claude Sonnet 5.5 through OpenRouter, with DeepSeek V4.1 Flash as a long-output backup. Default requests use Groq's openai/gpt-oss-20b model first, with Gemini 2.5 Flash and OpenRouter fallbacks. Image analysis uses Gemini first and OpenRouter vision models if needed. These models are called through their providers' APIs; ScorpStudy does not train them."
 );
 
 qBox(
@@ -772,7 +772,7 @@ heading1("Section 13: Code & Implementation Questions");
 
 qBox(
   "Can you show me a code snippet and explain it?",
-  "Here's the core of the AI provider rotation in askAI():\n\nconst providers = [groqProvider, cerebrasProvider, openRouterProvider];\nfor (const provider of providers) {\n  try {\n    const result = await provider.call(prompt, systemPrompt);\n    return { text: result.text, provider: provider.name };\n  } catch (error) {\n    console.warn('Provider failed:', provider.name, error);\n    continue; // try next provider\n  }\n}\nthrow new Error('All providers failed');\n\nThis iterates through providers in priority order. If one throws an error (network issue, rate limit), we catch it and continue to the next. We only throw a final error if ALL providers fail.",
+  "Long-answer requests first try OpenRouter Claude Sonnet 5.5, then DeepSeek V4.1 Flash, then the Gemini pool. Default requests try the Groq pool, then Gemini and OpenRouter. Each provider pool rotates configured keys and proceeds to fallbacks when a request fails. The actual routing implementation is in src/lib/aiProvider.functions.ts.",
   "If asked to show code, go to the actual source files. Walk judges through the logic calmly."
 );
 
@@ -788,7 +788,7 @@ qBox(
 
 qBox(
   "How do you manage multiple API keys?",
-  "I have multiple API keys for each provider (e.g., GROQ_API_KEY_1 through GROQ_API_KEY_6) stored as environment variables. The AI provider module randomly selects a key from the available set for each request. This effectively multiplies the rate limit — if each key allows 30 requests per minute, 6 keys give 180 requests per minute total. Keys are never hardcoded in source code — they exist only as server-side environment variables, invisible to browser clients and not committed to version control."
+  "Keys are stored as server-side environment variables and rotated across configured pools. The app supports up to 10 OpenRouter keys, 15 Groq keys, and 5 Gemini keys. A failed key does not prevent trying the others or the next provider. Multiple OpenRouter keys from the same account still share that account's credits; they do not multiply its balance."
 );
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -808,7 +808,7 @@ qBox(
 
 qBox(
   "What happens if the AI APIs shut down or change pricing?",
-  "This is a real risk and I've designed for it. The multi-provider architecture is specifically meant to avoid single points of failure. If Groq shuts down, Cerebras and OpenRouter still work. OpenRouter itself routes to 100+ models from different companies. If pricing becomes prohibitive, I can switch primary providers in the aiProvider.ts configuration file without changing any other code. Long-term, open-source models running on local infrastructure (like Ollama with Llama) could completely replace API dependence. The app's architecture is provider-agnostic — providers are pluggable modules."
+  "This is a real risk and I've designed for it. The multi-provider architecture is meant to avoid a single point of failure: long-answer features can fall back from OpenRouter to Gemini, while default requests can fall back from Groq to Gemini and OpenRouter. If pricing becomes prohibitive, the model and provider order can be changed in the server-side AI routing configuration."
 );
 
 qBox(
@@ -883,8 +883,8 @@ heading1("Section 17: Quick-Reference Cheat Sheet");
 heading2("Key Numbers to Remember");
 bullet([
   "10+ learning modules in the platform",
-  "3 AI providers in the rotation (Groq, Cerebras, OpenRouter)",
-  "6 API keys per provider for rate limit multiplication",
+  "Long answers: OpenRouter Claude, then DeepSeek V4.1 Flash and Gemini",
+  "Rotating pools support up to 10 OpenRouter, 15 Groq, and 5 Gemini keys",
   "PostgreSQL (relational database) via Supabase",
   "JWT tokens expire and auto-refresh via refresh tokens",
   "1200×630 px OG image for social media previews",
@@ -897,7 +897,7 @@ tableRow("Term", "Simple Definition", "Used In", true);
 tableRow("SSR", "HTML built on server before browser sees it", "TanStack Start, SEO");
 tableRow("JWT", "Encrypted token proving who you are", "Supabase Auth");
 tableRow("RLS", "Database rules: users see only their own data", "Supabase Security");
-tableRow("LLM", "AI language model (Llama, Gemini, etc.)", "Groq, Cerebras APIs");
+tableRow("LLM", "AI language model (Claude, DeepSeek, Gemini, etc.)", "OpenRouter, Groq, Gemini APIs");
 tableRow("Prompt Engineering", "Crafting inputs to get desired AI outputs", "All AI modules");
 tableRow("CORS", "Browser security: controls which domains can call APIs", "AI API calls");
 tableRow("Hydration", "React taking over a server-rendered HTML page", "SSR setup");

@@ -59,7 +59,7 @@ const SetPoolLimitInput = z.object({
   dailyLimit: z.number().int().min(0).max(2000),
 });
 
-/** Update the daily credit limit for a pool (Deep Engine = cerebras, Rapid Engine = groq). */
+/** Update the daily credit limit for a pool (Deep Engine or Rapid Engine). */
 export const adminSetPoolLimitServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => SetPoolLimitInput.parse(d))
   .handler(async ({ data }) => {

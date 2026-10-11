@@ -106,7 +106,7 @@ function AdminLogs() {
         <div>
           <h1 className="text-xl font-bold text-white">Request Logs</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Most recent 300 AI requests — who made them, and which engine (Deep = Cerebras, Rapid = Groq) handled it.
+            Most recent 300 AI requests — who made them, and which feature-credit pool (Deep or Rapid) was charged.
           </p>
         </div>
         <div className="flex gap-2">

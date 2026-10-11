@@ -1,4 +1,4 @@
-/** Daily credit limits per provider pool */
+/** App credit defaults; the "cerebras" pool string is retained for Supabase compatibility. */
 export const CEREBRAS_DAILY_LIMIT = 10;
 export const GROQ_DAILY_LIMIT = 20;
 

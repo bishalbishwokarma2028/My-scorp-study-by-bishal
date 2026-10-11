@@ -189,7 +189,7 @@ function TranslatorPage() {
       const systemPrompt = buildSystemPrompt(from, target);
 
       // Prefer the long-answer route; Gemini is the automatic fallback if the
-      // Cerebras pool has no available quota. maxTokens allows longer passages.
+      // Keep the translation response budget bounded even on the long-answer model.
       const res = await askAI(userPrompt, systemPrompt, undefined, true, 2048);
 
       // Strip common AI wrapper artefacts

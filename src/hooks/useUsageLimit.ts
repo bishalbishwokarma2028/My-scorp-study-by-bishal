@@ -45,8 +45,9 @@ function writeLocal(userId: string, pool: PoolKey, used: number, limit: number):
 
 /**
  * Per-pool daily credit hook.
- * Pass pool = "cerebras" for all Cerebras features (10 credits/day shared),
- * or pool = "groq" for all Groq features (20 credits/day shared).
+ * Pass pool = "cerebras" for Deep Engine features (10 credits/day shared; the
+ * database keeps this legacy pool id for compatibility), or "groq" for Rapid
+ * Engine features (20 credits/day shared).
  */
 export function useUsageLimit(userId: string, pool: PoolKey = GROQ_POOL_KEY) {
   const [quota, setQuota] = useState<QuotaState | null>(null);

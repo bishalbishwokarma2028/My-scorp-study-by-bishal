@@ -1851,7 +1851,7 @@ function WhiteboardPage() {
       const res = await askAIServer({
         data: {
           prompt: buildTeachingPrompt(text, safe),
-          preferCerebras: true,
+          preferLongAnswer: true,
           systemPrompt: "You are an expert AI teacher on an interactive whiteboard. Return ONLY valid JSON as instructed — no prose, no markdown wrappers.",
         },
       });
