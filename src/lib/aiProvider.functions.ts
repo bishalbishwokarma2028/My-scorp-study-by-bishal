@@ -156,6 +156,22 @@ async function tryOpenRouterPool(
   return null;
 }
 
+async function tryOpenRouterKeysInOrder(
+  prompt: string,
+  system: string,
+  model: string,
+  history: Turn[],
+  maxTokens: number,
+  verbosity?: "low" | "medium" | "high",
+): Promise<Result | null> {
+  // Long-answer requests deliberately use key 1 first, then 2 ... through 10.
+  for (const key of serverConfig.ai.openrouterKeys) {
+    const result = await tryOpenRouter(prompt, system, key, model, history, maxTokens, verbosity);
+    if (result) return result;
+  }
+  return null;
+}
+
 async function tryGemini(
   prompt: string,
   system: string,
@@ -391,7 +407,7 @@ export const solveMathServer = createServerFn({ method: "POST" })
     // Two attempts per provider so a one-off JSON slip gets a retry.
     for (let attempt = 0; attempt < 2; attempt++) {
       // Claude Sonnet 5.5 — detailed explanations, strict JSON, 16k output budget.
-      const longAnswer = await tryOpenRouterPool(
+      const longAnswer = await tryOpenRouterKeysInOrder(
         userMsg,
         SOLVE_SYSTEM,
         OPENROUTER_LONG_ANSWER_MODEL,
@@ -405,7 +421,7 @@ export const solveMathServer = createServerFn({ method: "POST" })
       }
 
       // OpenRouter's high-output backup, in case the primary model is unavailable.
-      const longAnswerBackup = await tryOpenRouterPool(
+      const longAnswerBackup = await tryOpenRouterKeysInOrder(
         userMsg,
         SOLVE_SYSTEM,
         OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
@@ -479,7 +495,7 @@ async function verifyMathSolutionInternal(
     `PROPOSED ANSWER: ${proposedAnswer.slice(0, 400)}\n\n` +
     "Solve the problem independently from scratch. Compare with the proposed answer. Return JSON only.";
 
-  const longAnswer = await tryOpenRouterPool(
+  const longAnswer = await tryOpenRouterKeysInOrder(
     prompt,
     VERIFY_SYSTEM,
     OPENROUTER_LONG_ANSWER_MODEL,
@@ -490,7 +506,7 @@ async function verifyMathSolutionInternal(
     const parsed = safeParseVerifyJSON(longAnswer.text);
     if (parsed) return parsed;
   }
-  const longAnswerBackup = await tryOpenRouterPool(
+  const longAnswerBackup = await tryOpenRouterKeysInOrder(
     prompt,
     VERIFY_SYSTEM,
     OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
@@ -536,7 +552,7 @@ export const askAIServer = createServerFn({ method: "POST" })
       // Long-answer features get the paid high-output model first. Its 16k
       // default budget and high-verbosity setting let tutors explain fully.
       const longTokens = data.maxTokens ?? LONG_ANSWER_MAX_TOKENS;
-      result = await tryOpenRouterPool(
+      result = await tryOpenRouterKeysInOrder(
         data.prompt,
         system,
         OPENROUTER_LONG_ANSWER_MODEL,
@@ -547,7 +563,7 @@ export const askAIServer = createServerFn({ method: "POST" })
 
       // Keep an OpenRouter long-output backup before falling back to Gemini.
       if (!result) {
-        result = await tryOpenRouterPool(
+        result = await tryOpenRouterKeysInOrder(
           data.prompt,
           system,
           OPENROUTER_LONG_ANSWER_BACKUP_MODEL,

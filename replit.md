@@ -34,6 +34,7 @@ All secrets are stored in Replit Secrets (never in code or `.env`). See `.env.ex
 | OpenRouter | `OPENROUTER_API_KEY` and optional `OPENROUTER_API_KEY_2` … `OPENROUTER_API_KEY_10` |
 
 Config is read lazily at request time (not module load) — see `src/lib/config.ts`.
+For long-answer requests, OpenRouter keys are tried in order (`OPENROUTER_API_KEY`, then `_2` through `_10`); provider/model fallbacks run only after the configured keys fail.
 
 ## Key source files
 

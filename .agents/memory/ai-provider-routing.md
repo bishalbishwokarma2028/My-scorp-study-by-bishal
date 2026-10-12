@@ -14,4 +14,8 @@ Text AI routing keeps separate long-answer and default paths:
 
 **How to apply:** verify model IDs against the current provider catalog and a small live request before changing them. Preserve Groq-first routing for default requests, keep Gemini as a fallback, and do not treat provider failures as user daily quota exhaustion. OpenRouter keys from one account share that account's credits; adding keys does not multiply the balance.
 
-The Groq pool merges `GROQ_API_KEY_N` with former `GROQ_COMPOUND_KEY_N` keys; do not restore a separate compound-mini path. Gemini supports up to 5 keys. OpenRouter uses the original unsuffixed key plus optional `_2` through `_10`; rotate the pool and try remaining keys after per-key failures.
+The Groq pool merges `GROQ_API_KEY_N` with former `GROQ_COMPOUND_KEY_N` keys; do not restore a separate compound-mini path. Gemini supports up to 5 keys. OpenRouter uses the original unsuffixed key plus optional `_2` through `_10`; long-answer requests must try them in numeric order on each request, stopping at the first successful response.
+
+**Why:** the user specifically wants key 1 preferred, with sequential failover through key 10 rather than round-robin starting positions.
+
+**How to apply:** preserve numeric key order for the long-answer route. A successful key ends that request's OpenRouter attempts; only a complete failure across the configured keys advances to the next model/provider.
