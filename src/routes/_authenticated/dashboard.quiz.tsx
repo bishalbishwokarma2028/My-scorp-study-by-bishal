@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Loader2, Check, X as XIcon, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAI, askAIJSON, extractJSON } from "@/lib/aiProvider";
+import { generateInBatches } from "@/lib/aiGeneration";
 import { supabase } from "@/integrations/supabase/client";
 import { ProviderBadge } from "@/components/ai-ui";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
@@ -106,6 +107,7 @@ function QuizPage() {
   const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
   const [type, setType] = useState<QType>("MCQ");
   const [loading, setLoading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<number | null>(null);
   const [questions, setQuestions] = useState<Q[] | null>(null);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -126,21 +128,57 @@ function QuizPage() {
     if (!topic.trim()) return toast.error("Enter a topic");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true); setQuestions(null); setDone(false); setCurrent(0); setAnswers([]); setShowAnswers([]);
-    const prompt = buildPrompt(topic, difficulty, type, count);
-    // Scale token budget: each question needs ~200-300 tokens; add 600 for overhead
-    const maxTokens = Math.min(count * 300 + 600, 5500);
-    const res = await askAI(prompt, "Output only valid JSON arrays. No code fences.", undefined, false, maxTokens);
-    setProvider(res.provider);
-    await bump();
-    const parsed = extractJSON<Q[]>(res.text);
-    if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
-      toast.error("Couldn't parse questions, try again");
-    } else {
-      setQuestions(parsed);
-      setAnswers(Array(parsed.length).fill(""));
-      setShowAnswers(Array(parsed.length).fill(false));
+    setBatchProgress(0);
+    try {
+      const batchSize = type === "Very Long Answer" ? 2 : type === "Long Answer" ? 4 : 5;
+      const generated = await generateInBatches<Q>({
+        count,
+        batchSize,
+        createPrompt: (batchCount, offset, previous) => {
+          const recent = previous.slice(-12).map((q) => q.question).join("\n- ");
+          return `${buildPrompt(topic, difficulty, type, batchCount)}
+
+This is segment ${offset + 1} onward in a larger set. Make these questions distinct from the earlier segment.
+${recent ? `Do not repeat these earlier questions:\n- ${recent}` : ""}`;
+        },
+        requestBatch: async (prompt, batchCount) => {
+          const { data, provider: responseProvider } = await askAIJSON<Q[]>(
+            prompt,
+            "Output only a valid JSON array. No code fences.",
+            undefined,
+            false,
+            Math.min(800 + batchCount * (type === "Very Long Answer" ? 1100 : 550), 8_000),
+          );
+          return { items: data, provider: responseProvider };
+        },
+        isValidItem: (item): item is Q => {
+          if (!item || typeof item !== "object") return false;
+          const q = item as Q;
+          return typeof q.question === "string" && q.question.trim().length > 0
+            && typeof q.answer === "string" && q.answer.trim().length > 0
+            && typeof q.explanation === "string";
+        },
+        onProgress: (generatedCount) => setBatchProgress(generatedCount),
+      });
+
+      setProvider(generated.provider);
+      if (!generated.items.length) {
+        toast.error("Couldn't generate questions. Please try again.");
+        return;
+      }
+      setQuestions(generated.items);
+      setAnswers(Array(generated.items.length).fill(""));
+      setShowAnswers(Array(generated.items.length).fill(false));
+      await bump();
+      if (!generated.complete) {
+        toast.warning(`Generated ${generated.items.length} of ${count} questions. You can use this set or try again.`);
+      }
+    } catch {
+      toast.error("Couldn't generate questions. Please try again.");
+    } finally {
+      setLoading(false);
+      setBatchProgress(null);
     }
-    setLoading(false);
   }
 
   function answer(val: string) {
@@ -329,7 +367,9 @@ function QuizPage() {
         </div>
       )}
       <button onClick={generate} disabled={loading} className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-        {loading ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Bishal's Assistant is thinking…</> : "Generate Quiz"}
+        {loading
+          ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Generating {batchProgress ?? 0}/{count}…</>
+          : "Generate Quiz"}
       </button>
     </div>
   );

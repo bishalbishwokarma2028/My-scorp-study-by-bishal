@@ -398,27 +398,86 @@ function NotesPage() {
     if (!content.trim()) return toast.error("Write something first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setAiLoading("enhance");
-    const res = await askAI(
-      `STEP 1 — SILENT MATH PRE-CHECK (internal only, do not output this step):\nScan these notes for any numerical calculations, equations, or formulas. For each one, independently solve it from scratch to confirm the correct answer. Remember the verified values.\n\nSTEP 2 — WRITE THE ENHANCED NOTES using your verified answers:\nImprove, restructure, and substantially expand these study notes into a long, thorough, exam-ready version — do NOT just lightly polish them, make them noticeably longer and more detailed. Keep the original meaning and facts, fix grammar, and:\n- Add clear Markdown headings and sub-headings to organize the material\n- Expand every key point with more explanation, context, and relevant detail a student would need to fully understand it (not just one-line bullets)\n- Add examples, analogies, or clarifying notes wherever they would help understanding\n- Bold every key term with **\n- For any formulas or mathematical steps, use the independently verified values from Step 1, show step-by-step working, and state the final answer with correct units\n- If helpful, add a short summary section at the end\n\nBe comprehensive and detailed throughout — a long, complete write-up is required, not a brief rewording.\n\nNotes:\n${content}`,
-      "You are an expert study tutor who writes long, thorough, detailed notes — never brief ones. Always expand and add useful depth rather than just rephrasing. ACCURACY IS THE HIGHEST PRIORITY: for any mathematical, numerical, physics, chemistry, or scientific content, verify every calculation before writing it, show step-by-step working with correct formulas, and state final answers with correct units. Use plain Unicode math symbols (×, ÷, √, ², ³, π, ≈, ±, ≤, ≥, θ, Δ) — NEVER raw LaTeX backslash commands.",
-      undefined, true,
-    );
-    setContent(res.text);
-    setDirty(true);
-    await bump();
-    setAiLoading(null);
-    toast.success("Enhanced");
+    try {
+      const res = await askAI(
+        `STEP 1 — SILENT MATH PRE-CHECK (internal only, do not output this step):\nScan these notes for any numerical calculations, equations, or formulas. For each one, independently solve it from scratch to confirm the correct answer. Remember the verified values.\n\nSTEP 2 — WRITE THE ENHANCED NOTES using your verified answers:\nImprove, restructure, and substantially expand these study notes into a long, thorough, exam-ready version — do NOT just lightly polish them, make them noticeably longer and more detailed. Keep the original meaning and facts, fix grammar, and:\n- Add clear Markdown headings and sub-headings to organize the material\n- Expand every key point with more explanation, context, and relevant detail a student would need to fully understand it (not just one-line bullets)\n- Add examples, analogies, or clarifying notes wherever they would help understanding\n- Bold every key term with **\n- For any formulas or mathematical steps, use the independently verified values from Step 1, show step-by-step working, and state the final answer with correct units\n- If helpful, add a short summary section at the end\n\nBe comprehensive and detailed throughout — a long, complete write-up is required, not a brief rewording.\n\nNotes:\n${content.slice(0, 44_000)}`,
+        "You are an expert study tutor who writes long, thorough, detailed notes — never brief ones. Always expand and add useful depth rather than just rephrasing. ACCURACY IS THE HIGHEST PRIORITY: for any mathematical, numerical, physics, chemistry, or scientific content, verify every calculation before writing it, show step-by-step working with correct formulas, and state final answers with correct units. Use plain Unicode math symbols (×, ÷, √, ², ³, π, ≈, ±, ≤, ≥, θ, Δ) — NEVER raw LaTeX backslash commands.",
+        undefined, true, 5_000,
+      );
+      if (res.provider === "none") return toast.error("AI is temporarily unavailable. Your notes were not changed.");
+      setContent(res.text);
+      setDirty(true);
+      await bump();
+      toast.success("Enhanced");
+    } catch {
+      toast.error("Could not enhance these notes. Please try again.");
+    } finally {
+      setAiLoading(null);
+    }
   }
   async function aiSummarize() {
     if (!content.trim()) return toast.error("Write something first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setAiLoading("summarize");
-    const res = await askAI(`Summarize these notes as crisp bullet points with bolded key terms:\n${content}`, undefined, undefined, true);
-    setContent(`${content}\n\n---\n\n## ✨ Summary\n${res.text}`);
-    setDirty(true);
-    await bump();
-    setAiLoading(null);
-    toast.success("Summary appended");
+    try {
+      const res = await askAI(
+        `Summarize these notes as crisp bullet points with bolded key terms:\n${content.slice(0, 44_000)}`,
+        undefined,
+        undefined,
+        true,
+        1_800,
+      );
+      if (res.provider === "none") return toast.error("AI is temporarily unavailable. Your notes were not changed.");
+      setContent(`${content}\n\n---\n\n## ✨ Summary\n${res.text}`);
+      setDirty(true);
+      await bump();
+      toast.success("Summary appended");
+    } catch {
+      toast.error("Could not summarize these notes. Please try again.");
+    } finally {
+      setAiLoading(null);
+    }
+  }
+  async function aiGenerateStudyGuide() {
+    const subject = title.trim() || content.trim().slice(0, 180);
+    if (!subject) return toast.error("Add a topic in the title or write some notes first");
+    if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
+    setAiLoading("detailed");
+    try {
+      const source = content.trim().slice(0, 44_000);
+      const res = await askAI(
+        `Create a comprehensive, exam-ready study guide about "${subject}".
+
+Target at least 20 standard A4 pages (roughly 7,000–9,000 words). Do not claim a page count. Use 12–16 substantial sections, with clear headings, foundational explanations, worked examples, important exceptions, common mistakes, recap points, and practice questions with answers. Cover the topic's major subtopics rather than repeating the same explanations. Keep the material accurate; identify genuine uncertainty instead of inventing facts.
+
+${source ? `Use and preserve the useful material in these existing notes, correcting errors where necessary:\n\n${source}` : "There are no existing notes; build the guide from the topic title."}`,
+        "You are an expert study tutor producing a detailed, accurate textbook-style study guide. Follow the requested length and section structure, use clear markdown, and explain concepts step by step. Use plain Unicode math symbols, not raw LaTeX commands.",
+        undefined,
+        true,
+        18_000,
+      );
+      if (res.provider === "none") {
+        toast.error("The study guide could not be generated. Your existing notes were not changed.");
+        return;
+      }
+      const nextContent = content.trim()
+        ? `${content}\n\n---\n\n${res.text}`
+        : res.text;
+      setContent(nextContent);
+      if (!title.trim()) setTitle(`Study Guide: ${subject.slice(0, 80)}`);
+      setDirty(true);
+      await bump();
+      const wordsInGuide = res.text.trim().split(/\s+/).length;
+      if (wordsInGuide < 6_000) {
+        toast.info(`Guide created (${wordsInGuide.toLocaleString()} words), but it fell short of the 20-page target.`);
+      } else {
+        toast.success(`Detailed study guide created (${wordsInGuide.toLocaleString()} words).`);
+      }
+    } catch {
+      toast.error("Could not generate the study guide. Your existing notes were not changed.");
+    } finally {
+      setAiLoading(null);
+    }
   }
   async function quizMe() {
     if (!content.trim()) return toast.error("Write something first");
@@ -773,9 +832,10 @@ function NotesPage() {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <AiBtn loading={aiLoading === "enhance"} onClick={aiEnhance}><Sparkles className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Enhance</span></AiBtn>
-            <AiBtn loading={aiLoading === "summarize"} onClick={aiSummarize}><Wand2 className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Summarize</span></AiBtn>
-            <AiBtn onClick={quizMe}><FileQuestion className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Quiz Me</span></AiBtn>
+            <AiBtn loading={aiLoading === "enhance"} disabled={!!aiLoading} onClick={aiEnhance}><Sparkles className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Enhance</span></AiBtn>
+            <AiBtn loading={aiLoading === "summarize"} disabled={!!aiLoading} onClick={aiSummarize}><Wand2 className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Summarize</span></AiBtn>
+            <AiBtn loading={aiLoading === "detailed"} disabled={!!aiLoading} onClick={aiGenerateStudyGuide}><BookOpen className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> 20-page guide</span></AiBtn>
+            <AiBtn disabled={!!aiLoading} onClick={quizMe}><FileQuestion className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Quiz Me</span></AiBtn>
             <AiBtn onClick={exportPDF}><FileDown className="h-3 w-3" /><span className="text-[11px] sm:text-xs"> Export PDF</span></AiBtn>
             <QuotaBadge quota={quota} loading={quotaLoading} />
             <button onClick={() => persist(true)} className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1.5 font-semibold text-white shadow-md hover:opacity-90">
@@ -816,7 +876,7 @@ function NotesPage() {
 
         <div className="mt-3 flex items-center justify-between border-t border-border pt-2 text-xs text-muted-foreground">
           <span>{words} words • {readMin} min read</span>
-          <span>{aiLoading && <span className="inline-flex items-center gap-1 text-violet-600"><Loader2 className="h-3 w-3 animate-spin" /> AI working…</span>}</span>
+              <span>{aiLoading && <span className="inline-flex items-center gap-1 text-violet-600"><Loader2 className="h-3 w-3 animate-spin" /> {aiLoading === "detailed" ? "Building a long study guide; this can take a few minutes…" : "AI working…"}</span>}</span>
         </div>
       </section>
     </div>
@@ -831,9 +891,9 @@ function ToolBtn({ children, onClick, title }: { children: React.ReactNode; onCl
   );
 }
 function Sep() { return <span className="mx-1 h-4 w-px bg-border" />; }
-function AiBtn({ children, onClick, loading }: { children: React.ReactNode; onClick: () => void; loading?: boolean }) {
+function AiBtn({ children, onClick, loading, disabled }: { children: React.ReactNode; onClick: () => void; loading?: boolean; disabled?: boolean }) {
   return (
-    <button onClick={onClick} disabled={loading} className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+    <button onClick={onClick} disabled={loading || disabled} className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50">
       {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : children}
     </button>
   );

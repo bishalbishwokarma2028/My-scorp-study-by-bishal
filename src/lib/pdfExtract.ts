@@ -8,23 +8,26 @@
  * - Returns up to MAX_CHARS characters of combined text.
  */
 
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
 const MAX_PAGES = 50;
 const MAX_CHARS = 50_000;
 const MIN_TEXT_PER_PAGE = 30;
 
-type VisionFn = (opts: { data: { prompt: string; imageBase64: string; mimeType: string } }) => Promise<{ text: string }>;
+type VisionFn = (opts: { data: { prompt: string; imageBase64: string; mimeType: string } }) => Promise<{ text: string; provider?: string }>;
 
 export interface PdfExtractResult {
   text: string;
   pageCount: number;
+  pagesProcessed: number;
   scannedPages: number;
+  truncated: boolean;
 }
 
 async function getPdfjs() {
   const pdfjs = await import("pdfjs-dist");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc =
-      `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+    pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
   }
   return pdfjs;
 }
@@ -39,7 +42,9 @@ async function pageToBase64(page: any): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     await page.render({ canvasContext: ctx, viewport }).promise;
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+    canvas.width = 0;
+    canvas.height = 0;
     return dataUrl.split(",")[1];
   } catch {
     return null;
@@ -85,7 +90,7 @@ export async function extractPdfText(
               mimeType: "image/jpeg",
             },
           });
-          if (res.text && res.text.length > 10) {
+          if (res.provider !== "none" && res.text && res.text.length > 10) {
             combined += `\n--- Page ${i} (scanned) ---\n${res.text}`;
           }
         } catch {
@@ -100,6 +105,8 @@ export async function extractPdfText(
   return {
     text: combined.trim().slice(0, MAX_CHARS),
     pageCount: doc.numPages,
+    pagesProcessed: pagesToProcess,
     scannedPages,
+    truncated: doc.numPages > pagesToProcess || combined.length > MAX_CHARS,
   };
 }

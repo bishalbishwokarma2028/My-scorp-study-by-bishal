@@ -3,6 +3,7 @@ import { z } from "zod";
 import { cacheGet, cacheSet } from "./aiCache";
 import { identityCacheLookup } from "./identityCache";
 import { serverConfig } from "./config";
+import { extractJSON } from "./jsonExtract";
 
 const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(1500) });
 
@@ -12,7 +13,7 @@ const Input = z.object({
   history: z.array(HistoryMsg).max(6).optional(),
   /** When true: prioritize the long-answer OpenRouter model before other providers. */
   preferLongAnswer: z.boolean().optional(),
-  /** Per-request output cap. Long-answer requests default to 16k tokens. */
+  /** Per-request output cap. Large-document and batch generators set a higher budget explicitly. */
   maxTokens: z.number().int().min(256).max(24000).optional(),
 });
 
@@ -34,8 +35,14 @@ function rotatedKeys(poolName: string, keys: string[]): string[] {
 type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
 type Turn = { role: "user" | "assistant" | "system"; content: string };
 
-const OPENROUTER_REQUEST_TIMEOUT_MS = 12_000;
-const OPENROUTER_KEY_POOL_BUDGET_MS = 15_000;
+const PROVIDER_REQUEST_TIMEOUT_MS = 8_000;
+const OPENROUTER_REQUEST_TIMEOUT_MS = 10_000;
+const OPENROUTER_KEY_POOL_BUDGET_MS = 12_000;
+const DEFAULT_LONG_ANSWER_TOKENS = 3_000;
+const MAX_OUTPUT_TOKENS = 24_000;
+const STANDARD_REQUEST_BUDGET_MS = 18_000;
+const LONG_REQUEST_BUDGET_MS = 30_000;
+const DETAILED_REQUEST_BUDGET_MS = 240_000;
 
 function isRateLimited(status: number, body: string): boolean {
   if (status === 429) return true;
@@ -70,6 +77,7 @@ async function tryGroq(
   key: string,
   history: Turn[],
   maxTokens = 1024,
+  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
 ): Promise<Result | null> {
   try {
     const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
@@ -81,6 +89,7 @@ async function tryGroq(
         messages,
         max_tokens: maxTokens, // Groq free tier: 6 000 TPM *total* (input + output); scale with request size
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const body = await res.text();
     if (!res.ok) {
@@ -147,7 +156,7 @@ const OPENROUTER_LONG_ANSWER_MODELS = [
   "deepseek/deepseek-v4.1-flash",
   "anthropic/claude-sonnet-5.5",
 ] as const;
-const LONG_ANSWER_MAX_TOKENS = 4096;
+const SOLVER_MAX_TOKENS = 6_000;
 
 async function tryOpenRouterPool(
   prompt: string,
@@ -156,10 +165,12 @@ async function tryOpenRouterPool(
   history: Turn[],
   maxTokens: number,
   verbosity?: "low" | "medium" | "high",
+  deadline?: number,
+  requestTimeoutMs = OPENROUTER_REQUEST_TIMEOUT_MS,
 ): Promise<Result | null> {
-  const startedAt = Date.now();
+  const poolDeadline = deadline ?? Date.now() + OPENROUTER_KEY_POOL_BUDGET_MS;
   for (const key of rotatedKeys("openrouter", serverConfig.ai.openrouterKeys)) {
-    const remaining = OPENROUTER_KEY_POOL_BUDGET_MS - (Date.now() - startedAt);
+    const remaining = poolDeadline - Date.now();
     if (remaining <= 0) break;
     const result = await tryOpenRouter(
       prompt,
@@ -169,7 +180,7 @@ async function tryOpenRouterPool(
       history,
       maxTokens,
       verbosity,
-      Math.min(OPENROUTER_REQUEST_TIMEOUT_MS, remaining),
+      Math.min(requestTimeoutMs, remaining),
     );
     if (result) return result;
   }
@@ -183,11 +194,13 @@ async function tryOpenRouterKeysInOrder(
   history: Turn[],
   maxTokens: number,
   verbosity?: "low" | "medium" | "high",
+  deadline?: number,
+  requestTimeoutMs = OPENROUTER_REQUEST_TIMEOUT_MS,
 ): Promise<Result | null> {
   // Long-answer requests deliberately use key 1 first, then 2 ... through 10.
-  const startedAt = Date.now();
+  const poolDeadline = deadline ?? Date.now() + OPENROUTER_KEY_POOL_BUDGET_MS;
   for (const key of serverConfig.ai.openrouterKeys) {
-    const remaining = OPENROUTER_KEY_POOL_BUDGET_MS - (Date.now() - startedAt);
+    const remaining = poolDeadline - Date.now();
     if (remaining <= 0) break;
     const result = await tryOpenRouter(
       prompt,
@@ -197,7 +210,7 @@ async function tryOpenRouterKeysInOrder(
       history,
       maxTokens,
       verbosity,
-      Math.min(OPENROUTER_REQUEST_TIMEOUT_MS, remaining),
+      Math.min(requestTimeoutMs, remaining),
     );
     if (result) return result;
   }
@@ -210,6 +223,7 @@ async function tryGemini(
   key: string,
   history: Turn[],
   maxTokens = 4096,
+  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
 ): Promise<Result | null> {
   try {
     const contextStr = history.length > 0
@@ -227,6 +241,7 @@ async function tryGemini(
             thinkingConfig: { thinkingBudget: 0 },
           },
         }),
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
     const body = await res.text();
@@ -250,9 +265,19 @@ async function tryGeminiPool(
   system: string,
   history: Turn[],
   maxTokens: number,
+  deadline?: number,
 ): Promise<Result | null> {
   for (const key of rotatedKeys("gemini-text", serverConfig.ai.geminiKeys)) {
-    const result = await tryGemini(prompt, system, key, history, maxTokens);
+    const remaining = deadline === undefined ? PROVIDER_REQUEST_TIMEOUT_MS : deadline - Date.now();
+    if (remaining <= 0) break;
+    const result = await tryGemini(
+      prompt,
+      system,
+      key,
+      history,
+      maxTokens,
+      Math.min(PROVIDER_REQUEST_TIMEOUT_MS, remaining),
+    );
     if (result) return result;
   }
   return null;
@@ -264,6 +289,7 @@ async function tryGeminiVision(
   mimeType: string,
   key: string,
   history: VisionHistory = [],
+  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
 ): Promise<string | null> {
   // Build contents array: history turns (text-only) + final user turn with image
   const contents: object[] = [];
@@ -293,26 +319,19 @@ async function tryGeminiVision(
   }
 
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60_000);
-    let res: Response;
-    try {
-      res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents,
-            // Disable extended thinking — adds 30-60 s latency with no benefit for OCR/solving.
-            generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
-          }),
-        },
-      );
-    } finally {
-      clearTimeout(timer);
-    }
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(timeoutMs),
+        body: JSON.stringify({
+          contents,
+          // Disable extended thinking — adds latency with no benefit for OCR/solving.
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+        }),
+      },
+    );
     const body = await res.text();
     if (!res.ok) {
       console.error(`[Vision] Gemini HTTP ${res.status}:`, body.slice(0, 400));
@@ -327,7 +346,13 @@ async function tryGeminiVision(
   }
 }
 
-async function tryHuggingFace(prompt: string, system: string, key: string): Promise<Result | null> {
+async function tryHuggingFace(
+  prompt: string,
+  system: string,
+  key: string,
+  maxTokens = 1024,
+  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
+): Promise<Result | null> {
   try {
     const res = await fetch(
       "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1",
@@ -336,8 +361,9 @@ async function tryHuggingFace(prompt: string, system: string, key: string): Prom
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify({
           inputs: `${system}\n\n${prompt}`,
-          parameters: { max_new_tokens: 1024 },
+          parameters: { max_new_tokens: Math.min(maxTokens, 4096) },
         }),
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
     const body = await res.text();
@@ -401,24 +427,8 @@ REQUIREMENTS:
 
 /** Greedy JSON extractor — salvages valid JSON even from partially fenced responses. */
 function extractSolveJSON(text: string): Record<string, unknown> | null {
-  try {
-    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    const candidate = (fenced ? fenced[1] : text).trim();
-    const start = candidate.search(/\{/);
-    if (start === -1) return null;
-    const sliced = candidate.slice(start);
-    for (let end = sliced.length; end > 0; end--) {
-      try {
-        const parsed = JSON.parse(sliced.slice(0, end));
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          return parsed as Record<string, unknown>;
-        }
-      } catch { /* keep shrinking */ }
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  const parsed = extractJSON<Record<string, unknown>>(text);
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
 }
 
 const SolveInputSchema = z.object({
@@ -435,15 +445,19 @@ export const solveMathServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => SolveInputSchema.parse(d))
   .handler(async ({ data }) => {
     const userMsg = `Subject: ${data.subject}\n\nProblem: ${data.problem}`;
+    const deadline = Date.now() + 45_000;
 
     // Try fast OpenRouter models first; advance on request or JSON-format failure.
     for (const model of OPENROUTER_LONG_ANSWER_MODELS) {
+      if (deadline - Date.now() <= 0) break;
       const longAnswer = await tryOpenRouterKeysInOrder(
         userMsg,
         SOLVE_SYSTEM,
         model,
         [],
-        LONG_ANSWER_MAX_TOKENS,
+        SOLVER_MAX_TOKENS,
+        undefined,
+        deadline,
       );
       if (longAnswer) {
         const parsed = extractSolveJSON(longAnswer.text);
@@ -453,13 +467,22 @@ export const solveMathServer = createServerFn({ method: "POST" })
 
     // Groq fallback — handles shorter/simpler problems well.
     for (const key of rotatedKeys("groq-solve", serverConfig.ai.groqKeys)) {
-      const r = await tryGroq(userMsg, SOLVE_SYSTEM, key, [], 6000);
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const r = await tryGroq(
+        userMsg,
+        SOLVE_SYSTEM,
+        key,
+        [],
+        SOLVER_MAX_TOKENS,
+        Math.min(PROVIDER_REQUEST_TIMEOUT_MS, remaining),
+      );
       if (r) {
         const parsed = extractSolveJSON(r.text);
         if (parsed) return { data: parsed, provider: r.provider };
       }
     }
-    const gemini = await tryGeminiPool(userMsg, SOLVE_SYSTEM, [], 6000);
+    const gemini = await tryGeminiPool(userMsg, SOLVE_SYSTEM, [], SOLVER_MAX_TOKENS, deadline);
     if (gemini) {
       const parsed = extractSolveJSON(gemini.text);
       if (parsed) return { data: parsed, provider: gemini.provider };
@@ -478,10 +501,8 @@ function safeParseVerifyJSON(
   raw: string,
 ): { correct: boolean; answer: string; briefCheck: string } | null {
   try {
-    const clean = raw.replace(/```json?\n?|\n?```/g, "").trim();
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const j = JSON.parse(match[0]);
+    const j = extractJSON<Record<string, unknown>>(raw);
+    if (!j || typeof j !== "object" || Array.isArray(j)) return null;
     if (typeof j.correct === "boolean" && typeof j.answer === "string" && j.answer.trim()) {
       return { correct: j.correct, answer: j.answer.trim(), briefCheck: String(j.brief_check ?? "") };
     }
@@ -512,19 +533,31 @@ async function verifyMathSolutionInternal(
     `PROBLEM:\n${problem.slice(0, 3000)}\n\n` +
     `PROPOSED ANSWER: ${proposedAnswer.slice(0, 400)}\n\n` +
     "Solve the problem independently from scratch. Compare with the proposed answer. Return JSON only.";
+  const deadline = Date.now() + 25_000;
 
   for (const model of OPENROUTER_LONG_ANSWER_MODELS) {
-    const response = await tryOpenRouterKeysInOrder(prompt, VERIFY_SYSTEM, model, [], 2048);
+    if (deadline - Date.now() <= 0) break;
+    const response = await tryOpenRouterKeysInOrder(
+      prompt,
+      VERIFY_SYSTEM,
+      model,
+      [],
+      2048,
+      undefined,
+      deadline,
+    );
     if (response) {
       const parsed = safeParseVerifyJSON(response.text);
       if (parsed) return parsed;
     }
   }
   for (const key of rotatedKeys("groq-verify", serverConfig.ai.groqKeys)) {
-    const r = await tryGroq(prompt, VERIFY_SYSTEM, key, [], 512);
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    const r = await tryGroq(prompt, VERIFY_SYSTEM, key, [], 512, Math.min(PROVIDER_REQUEST_TIMEOUT_MS, remaining));
     if (r) { const p = safeParseVerifyJSON(r.text); if (p) return p; }
   }
-  const gemini = await tryGeminiPool(prompt, VERIFY_SYSTEM, [], 512);
+  const gemini = await tryGeminiPool(prompt, VERIFY_SYSTEM, [], 512, deadline);
   if (gemini) return safeParseVerifyJSON(gemini.text);
   return null;
 }
@@ -550,81 +583,121 @@ export const askAIServer = createServerFn({ method: "POST" })
     }
 
     let result: Result | null = null;
+    const requestedTokens = Math.min(data.maxTokens ?? DEFAULT_LONG_ANSWER_TOKENS, MAX_OUTPUT_TOKENS);
+    const detailedOutput = requestedTokens > 6_000;
+    const requestBudget = detailedOutput
+      ? DETAILED_REQUEST_BUDGET_MS
+      : data.preferLongAnswer
+        ? LONG_REQUEST_BUDGET_MS
+        : STANDARD_REQUEST_BUDGET_MS;
+    const deadline = Date.now() + requestBudget;
 
     if (data.preferLongAnswer) {
-      // Prefer low-latency output, with sequential key failover and model backups.
-      const longTokens = Math.min(data.maxTokens ?? LONG_ANSWER_MAX_TOKENS, LONG_ANSWER_MAX_TOKENS);
-      const quickSystem = `${system}\n\nAnswer directly and concisely without repeated introductions or filler. Keep all required calculation steps and output formats, and expand when the user explicitly asks for detail.`;
+      const longTokens = requestedTokens;
+      const quickSystem = detailedOutput
+        ? system
+        : `${system}\n\nAnswer directly and concisely without repeated introductions or filler. Keep all required calculation steps and output formats, and expand when the user explicitly asks for detail.`;
+      const openRouterTimeout = detailedOutput ? 180_000 : OPENROUTER_REQUEST_TIMEOUT_MS;
+
       for (const model of OPENROUTER_LONG_ANSWER_MODELS) {
+        if (deadline - Date.now() <= 0) break;
         result = await tryOpenRouterKeysInOrder(
           data.prompt,
           quickSystem,
           model,
           history,
           longTokens,
+          undefined,
+          deadline,
+          openRouterTimeout,
         );
         if (result) break;
       }
 
-      if (!result) {
+      if (!result && deadline - Date.now() > 0) {
         result = await tryGeminiPool(
           data.prompt,
           quickSystem,
           history,
-          longTokens,
+          Math.min(longTokens, detailedOutput ? 12_000 : longTokens),
+          deadline,
         );
       }
 
       // Free OpenRouter models remain a fallback for account-credit issues.
       for (const model of ["nvidia/nemotron-3.5-lightning:free", "apodex/apodex-1.1-mini:free"]) {
-        if (result) break;
+        if (result || deadline - Date.now() <= 0) break;
         result = await tryOpenRouterPool(
           data.prompt,
           quickSystem,
           model,
           history,
           Math.min(longTokens, 6000),
+          undefined,
+          deadline,
+          openRouterTimeout,
         );
       }
 
       // Final fallback — HuggingFace
-      if (!result && serverConfig.ai.huggingfaceKey) {
-        result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
+      if (!result && serverConfig.ai.huggingfaceKey && deadline - Date.now() > 0) {
+        result = await tryHuggingFace(
+          data.prompt,
+          system,
+          serverConfig.ai.huggingfaceKey,
+          Math.min(longTokens, 4096),
+          Math.min(PROVIDER_REQUEST_TIMEOUT_MS, deadline - Date.now()),
+        );
       }
     } else {
       // ── Groq-first path (all other features) ─────────────────────────────
-      // Rotated across the full 15-key Groq pool for load balancing.
       const groqMax = data.maxTokens ?? 1024;
       for (const key of rotatedKeys("groq", serverConfig.ai.groqKeys)) {
-        result = await tryGroq(data.prompt, system, key, history, groqMax);
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        result = await tryGroq(
+          data.prompt,
+          system,
+          key,
+          history,
+          groqMax,
+          Math.min(PROVIDER_REQUEST_TIMEOUT_MS, remaining),
+        );
         if (result) break;
       }
 
-      // Gemini stays ahead of OpenRouter fallbacks for default short-answer requests.
-      if (!result) {
+      if (!result && deadline - Date.now() > 0) {
         result = await tryGeminiPool(
           data.prompt,
           system,
           history,
-          data.maxTokens ?? 4096,
+          Math.min(data.maxTokens ?? 4096, 12_000),
+          deadline,
         );
       }
 
-      // Fallback 2 — current free OpenRouter models, rotated across the key pool.
+      // Free OpenRouter models remain the fallback for short-answer requests.
       for (const model of ["nvidia/nemotron-3.5-lightning:free", "apodex/apodex-1.1-mini:free"]) {
-        if (result) break;
+        if (result || deadline - Date.now() <= 0) break;
         result = await tryOpenRouterPool(
           data.prompt,
           system,
           model,
           history,
           data.maxTokens ?? 6000,
+          undefined,
+          deadline,
         );
       }
 
-      // Fallback 3 — HuggingFace
-      if (!result && serverConfig.ai.huggingfaceKey) {
-        result = await tryHuggingFace(data.prompt, system, serverConfig.ai.huggingfaceKey);
+      if (!result && serverConfig.ai.huggingfaceKey && deadline - Date.now() > 0) {
+        result = await tryHuggingFace(
+          data.prompt,
+          system,
+          serverConfig.ai.huggingfaceKey,
+          Math.min(data.maxTokens ?? 1024, 4096),
+          Math.min(PROVIDER_REQUEST_TIMEOUT_MS, deadline - Date.now()),
+        );
       }
     }
 
@@ -643,13 +716,13 @@ const VisionMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.str
 
 const VisionInput = z.object({
   prompt: z.string().min(1).max(10000),
-  imageBase64: z.string(),
+  imageBase64: z.string().min(1).max(3_000_000),
   mimeType: z.string().default("image/jpeg"),
   /** Conversation history from previous turns (first item = initial user prompt). */
   history: z.array(VisionMsg).max(20).optional(),
 });
 
-// Current multimodal OpenRouter models, reached only after the Gemini vision pool.
+// Current multimodal OpenRouter models, reached after configured primary pools.
 const OPENROUTER_VISION_MODELS = [
   "google/gemini-2.5-flash-lite",
   "deepseek/deepseek-v4.1-flash",
@@ -745,6 +818,7 @@ async function tryOpenRouterVision(
   key: string,
   model: string,
   history: VisionHistory = [],
+  timeoutMs = OPENROUTER_REQUEST_TIMEOUT_MS,
 ): Promise<string | null> {
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -760,6 +834,7 @@ async function tryOpenRouterVision(
         messages: buildVisionMessages(prompt, imageBase64, mimeType, history),
         max_tokens: 4096,
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const body = await res.text();
     if (!res.ok) {
@@ -795,20 +870,44 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => VisionInput.parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const history: VisionHistory = data.history ?? [];
+    const deadline = Date.now() + 18_000;
 
-    // Primary — Gemini (free tier, multimodal, rotated across up to 5 keys).
-    // Groq no longer offers vision models; Gemini is the best free alternative.
-    for (const key of rotatedKeys("gemini-vision", serverConfig.ai.geminiKeys)) {
-      const text = await tryGeminiVision(data.prompt, data.imageBase64, data.mimeType, key, history);
+    // Groq Llama 4 Scout supports image input and is the fastest configured path.
+    for (const key of rotatedKeys("groq-vision", serverConfig.ai.groqKeys)) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const text = await tryGroqVision(
+        data.prompt,
+        data.imageBase64,
+        data.mimeType,
+        key,
+        GROQ_VISION_MODELS[0],
+        history,
+        Math.min(PROVIDER_REQUEST_TIMEOUT_MS, remaining),
+      );
       if (text) return { text, provider: "Bishal's Assistant" };
     }
 
-    // Fallback — prefer fast multimodal models and stop waiting after the pool budget.
-    const openRouterStartedAt = Date.now();
+    // Gemini remains available for accounts that configure a Gemini key.
+    for (const key of rotatedKeys("gemini-vision", serverConfig.ai.geminiKeys)) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const text = await tryGeminiVision(
+        data.prompt,
+        data.imageBase64,
+        data.mimeType,
+        key,
+        history,
+        Math.min(PROVIDER_REQUEST_TIMEOUT_MS, remaining),
+      );
+      if (text) return { text, provider: "Bishal's Assistant" };
+    }
+
+    // OpenRouter fallback shares the same request deadline across models and keys.
     openRouterVision:
     for (const model of OPENROUTER_VISION_MODELS) {
       for (const key of rotatedKeys("openrouter", serverConfig.ai.openrouterKeys)) {
-        const remaining = OPENROUTER_KEY_POOL_BUDGET_MS - (Date.now() - openRouterStartedAt);
+        const remaining = deadline - Date.now();
         if (remaining <= 0) break openRouterVision;
         const text = await tryOpenRouterVision(
           data.prompt,
@@ -823,5 +922,5 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
       }
     }
 
-    return { text: "Could not analyze the image. Please try again.", provider: "Bishal's Assistant" };
+    return { text: "Image analysis is temporarily unavailable. Please try again in a moment.", provider: "none" };
   });

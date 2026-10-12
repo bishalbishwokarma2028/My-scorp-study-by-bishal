@@ -224,8 +224,8 @@ function FormulaSheetPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
     set({ sheet: null, provider: null });
-
-    const subjectLabel = SUBJECTS.find(x => x.id === s.subject)?.label.replace(/[^a-zA-Z ]/g, "").trim();
+    try {
+      const subjectLabel = SUBJECTS.find(x => x.id === s.subject)?.label.replace(/[^a-zA-Z ]/g, "").trim();
 
     const formatInstr = s.format === "full"
       ? `For EACH formula:
@@ -317,12 +317,28 @@ with columns: Formula | What It Finds | Key Variables
 
 ${formatInstr}`;
 
-    const res = await askAI(prompt,
-      "You are an expert teacher and mathematician who produces exhaustive, complete formula references — you never skip or truncate formulas for the sake of brevity. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Include short derivations/proofs from first principles whenever mathematically standard. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.",
-      undefined, true);
-    set({ sheet: res.text, provider: res.provider });
-    await bump();
-    setLoading(false);
+      const res = await askAI(
+        prompt,
+        "You are an expert teacher and mathematician who produces exhaustive, complete formula references — you never skip or truncate formulas for the sake of brevity. Always use Unicode math symbols (², ³, √, θ, π, α, Δ etc.) directly in formula code blocks — never write '^2' or '^3'. Include short derivations/proofs from first principles whenever mathematically standard. Write variable explanations in plain, simple English that any student can understand. Use proper markdown structure exactly as instructed. Never reveal AI provider names.",
+        undefined,
+        true,
+        18_000,
+      );
+      if (res.provider === "none") {
+        toast.error("Formula generation is temporarily unavailable. Please try again.");
+        return;
+      }
+      set({ sheet: res.text, provider: res.provider });
+      await bump();
+      const groups = (res.text.match(/^###\s+/gm) ?? []).length;
+      if (groups > 0 && groups < 12) {
+        toast.info(`Generated ${groups} formula groups. For a broader topic, generate a separate sheet for each chapter or sub-topic.`);
+      }
+    } catch {
+      toast.error("Could not generate the formula sheet. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function copySheet() {

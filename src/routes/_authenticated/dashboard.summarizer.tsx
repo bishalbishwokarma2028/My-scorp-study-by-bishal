@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Download, Save, ListChecks, Paperclip, FileText, BookOpen, Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAI, askAIJSON } from "@/lib/aiProvider";
 import { analyzeImageServer } from "@/lib/aiProvider.functions";
 import { extractPdfText } from "@/lib/pdfExtract";
 import { ensureBrowserSupportedImage, isImageFile } from "@/lib/imageUpload";
@@ -24,12 +24,30 @@ type Output = {
 };
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_SOURCE_CHARS = 120_000;
+const SUMMARY_CHUNK_CHARS = 16_000;
+
+function splitForSummary(source: string): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < source.length) {
+    let end = Math.min(start + SUMMARY_CHUNK_CHARS, source.length);
+    if (end < source.length) {
+      const boundary = source.lastIndexOf("\n", end);
+      if (boundary > start + SUMMARY_CHUNK_CHARS * 0.7) end = boundary;
+    }
+    chunks.push(source.slice(start, end));
+    start = end;
+  }
+  return chunks;
+}
 
 function SummarizerPage() {
   const { user } = Route.useRouteContext();
   const navigate = useNavigate();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sectionProgress, setSectionProgress] = useState<{ done: number; total: number } | null>(null);
   const [output, setOutput] = useState<Output | null>(null);
   const [provider, setProvider] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -52,7 +70,7 @@ function SummarizerPage() {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_BYTES) return toast.error("File too large. Max 2 MB.");
+    if (file.size > MAX_BYTES) return toast.error("File too large. Maximum size is 10 MB.");
     const ext = file.name.toLowerCase().split(".").pop() ?? "";
 
     if (["txt", "md", "csv"].includes(ext)) {
@@ -71,7 +89,8 @@ function SummarizerPage() {
         if (!result.text) return toast.error("Could not extract text from this PDF");
         setText(result.text);
         const scannedNote = result.scannedPages > 0 ? ` (${result.scannedPages} scanned pages read via AI)` : "";
-        toast.success(`PDF loaded — ${result.pageCount} pages${scannedNote}`);
+        toast.success(`PDF loaded — ${result.pagesProcessed}/${result.pageCount} pages${scannedNote}`);
+        if (result.truncated) toast.info("This PDF exceeds the indexing limit; only processed pages/characters are available.");
       } catch {
         toast.error("Failed to read PDF — try a different file");
       }
@@ -85,24 +104,33 @@ function SummarizerPage() {
         const convertedFile = await ensureBrowserSupportedImage(file);
         const reader = new FileReader();
         reader.onload = async () => {
-          const dataUrl = reader.result as string;
-          const base64 = dataUrl.split(",")[1];
-          const mimeType = convertedFile.type || "image/jpeg";
-          const res = await analyzeImageServer({
-            data: {
-              prompt: "Extract ALL visible text from this image exactly as it appears. If there is study content (notes, diagrams with labels, textbook pages), describe what you see and transcribe all text. Output only the extracted text content, no commentary.",
-              imageBase64: base64,
-              mimeType,
-            },
-          });
-          const extracted = res.text.trim();
-          if (!extracted || extracted.length < 10) {
-            toast.error("Could not extract text from this image — try a clearer photo");
-          } else {
-            setText(extracted);
-            toast.success("Text extracted from image — ready to summarize");
+          try {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(",")[1];
+            const mimeType = convertedFile.type || "image/jpeg";
+            const res = await analyzeImageServer({
+              data: {
+                prompt: "Extract ALL visible text from this image exactly as it appears. If there is study content (notes, diagrams with labels, textbook pages), describe what you see and transcribe all text. Output only the extracted text content, no commentary.",
+                imageBase64: base64,
+                mimeType,
+              },
+            });
+            if (res.provider === "none") {
+              toast.error(res.text);
+              return;
+            }
+            const extracted = res.text.trim();
+            if (!extracted || extracted.length < 10) {
+              toast.error("Could not extract text from this image — try a clearer photo");
+            } else {
+              setText(extracted);
+              toast.success("Text extracted from image — ready to summarize");
+            }
+          } catch {
+            toast.error("Could not extract text from this image. Please try again.");
           }
         };
+        reader.onerror = () => toast.error("Could not read this image file.");
         reader.readAsDataURL(convertedFile);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to read image");
@@ -119,21 +147,69 @@ function SummarizerPage() {
     const source = text.trim();
     if (source.length < 50) return toast.error("Please enter at least 50 characters");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
+    if (source.length > MAX_SOURCE_CHARS) {
+      return toast.error(`This text is too long to summarize at once (${MAX_SOURCE_CHARS.toLocaleString()} character limit). Split it into smaller sections.`);
+    }
     setLoading(true);
     setOutput(null);
-    const prompt = `Summarize the following text.
+    setProvider(null);
+    const chunks = splitForSummary(source);
+    setSectionProgress({ done: 0, total: chunks.length });
+    try {
+      let materialForFinal = source;
+      if (chunks.length > 1) {
+        const summaries: string[] = [];
+        for (let i = 0; i < chunks.length; i++) {
+          const res = await askAI(
+            `Summarize this section of a larger document accurately. Preserve the key facts, definitions, arguments, and examples; include page labels if present. This is section ${i + 1} of ${chunks.length}.\n\n${chunks[i]}`,
+            "You are a careful document analyst. Produce a compact but complete section summary in plain markdown. Do not invent details.",
+            undefined,
+            false,
+            1_200,
+          );
+          if (res.provider === "none") {
+            toast.error(`Could not process section ${i + 1} of ${chunks.length}. No partial summary was saved.`);
+            return;
+          }
+          summaries.push(res.text.slice(0, 2_500));
+          setSectionProgress({ done: i + 1, total: chunks.length });
+        }
+        materialForFinal = summaries.map((summary, i) => `SECTION ${i + 1} SUMMARY:\n${summary}`).join("\n\n");
+      }
+
+      const prompt = `Summarize all of the following ${chunks.length > 1 ? "section summaries from one document" : "text"}.
 
 Return STRICT JSON with this exact shape:
 {"summary": "string", "keyPoints": ["..."], "examQuestions": ["5 exam questions"], "vocabulary": [{"term": "...", "definition": "..."}]}
 
+Include information from every section. Do not add facts absent from the source.
+
 TEXT:
-${source.slice(0, 12000)}`;
-    const res = await askAI(prompt, "You output only valid JSON. No prose, no code fences.");
-    setProvider(res.provider);
-    const parsed = extractJSON<Output>(res.text);
-    setOutput(parsed ?? { summary: res.text, keyPoints: [], examQuestions: [], vocabulary: [] });
-    await bump();
-    setLoading(false);
+${materialForFinal}`;
+      const { data, provider: responseProvider } = await askAIJSON<Output>(
+        prompt,
+        "Return only valid JSON with the requested fields. No prose and no code fences.",
+        undefined,
+        true,
+        3_500,
+      );
+      if (responseProvider === "none" || !data
+        || typeof data.summary !== "string"
+        || !Array.isArray(data.keyPoints)
+        || !Array.isArray(data.examQuestions)
+        || !Array.isArray(data.vocabulary)) {
+        toast.error("The summary could not be completed. Please try again.");
+        return;
+      }
+      setProvider(responseProvider);
+      setOutput(data);
+      await bump();
+    } catch {
+      toast.error("The summary could not be completed. Please try again.");
+    } finally {
+      setLoading(false);
+      setSectionProgress(null);
+    }
   }
 
   function download() {
@@ -206,7 +282,9 @@ ${source.slice(0, 12000)}`;
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
             <span><span className="font-semibold text-foreground">{chars}</span> chars  <span className="ml-2 font-semibold text-foreground">{words}</span> words</span>
             <button onClick={summarize} disabled={loading || chars < 50} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:opacity-90 disabled:opacity-50">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Summarize
+              {loading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> {sectionProgress ? `Processing ${sectionProgress.done}/${sectionProgress.total}…` : "Preparing summary…"}</>
+                : <><Sparkles className="h-4 w-4" /> Summarize</>}
             </button>
           </div>
         </div>

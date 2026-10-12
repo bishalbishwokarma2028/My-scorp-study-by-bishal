@@ -6,6 +6,7 @@ import {
   AlertCircle, Flag, Clock,
 } from "lucide-react";
 import { askAIJSON } from "@/lib/aiProvider";
+import { generateInBatches } from "@/lib/aiGeneration";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge } from "@/components/ai-ui";
@@ -73,6 +74,7 @@ function MockTestPage() {
   const [subject,    setSubject]    = useState("Physics");
   const [topic,      setTopic]      = useState("");
   const [qCount,     setQCount]     = useState(10);
+  const [batchProgress, setBatchProgress] = useState<number | null>(null);
   const [difficulty, setDifficulty] = useState("medium");
   const [timeSecs,   setTimeSecs]   = useState(computeTimeSecs(10));
 
@@ -109,6 +111,7 @@ function MockTestPage() {
   async function generate() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setPhase("loading");
+    setBatchProgress(0);
 
     const difficultyInstr = difficulty === "easy"
       ? "Require genuine conceptual understanding, not just simple one-line recall. Avoid trivially obvious questions — every question should make the student think."
@@ -116,10 +119,16 @@ function MockTestPage() {
       ? "Require applying concepts to new situations, multi-step reasoning, and connecting multiple ideas. Comparable to a challenging school/college exam."
       : "Require deep analysis, multi-step problem-solving, tricky edge cases, and careful reasoning to eliminate close distractors. Comparable to competitive exam or olympiad-level difficulty. Options should include plausible near-miss distractors, not obviously wrong choices.";
 
-    const prompt = `Generate a ${difficulty} difficulty mock test on "${topic || subject}" for subject "${subject}".
+    try {
+      const generated = await generateInBatches<Question>({
+        count: qCount,
+        batchSize: 10,
+        createPrompt: (batchCount, offset, previous) => {
+          const recent = previous.slice(-12).map((q) => q.q).join("\n- ");
+          return `Generate a ${difficulty} difficulty mock test on "${topic || subject}" for subject "${subject}".
 
 Requirements:
-- Exactly ${qCount} questions
+- Exactly ${batchCount} questions, numbered in this segment from ${offset + 1}
 - Mix of MCQ (4 options) and True/False questions (at least 70% MCQ, rest True/False)
 - Questions should cover different sub-topics within "${topic || subject}" — spread across the full breadth of the topic
 - Difficulty: ${difficulty} — ${difficultyInstr}
@@ -147,18 +156,40 @@ Return ONLY valid JSON in this exact format (no markdown, no extra text):
   ]
 }
 
-The "ans" field is the 0-based index of the correct option.`;
+The "ans" field is the 0-based index of the correct option.
+${recent ? `Avoid repeating these earlier questions:\n- ${recent}` : ""}`;
+        },
+        requestBatch: async (prompt, batchCount) => {
+          const { data, provider } = await askAIJSON<{ questions: Question[] }>(
+            prompt,
+            "You are an expert exam paper setter. Return ONLY valid JSON. No markdown fences.",
+            undefined,
+            false,
+            Math.min(800 + batchCount * 360, 6_000),
+          );
+          return { items: data?.questions ?? null, provider };
+        },
+        isValidItem: (item): item is Question => {
+          if (!item || typeof item !== "object") return false;
+          const question = item as Question;
+          const expectedOptions = question.type === "tf" ? 2 : 4;
+          return typeof question.q === "string" && question.q.trim().length > 0
+            && (question.type === "mcq" || question.type === "tf")
+            && Array.isArray(question.opts) && question.opts.length === expectedOptions
+            && question.opts.every((option) => typeof option === "string" && option.trim().length > 0)
+            && Number.isInteger(question.ans) && question.ans >= 0 && question.ans < expectedOptions
+            && typeof question.exp === "string" && question.exp.trim().length > 0;
+        },
+        onProgress: (generatedCount) => setBatchProgress(generatedCount),
+      });
 
-    const { data } = await askAIJSON<{ questions: Question[] }>(prompt,
-      "You are an expert exam paper setter. Return ONLY valid JSON. No markdown fences.", undefined, true);
+      if (!generated.items.length) {
+        toast.error("Failed to generate questions — please try again");
+        setPhase("setup");
+        return;
+      }
 
-    if (!data?.questions?.length) {
-      toast.error("Failed to generate questions — please try again");
-      setPhase("setup");
-      return;
-    }
-
-    const qs = data.questions.slice(0, qCount);
+      const qs = generated.items;
     setQuestions(qs);
     setAnswers(new Array(qs.length).fill(null));
     setFlagged(new Array(qs.length).fill(false));
@@ -168,6 +199,15 @@ The "ans" field is the 0-based index of the correct option.`;
     await bump();
     setPhase("test");
     setTimeout(startTimer, 100);
+      if (!generated.complete) {
+        toast.warning(`Generated ${qs.length} of ${qCount} questions. Starting with the questions that are ready.`);
+      }
+    } catch {
+      toast.error("Failed to generate questions — please try again");
+      setPhase("setup");
+    } finally {
+      setBatchProgress(null);
+    }
   }
 
   function selectAnswer(idx: number) {
@@ -214,7 +254,9 @@ The "ans" field is the 0-based index of the correct option.`;
     <div className="flex flex-col items-center gap-4 py-20 text-center">
       <Loader2 className="h-12 w-12 animate-spin text-primary" />
       <p className="text-lg font-semibold">Building your mock test…</p>
-      <p className="text-sm text-muted-foreground">Generating {qCount} {difficulty} questions on {topic || subject}</p>
+      <p className="text-sm text-muted-foreground">
+        Generating {batchProgress ?? 0} of {qCount} {difficulty} questions on {topic || subject}
+      </p>
     </div>
   );
 
@@ -482,7 +524,7 @@ The "ans" field is the 0-based index of the correct option.`;
         <button onClick={generate} disabled={phase === "loading"}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-50 hover:opacity-90 transition">
           {phase === "loading"
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating Test…</>
+            ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating {batchProgress ?? 0}/{qCount}…</>
             : <><FlaskConical className="h-4 w-4" /> Start Mock Test</>}
         </button>
       </div>

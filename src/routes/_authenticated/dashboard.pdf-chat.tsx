@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
+import { extractPdfText } from "@/lib/pdfExtract";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
@@ -19,8 +20,8 @@ export const Route = createFileRoute("/_authenticated/dashboard/pdf-chat")({
 
 type Message = { role: "user" | "assistant"; content: string; provider?: string; revealed?: boolean };
 
-const CHUNK_SIZE = 2500;   // smaller chunks to leave room in system prompt
-const MAX_CHUNKS = 6;      // 6 × 2500 = 15 000 chars — safely under 44 000 limit
+const CHUNK_SIZE = 2000;
+const MAX_CHUNKS = 4;
 
 function splitIntoChunks(text: string): string[] {
   const chunks: string[] = [];
@@ -75,33 +76,18 @@ FORMATTING RULES (always follow, for both document and general answers):
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown only.`;
 }
 
-const GENERAL_SYSTEM_PROMPT = "You are Bishal's Assistant, a friendly expert study AI. Answer the student's question directly, confidently, and helpfully using your own general knowledge — never say you are unable to answer or ask them to try again later. Use rich markdown formatting: **bold** for key terms, short paragraphs separated by blank lines, bullet/numbered lists for multi-part answers, ## headers for longer answers, and > blockquotes for key definitions or takeaways.";
-
-// Retries several times, shrinking the document context and finally dropping
-// it entirely, so the user should never see a raw "AI is busy" error inside
-// the PDF chat — there is always a substantive answer by the last attempt.
-async function askWithResilience(
+async function askDocumentQuestion(
   text: string,
   pdfName: string,
   chunks: string[],
   history: { role: "user" | "assistant"; content: string }[],
 ): Promise<{ text: string; provider: string }> {
-  const attempts: { systemPrompt: string; delay: number }[] = [
-    { systemPrompt: buildDocSystemPrompt(pdfName, getRelevantContext(chunks, text, MAX_CHUNKS)), delay: 0 },
-    { systemPrompt: buildDocSystemPrompt(pdfName, getRelevantContext(chunks, text, MAX_CHUNKS)), delay: 600 },
-    { systemPrompt: buildDocSystemPrompt(pdfName, getRelevantContext(chunks, text, 2)), delay: 900 },
-    { systemPrompt: GENERAL_SYSTEM_PROMPT, delay: 1200 },
-    { systemPrompt: GENERAL_SYSTEM_PROMPT, delay: 1800 },
-  ];
-
-  let last: { text: string; provider: string } | null = null;
-  for (const { systemPrompt, delay } of attempts) {
-    if (delay) await new Promise((r) => setTimeout(r, delay));
-    const res = await askAI(text, systemPrompt, history, true);
-    if (res.provider !== "none") return res;
-    last = res;
-  }
-  return last ?? { text: "I'm sorry, I couldn't reach the AI service just now — please try again in a moment.", provider: "Bishal's Assistant" };
+  const context = getRelevantContext(chunks, text, MAX_CHUNKS);
+  const compactHistory = history.slice(-4).map((message) => ({
+    ...message,
+    content: message.content.slice(0, 900),
+  }));
+  return askAI(text, buildDocSystemPrompt(pdfName, context), compactHistory, false, 2_200);
 }
 
 const QUICK_PROMPTS = [
@@ -191,32 +177,14 @@ function PdfChatPage() {
     set({ pdfText: null, chunks: [], messages: [] });
 
     try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://unpkg.com/pdfjs-dist@6.0.227/build/pdf.worker.min.mjs";
-
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-      const numPages = pdf.numPages;
-      let fullText = "";
-
-      for (let i = 1; i <= numPages; i++) {
-        setExtractProgress(Math.round((i / numPages) * 100));
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const pageText = content.items
-          .map((item: unknown) =>
-            item && typeof item === "object" && "str" in item
-              ? (item as { str: string }).str
-              : ""
-          )
-          .join(" ");
-        fullText += `\n\n[Page ${i}]\n${pageText}`;
-      }
-
-      const cleaned = fullText.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+      const result = await extractPdfText(
+        file,
+        analyzeImageServer,
+        (page, total) => setExtractProgress(Math.round((page / total) * 100)),
+      );
+      const cleaned = result.text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
       if (cleaned.length < 100) {
-        toast.error("No readable text found. This PDF may be scanned/image-based. Try a text-based PDF.");
+        toast.error("No readable text could be extracted. The PDF may be protected or too low quality.");
         setExtracting(false);
         return;
       }
@@ -226,13 +194,14 @@ function PdfChatPage() {
         pdfText:  cleaned,
         chunks:   allChunks,
         pdfName:  file.name,
-        pdfPages: numPages,
+          pdfPages: result.pageCount,
         messages: [{
           role: "assistant",
-          content: `📄 **${file.name}** is ready!\n\n**${numPages} pages** · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted\n\nI've read your entire document. Ask me anything about it — I'll search the relevant sections and give you a detailed answer.\n\n> ℹ️ I will only answer based on what's inside this document. If your question isn't covered in the PDF, I'll let you know.`,
+            content: `📄 **${file.name}** is ready!\n\n**${result.pagesProcessed} of ${result.pageCount} pages** processed · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted${result.scannedPages ? ` · **${result.scannedPages} scanned pages** read with OCR` : ""}${result.truncated ? "\n\n> This PDF exceeds the current indexing limit; the first processed pages or characters are available in chat." : ""}\n\nAsk me anything about the indexed content — I'll search the relevant sections and cite their page labels.`,
           provider: "Bishal's Assistant",
         }],
       });
+      if (result.truncated) toast.info("The PDF is larger than the indexing limit; only the processed pages are searchable.");
     } catch (err) {
       console.error("PDF extraction error:", err);
       toast.error("Failed to read PDF. Try another file or check it isn't password-protected.");
@@ -259,7 +228,12 @@ function PdfChatPage() {
     const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 1500) }));
 
     try {
-      const res = await askWithResilience(text, pdfName, chunks, history);
+      const res = await askDocumentQuestion(text, pdfName, chunks, history);
+      if (res.provider === "none") {
+        toast.error("The AI service is temporarily unavailable. Please retry your question.");
+        set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: "none", revealed: false }] });
+        return;
+      }
       await bump();
       set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider, revealed: false }] });
     } catch {

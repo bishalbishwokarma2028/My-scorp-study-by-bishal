@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Shuffle, Check, RotateCw } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAI, askAIJSON, extractJSON } from "@/lib/aiProvider";
+import { generateInBatches } from "@/lib/aiGeneration";
 import { supabase } from "@/integrations/supabase/client";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -67,6 +68,7 @@ function FlashcardsPage() {
   const [flipped, setFlipped] = useState(false);
   const [known, setKnown] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<number | null>(null);
   const [typed, setTyped] = useState("");
   const [matches, setMatches] = useState<{ q: number; a: number }[]>([]);
   const [selQ, setSelQ] = useState<number | null>(null);
@@ -87,16 +89,58 @@ function FlashcardsPage() {
     if (!topic.trim()) return toast.error("Topic required");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     setLoading(true);
-    const prompt = buildFlashcardPrompt(topic, count, cardType);
-    // Scale token budget: each card needs ~150-400 tokens depending on type; add 500 for overhead
-    const maxTokens = Math.min(count * 350 + 500, 5500);
-    const res = await askAI(prompt, "Output JSON only.", undefined, false, maxTokens);
-    await bump();
-    const parsed = extractJSON<Card[]>(res.text);
-    if (parsed && parsed.length) {
-      setCards(parsed); setIdx(0); setFlipped(false); setKnown(new Set()); setTyped(""); setMatches([]);
-    } else toast.error("Could not generate, try again");
-    setLoading(false);
+    setBatchProgress(0);
+    try {
+      const batchSize = cardType === "Long Answer" ? 3 : 8;
+      const generated = await generateInBatches<Card>({
+        count,
+        batchSize,
+        createPrompt: (batchCount, offset, previous) => {
+          const recent = previous.slice(-12).map((card) => card.front).join("\n- ");
+          return `${buildFlashcardPrompt(topic, batchCount, cardType)}
+
+This is segment ${offset + 1} onward in a larger set. Cover different points and do not repeat these earlier cards:
+${recent ? `\n- ${recent}` : ""}`;
+        },
+        requestBatch: async (prompt, batchCount) => {
+          const response = await askAIJSON<Card[]>(
+            prompt,
+            "Return only a valid JSON array. No markdown fences or prose.",
+            undefined,
+            false,
+            Math.min(700 + batchCount * (cardType === "Long Answer" ? 900 : 450), 8_000),
+          );
+          return { items: response.data, provider: response.provider };
+        },
+        isValidItem: (item): item is Card => {
+          if (!item || typeof item !== "object") return false;
+          const card = item as Card;
+          return typeof card.front === "string" && card.front.trim().length > 0
+            && typeof card.back === "string" && card.back.trim().length > 0;
+        },
+        onProgress: (generatedCount) => setBatchProgress(generatedCount),
+      });
+
+      if (!generated.items.length) {
+        toast.error("Could not generate flashcards. Please try again.");
+        return;
+      }
+      setCards(generated.items);
+      setIdx(0);
+      setFlipped(false);
+      setKnown(new Set());
+      setTyped("");
+      setMatches([]);
+      await bump();
+      if (!generated.complete) {
+        toast.warning(`Generated ${generated.items.length} of ${count} cards. You can use this set or try again.`);
+      }
+    } catch {
+      toast.error("Could not generate flashcards. Please try again.");
+    } finally {
+      setLoading(false);
+      setBatchProgress(null);
+    }
   }
 
   function next() { if (cards) { setIdx((idx + 1) % cards.length); setFlipped(false); setTyped(""); } }
@@ -158,7 +202,9 @@ function FlashcardsPage() {
         </select>
 
         <button onClick={generate} disabled={loading} className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-          {loading ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Bishal's Assistant is thinking…</> : "Generate"}
+          {loading
+            ? <><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Generating {batchProgress ?? 0}/{count}…</>
+            : "Generate"}
         </button>
       </div>
     );
