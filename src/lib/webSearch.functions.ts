@@ -94,9 +94,11 @@ async function trySerper(query: string, key: string): Promise<SourcedResult> {
 
 // Perplexity (via OpenRouter) — an AI model with built-in live browsing,
 // used as a secondary cross-check / fallback if Tavily & Serper are unavailable.
-async function tryPerplexity(query: string, key: string): Promise<SourcedResult> {
-  const models = ["perplexity/sonar", "perplexity/sonar-small-online"];
+async function tryPerplexity(query: string, key: string, deadline: number): Promise<SourcedResult | null> {
+  const models = ["perplexity/sonar-small-online", "perplexity/sonar"];
   for (const model of models) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
     try {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -117,7 +119,7 @@ async function tryPerplexity(query: string, key: string): Promise<SourcedResult>
           ],
           max_tokens: 900,
         }),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(Math.min(8000, remaining)),
       });
       const body = await res.text();
       if (!res.ok) continue;
@@ -204,8 +206,10 @@ export const webSearchServer = createServerFn({ method: "POST" })
     }
 
     // 3) Perplexity via OpenRouter — AI model with live browsing
+    const perplexityDeadline = Date.now() + 12_000;
     for (const key of rotatedOpenRouterSearchKeys(openrouterKeys)) {
-      const result = await tryPerplexity(data.query, key);
+      if (Date.now() >= perplexityDeadline) break;
+      const result = await tryPerplexity(data.query, key, perplexityDeadline);
       if (result) return { context: result.context, used: true };
     }
 

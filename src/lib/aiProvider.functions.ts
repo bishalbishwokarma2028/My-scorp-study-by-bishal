@@ -34,6 +34,9 @@ function rotatedKeys(poolName: string, keys: string[]): string[] {
 type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
 type Turn = { role: "user" | "assistant" | "system"; content: string };
 
+const OPENROUTER_REQUEST_TIMEOUT_MS = 12_000;
+const OPENROUTER_KEY_POOL_BUDGET_MS = 15_000;
+
 function isRateLimited(status: number, body: string): boolean {
   if (status === 429) return true;
   if (status === 503) return true;
@@ -103,6 +106,7 @@ async function tryOpenRouter(
   history: Turn[],
   maxTokens = 6000,
   verbosity?: "low" | "medium" | "high",
+  timeoutMs = OPENROUTER_REQUEST_TIMEOUT_MS,
 ): Promise<Result | null> {
   try {
     const messages: Turn[] = [{ role: "system", content: system }, ...history, { role: "user", content: prompt }];
@@ -120,6 +124,7 @@ async function tryOpenRouter(
         max_tokens: maxTokens,
         ...(verbosity ? { verbosity } : {}),
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const body = await res.text();
     if (!res.ok) {
@@ -137,9 +142,12 @@ async function tryOpenRouter(
   }
 }
 
-const OPENROUTER_LONG_ANSWER_MODEL = "anthropic/claude-sonnet-5.5";
-const OPENROUTER_LONG_ANSWER_BACKUP_MODEL = "deepseek/deepseek-v4.1-flash";
-const LONG_ANSWER_MAX_TOKENS = 16000;
+const OPENROUTER_LONG_ANSWER_MODELS = [
+  "google/gemini-2.5-flash-lite",
+  "deepseek/deepseek-v4.1-flash",
+  "anthropic/claude-sonnet-5.5",
+] as const;
+const LONG_ANSWER_MAX_TOKENS = 4096;
 
 async function tryOpenRouterPool(
   prompt: string,
@@ -149,8 +157,20 @@ async function tryOpenRouterPool(
   maxTokens: number,
   verbosity?: "low" | "medium" | "high",
 ): Promise<Result | null> {
+  const startedAt = Date.now();
   for (const key of rotatedKeys("openrouter", serverConfig.ai.openrouterKeys)) {
-    const result = await tryOpenRouter(prompt, system, key, model, history, maxTokens, verbosity);
+    const remaining = OPENROUTER_KEY_POOL_BUDGET_MS - (Date.now() - startedAt);
+    if (remaining <= 0) break;
+    const result = await tryOpenRouter(
+      prompt,
+      system,
+      key,
+      model,
+      history,
+      maxTokens,
+      verbosity,
+      Math.min(OPENROUTER_REQUEST_TIMEOUT_MS, remaining),
+    );
     if (result) return result;
   }
   return null;
@@ -165,8 +185,20 @@ async function tryOpenRouterKeysInOrder(
   verbosity?: "low" | "medium" | "high",
 ): Promise<Result | null> {
   // Long-answer requests deliberately use key 1 first, then 2 ... through 10.
+  const startedAt = Date.now();
   for (const key of serverConfig.ai.openrouterKeys) {
-    const result = await tryOpenRouter(prompt, system, key, model, history, maxTokens, verbosity);
+    const remaining = OPENROUTER_KEY_POOL_BUDGET_MS - (Date.now() - startedAt);
+    if (remaining <= 0) break;
+    const result = await tryOpenRouter(
+      prompt,
+      system,
+      key,
+      model,
+      history,
+      maxTokens,
+      verbosity,
+      Math.min(OPENROUTER_REQUEST_TIMEOUT_MS, remaining),
+    );
     if (result) return result;
   }
   return null;
@@ -396,7 +428,7 @@ const SolveInputSchema = z.object({
 
 /**
  * Dedicated solver used by the Step-by-Step Solver feature.
- * OpenRouter long-answer model → Groq → Gemini fallback. Retries once on unparseable JSON.
+ * Fast OpenRouter model chain → Groq → Gemini fallback.
  * Returns { data: Solution, provider } or { data: null, provider: "none" }.
  */
 export const solveMathServer = createServerFn({ method: "POST" })
@@ -404,47 +436,33 @@ export const solveMathServer = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const userMsg = `Subject: ${data.subject}\n\nProblem: ${data.problem}`;
 
-    // Two attempts per provider so a one-off JSON slip gets a retry.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      // Claude Sonnet 5.5 — detailed explanations, strict JSON, 16k output budget.
+    // Try fast OpenRouter models first; advance on request or JSON-format failure.
+    for (const model of OPENROUTER_LONG_ANSWER_MODELS) {
       const longAnswer = await tryOpenRouterKeysInOrder(
         userMsg,
         SOLVE_SYSTEM,
-        OPENROUTER_LONG_ANSWER_MODEL,
+        model,
         [],
         LONG_ANSWER_MAX_TOKENS,
-        "high",
       );
       if (longAnswer) {
         const parsed = extractSolveJSON(longAnswer.text);
         if (parsed) return { data: parsed, provider: longAnswer.provider };
       }
+    }
 
-      // OpenRouter's high-output backup, in case the primary model is unavailable.
-      const longAnswerBackup = await tryOpenRouterKeysInOrder(
-        userMsg,
-        SOLVE_SYSTEM,
-        OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
-        [],
-        LONG_ANSWER_MAX_TOKENS,
-      );
-      if (longAnswerBackup) {
-        const parsed = extractSolveJSON(longAnswerBackup.text);
-        if (parsed) return { data: parsed, provider: longAnswerBackup.provider };
+    // Groq fallback — handles shorter/simpler problems well.
+    for (const key of rotatedKeys("groq-solve", serverConfig.ai.groqKeys)) {
+      const r = await tryGroq(userMsg, SOLVE_SYSTEM, key, [], 6000);
+      if (r) {
+        const parsed = extractSolveJSON(r.text);
+        if (parsed) return { data: parsed, provider: r.provider };
       }
-      // Groq fallback — handles shorter/simpler problems well
-      for (const key of rotatedKeys("groq-solve", serverConfig.ai.groqKeys)) {
-        const r = await tryGroq(userMsg, SOLVE_SYSTEM, key, [], 6000);
-        if (r) {
-          const parsed = extractSolveJSON(r.text);
-          if (parsed) return { data: parsed, provider: r.provider };
-        }
-      }
-      const gemini = await tryGeminiPool(userMsg, SOLVE_SYSTEM, [], 6000);
-      if (gemini) {
-        const parsed = extractSolveJSON(gemini.text);
-        if (parsed) return { data: parsed, provider: gemini.provider };
-      }
+    }
+    const gemini = await tryGeminiPool(userMsg, SOLVE_SYSTEM, [], 6000);
+    if (gemini) {
+      const parsed = extractSolveJSON(gemini.text);
+      if (parsed) return { data: parsed, provider: gemini.provider };
     }
 
     return { data: null as Record<string, unknown> | null, provider: "none" };
@@ -495,27 +513,12 @@ async function verifyMathSolutionInternal(
     `PROPOSED ANSWER: ${proposedAnswer.slice(0, 400)}\n\n` +
     "Solve the problem independently from scratch. Compare with the proposed answer. Return JSON only.";
 
-  const longAnswer = await tryOpenRouterKeysInOrder(
-    prompt,
-    VERIFY_SYSTEM,
-    OPENROUTER_LONG_ANSWER_MODEL,
-    [],
-    2048,
-  );
-  if (longAnswer) {
-    const parsed = safeParseVerifyJSON(longAnswer.text);
-    if (parsed) return parsed;
-  }
-  const longAnswerBackup = await tryOpenRouterKeysInOrder(
-    prompt,
-    VERIFY_SYSTEM,
-    OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
-    [],
-    2048,
-  );
-  if (longAnswerBackup) {
-    const parsed = safeParseVerifyJSON(longAnswerBackup.text);
-    if (parsed) return parsed;
+  for (const model of OPENROUTER_LONG_ANSWER_MODELS) {
+    const response = await tryOpenRouterKeysInOrder(prompt, VERIFY_SYSTEM, model, [], 2048);
+    if (response) {
+      const parsed = safeParseVerifyJSON(response.text);
+      if (parsed) return parsed;
+    }
   }
   for (const key of rotatedKeys("groq-verify", serverConfig.ai.groqKeys)) {
     const r = await tryGroq(prompt, VERIFY_SYSTEM, key, [], 512);
@@ -549,33 +552,24 @@ export const askAIServer = createServerFn({ method: "POST" })
     let result: Result | null = null;
 
     if (data.preferLongAnswer) {
-      // Long-answer features get the paid high-output model first. Its 16k
-      // default budget and high-verbosity setting let tutors explain fully.
-      const longTokens = data.maxTokens ?? LONG_ANSWER_MAX_TOKENS;
-      result = await tryOpenRouterKeysInOrder(
-        data.prompt,
-        system,
-        OPENROUTER_LONG_ANSWER_MODEL,
-        history,
-        longTokens,
-        "high",
-      );
-
-      // Keep an OpenRouter long-output backup before falling back to Gemini.
-      if (!result) {
+      // Prefer low-latency output, with sequential key failover and model backups.
+      const longTokens = Math.min(data.maxTokens ?? LONG_ANSWER_MAX_TOKENS, LONG_ANSWER_MAX_TOKENS);
+      const quickSystem = `${system}\n\nAnswer directly and concisely without repeated introductions or filler. Keep all required calculation steps and output formats, and expand when the user explicitly asks for detail.`;
+      for (const model of OPENROUTER_LONG_ANSWER_MODELS) {
         result = await tryOpenRouterKeysInOrder(
           data.prompt,
-          system,
-          OPENROUTER_LONG_ANSWER_BACKUP_MODEL,
+          quickSystem,
+          model,
           history,
           longTokens,
         );
+        if (result) break;
       }
 
       if (!result) {
         result = await tryGeminiPool(
           data.prompt,
-          system,
+          quickSystem,
           history,
           longTokens,
         );
@@ -586,7 +580,7 @@ export const askAIServer = createServerFn({ method: "POST" })
         if (result) break;
         result = await tryOpenRouterPool(
           data.prompt,
-          system,
+          quickSystem,
           model,
           history,
           Math.min(longTokens, 6000),
@@ -657,9 +651,11 @@ const VisionInput = z.object({
 
 // Current multimodal OpenRouter models, reached only after the Gemini vision pool.
 const OPENROUTER_VISION_MODELS = [
-  "anthropic/claude-sonnet-5.5",
+  "google/gemini-2.5-flash-lite",
+  "deepseek/deepseek-v4.1-flash",
   "openai/gpt-4o-mini",
   "meta-llama/llama-3.2-11b-vision-instruct",
+  "anthropic/claude-sonnet-5.5",
 ];
 
 // Groq's free-tier vision model — tried first since it requires no paid
@@ -715,6 +711,7 @@ async function tryGroqVision(
   key: string,
   model: string,
   history: VisionHistory = [],
+  timeoutMs = OPENROUTER_REQUEST_TIMEOUT_MS,
 ): Promise<string | null> {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -725,6 +722,7 @@ async function tryGroqVision(
         messages: buildVisionMessages(prompt, imageBase64, mimeType, history),
         max_tokens: 4096,
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const body = await res.text();
     if (!res.ok) {
@@ -805,9 +803,13 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
       if (text) return { text, provider: "Bishal's Assistant" };
     }
 
-    // Fallback — rotate through configured OpenRouter keys and vision models.
+    // Fallback — prefer fast multimodal models and stop waiting after the pool budget.
+    const openRouterStartedAt = Date.now();
+    openRouterVision:
     for (const model of OPENROUTER_VISION_MODELS) {
       for (const key of rotatedKeys("openrouter", serverConfig.ai.openrouterKeys)) {
+        const remaining = OPENROUTER_KEY_POOL_BUDGET_MS - (Date.now() - openRouterStartedAt);
+        if (remaining <= 0) break openRouterVision;
         const text = await tryOpenRouterVision(
           data.prompt,
           data.imageBase64,
@@ -815,6 +817,7 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
           key,
           model,
           history,
+          Math.min(OPENROUTER_REQUEST_TIMEOUT_MS, remaining),
         );
         if (text) return { text, provider: "Bishal's Assistant" };
       }
