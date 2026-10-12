@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePageState } from "@/lib/pageState";
 import { Loader2, ChevronRight, ChevronLeft, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAI, askAIJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
@@ -113,74 +113,51 @@ const MATH_SUBJECTS = [
 ];
 
 function buildMathPrompt(topic: string, subject: string): string {
-  return `You are a world-class mathematics teacher. Teach "${topic}" from ${subject} in MAXIMUM detail so students truly master the concept.
+  return `Teach "${topic}" from ${subject} as a clear, accurate student lesson. Be focused rather than repetitive so the full lesson fits in one response.
 
-CRITICAL SYMBOL RULE — applies to every "formula" string and every "solution" string in the JSON below:
-NEVER use LaTeX syntax of any kind — no \\frac{}{}, \\sqrt{}, \\times, \\div, \\pm, \\leq, \\geq, \\neq, \\infty, \\theta, \\pi, \\sum, \\int, \\lim, \\boxed{}, ^{}, _{}, $ signs, or any backslash commands. A student who has never seen LaTeX must be able to read every formula instantly.
-Use plain Unicode symbols instead: × for multiply, ÷ for divide, ± for plus-minus, √ for square root, ² ³ ⁿ for powers/exponents (or write x^2 as x²), ≤ ≥ ≠ ≈ ∞, π θ α β, → for "leads to", Σ for sum, ∫ for integral, and write fractions as "(numerator) / (denominator)" on one line, e.g. "x = (-b ± √(b² - 4ac)) / 2a" NOT "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}".
-
-Return STRICT JSON only — no prose, no markdown fences:
+Use plain Unicode math only (×, ÷, √, ², π, ≤, ≥, ≠); never use LaTeX, backslashes, or dollar-sign math.
+Return exactly one valid JSON object matching this shape. Do not add markdown, comments, or keys:
 {
-  "topic": "${topic}",
-  "subject": "${subject}",
-  "introduction": "Engaging 3-4 sentence introduction: what this topic is, why it matters, and what students will be able to do after learning it",
-  "prerequisites": ["Prerequisite 1 — what student should already know", "Prerequisite 2", "Prerequisite 3"],
-  "key_concepts": [
-    {"term": "Key term or concept name", "definition": "Precise mathematical definition with context (2 sentences)"},
-    ... 5 to 7 concepts ...
-  ],
-  "formulas": [
-    {
-      "name": "Formula name",
-      "formula": "Exact formula with proper notation (e.g. x = (-b ± √(b²-4ac)) / 2a)",
-      "variables": "Explain what each variable means (e.g. x = roots, a,b,c = coefficients, discriminant = b²-4ac)",
-      "when_to_use": "Specific conditions when this formula applies (2 sentences)"
-    },
-    ... 2 to 6 formulas depending on topic ...
-  ],
-  "worked_examples": [
-    {
-      "title": "Example 1 title (e.g. 'Basic Application')",
-      "problem": "Clear, specific problem statement with all values given",
-      "solution": "EXTREMELY detailed step-by-step solution. Show every step:\\nStep 1: [action and reason]\\nStep 2: [substitute values]\\nStep 3: [simplify]\\nStep 4: [result]\\n...continue until final answer",
-      "insight": "The key mathematical insight or pattern this example reveals (1-2 sentences)"
-    },
-    {
-      "title": "Example 2 title (e.g. 'Intermediate Application')",
-      "problem": "Harder problem",
-      "solution": "Full step-by-step solution",
-      "insight": "What this example teaches"
-    },
-    {
-      "title": "Example 3 (Real-world or tricky case)",
-      "problem": "...",
-      "solution": "...",
-      "insight": "..."
-    }
-  ],
-  "common_errors": [
-    {"error": "Describe the mistake students commonly make", "fix": "How to avoid it and the correct approach (2 sentences)"},
-    {"error": "Error 2", "fix": "Fix 2"},
-    {"error": "Error 3", "fix": "Fix 3"},
-    {"error": "Error 4", "fix": "Fix 4"}
-  ],
-  "practice_problems": [
-    {"difficulty": "Easy", "problem": "Practice problem", "answer": "Final answer with units", "solution_hint": "Key step or formula to use"},
-    {"difficulty": "Easy", "problem": "...", "answer": "...", "solution_hint": "..."},
-    {"difficulty": "Medium", "problem": "...", "answer": "...", "solution_hint": "..."},
-    {"difficulty": "Medium", "problem": "...", "answer": "...", "solution_hint": "..."},
-    {"difficulty": "Hard", "problem": "...", "answer": "...", "solution_hint": "..."}
-  ],
-  "real_world_application": {
-    "context": "The field or situation where this math is used (e.g. engineering, finance, medicine)",
-    "example": "Specific, concrete real-world example showing exactly how this topic applies (3-4 sentences)"
-  },
-  "exam_tips": [
-    "Exam tip 1 — specific actionable advice for exams",
-    "Exam tip 2 — common trap to watch for in exams",
-    "Exam tip 3 — time-saving shortcut or check method"
-  ]
-}`;
+  "topic": "...",
+  "subject": "...",
+  "introduction": "2-3 sentences explaining the idea and why it matters",
+  "prerequisites": ["..."],
+  "key_concepts": [{"term": "...", "definition": "Clear definition and context"}],
+  "formulas": [{"name": "...", "formula": "...", "variables": "...", "when_to_use": "..."}],
+  "worked_examples": [{"title": "...", "problem": "...", "solution": "Numbered steps with the essential reasoning and arithmetic", "insight": "..."}],
+  "common_errors": [{"error": "...", "fix": "..."}],
+  "practice_problems": [{"difficulty": "Easy", "problem": "...", "answer": "...", "solution_hint": "..."}],
+  "real_world_application": {"context": "...", "example": "..."},
+  "exam_tips": ["..."]
+}
+
+Include 4-6 key concepts, only formulas relevant to this topic, 2 worked examples, 3 common errors, 4 practice problems (easy to hard), and 3 useful exam tips. Explain worked solutions in 3-6 numbered steps; ensure each answer and formula is correct. Use empty arrays only where a section genuinely does not apply.`;
+}
+
+function isMathData(value: unknown): value is MathData {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  const isString = (item: unknown) => typeof item === "string";
+  const isStringArray = (item: unknown) => Array.isArray(item) && item.every(isString);
+  const isObjectArray = (item: unknown, keys: string[]) =>
+    Array.isArray(item) && item.length > 0 && item.every((entry) =>
+      Boolean(entry) && typeof entry === "object" && keys.every((key) => isString((entry as Record<string, unknown>)[key])),
+    );
+  const application = data.real_world_application;
+  if (!application || typeof application !== "object") return false;
+  const applicationFields = application as Record<string, unknown>;
+
+  return isString(data.topic) && isString(data.subject) && isString(data.introduction) &&
+    isStringArray(data.prerequisites) &&
+    isObjectArray(data.key_concepts, ["term", "definition"]) &&
+    (Array.isArray(data.formulas) && data.formulas.every((entry) =>
+      Boolean(entry) && typeof entry === "object" && ["name", "formula", "variables", "when_to_use"].every((key) => isString((entry as Record<string, unknown>)[key])),
+    )) &&
+    isObjectArray(data.worked_examples, ["title", "problem", "solution", "insight"]) &&
+    isObjectArray(data.common_errors, ["error", "fix"]) &&
+    isObjectArray(data.practice_problems, ["difficulty", "problem", "answer", "solution_hint"]) &&
+    isString(applicationFields.context) && isString(applicationFields.example) &&
+    isStringArray(data.exam_tips);
 }
 
 function PracticeCard({ p, index }: { p: MathData["practice_problems"][0]; index: number }) {
@@ -252,11 +229,22 @@ FORMATTING RULES (strict):
 - NEVER use LaTeX syntax of any kind — no \\boxed{}, \\frac{}, \\times, \\subset, \\to, ^{}, _{}, $ signs, or backslash commands. Use plain Unicode math symbols instead: × for multiply, ÷ for divide, √ for square root, ² ³ for powers, π, ≤ ≥ ≠ ≈, → for "leads to", ⊂ for subset, ∈ for "is an element of".
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
 - Show calculations step-by-step using plain math notation, bolding the key formula or result of each step.`;
-    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
-    const res = await askAI(text, system, history, true);
-    await bump();
-    setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
-    setLoading(false);
+    const history = msgsWithUser.slice(0, -1).slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
+    try {
+      const res = await askAI(text, system, history, true);
+      if (res.provider === "none") {
+        toast.error("The AI service is unavailable. Your question is ready to retry.");
+        setAs({ messages, input: text });
+        return;
+      }
+      await bump();
+      setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
+    } catch {
+      toast.error("The answer could not be loaded. Your question is ready to retry.");
+      setAs({ messages, input: text });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -331,6 +319,7 @@ function MathPage() {
     activeSubjectIdx: 0,
     selectedTopic:    null as string | null,
     mathData:         null as MathData | null,
+    topicCache:       {} as Record<string, { data: MathData; provider: string | null }>,
     section:          "learn" as "learn" | "practice",
     provider:         null as string | null,
     expandedExample:  0 as number | null,
@@ -343,17 +332,42 @@ function MathPage() {
 
   async function selectTopic(topic: string) {
     if (topic === selectedTopic) return;
+    const cacheKey = `${activeSubject.subject}:${topic}`;
+    const cached = ps.topicCache?.[cacheKey];
+    if (cached) {
+      set({ selectedTopic: topic, mathData: cached.data, provider: cached.provider, section: "learn", expandedExample: 0 });
+      return;
+    }
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    set({ selectedTopic: topic, mathData: null, section: "learn", expandedExample: 0 });
+    set({ selectedTopic: topic, mathData: null, provider: null, section: "learn", expandedExample: 0 });
     setLoading(true);
     try {
-      const res = await askAI(buildMathPrompt(topic, activeSubject.subject), "You are a math teacher. Return ONLY valid JSON — no markdown, no prose.", undefined, true);
-      set({ provider: res.provider });
+      const result = await askAIJSON<unknown>(
+        buildMathPrompt(topic, activeSubject.subject),
+        "You are an accurate math teacher. Return one valid JSON object matching the supplied schema.",
+        undefined,
+        true,
+        4096,
+      );
+      if (result.provider === "none" || !isMathData(result.data)) {
+        toast.error(result.provider === "none" ? "The AI service is unavailable. Please retry this topic." : "The lesson response was incomplete. Please retry this topic.");
+        set({ selectedTopic: null });
+        return;
+      }
+
+      const entries = Object.entries(ps.topicCache ?? {}).filter(([key]) => key !== cacheKey);
+      const topicCache = Object.fromEntries([
+        ...entries,
+        [cacheKey, { data: result.data, provider: result.provider }],
+      ].slice(-12));
+      set({ mathData: result.data, provider: result.provider, topicCache });
       await bump();
-      const parsed = extractJSON<MathData>(res.text);
-      if (parsed) { set({ mathData: parsed }); } else { toast.error("Could not load topic — try again"); set({ selectedTopic: null }); }
-    } catch { toast.error("Failed to load topic"); set({ selectedTopic: null }); }
-    setLoading(false);
+    } catch {
+      toast.error("Failed to load topic. Please try again.");
+      set({ selectedTopic: null });
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (selectedTopic) {

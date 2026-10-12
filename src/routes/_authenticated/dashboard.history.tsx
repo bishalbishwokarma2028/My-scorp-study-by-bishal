@@ -13,14 +13,13 @@ export const Route = createFileRoute("/_authenticated/dashboard/history")({
 
 const COLORS = ["#2563EB", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4", "#EF4444", "#84CC16", "#F97316", "#6366F1"];
 
-const FILTERS = ["All", "Chat", "Quiz", "Note", "Flashcard", "Image", "Summary", "Translation", "Compare", "Research", "Visual"] as const;
+const FILTERS = ["All", "Chat", "Quiz", "Note", "Flashcard", "Summary", "Translation", "Compare", "Research", "Visual"] as const;
 
 const TYPE_TO_ROUTE: Record<string, string> = {
   Chat:        "/dashboard/chat",
   Quiz:        "/dashboard/quiz",
   Note:        "/dashboard/notes",
   Flashcard:   "/dashboard/flashcards",
-  Image:       "/dashboard/image-gen",
   Summary:     "/dashboard/summarizer",
   Translation: "/dashboard/translator",
   Compare:     "/dashboard/compare",
@@ -89,12 +88,11 @@ function HistoryPage() {
   const { data: all } = useQuery({
     queryKey: ["history", user.id],
     queryFn: async () => {
-      const [c, q, n, f, img, s, t, r, cmp, vis] = await Promise.all([
+      const [c, q, n, f, s, t, r, cmp, vis] = await Promise.all([
         safeFetch(supabase.from("chat_history").select("id,title,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
         safeFetch(supabase.from("quiz_results").select("id,topic,score,total,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
         safeFetch(supabase.from("notes").select("id,title,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
         safeFetch(supabase.from("flashcards").select("id,topic,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
-        safeFetch(supabase.from("generated_images").select("id,prompt,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
         safeFetch(supabase.from("summaries").select("id,summary,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
         safeFetch(supabase.from("translations").select("id,original_text,translated_text,source_language,target_language,created_at").eq("user_id", user.id).order("created_at", { ascending: false })),
         safeFetch(supabase.from("research_history" as never).select("id,query,focus_type,report,sources,search_source,provider,created_at").eq("user_id", user.id).order("created_at", { ascending: false }) as never),
@@ -115,9 +113,6 @@ function HistoryPage() {
 
       (f as { id: string; topic: string | null; created_at: string }[]).forEach(x =>
         items.push({ id: x.id, table: "flashcards", type: "Flashcard", desc: x.topic ?? "Set", created_at: x.created_at, extra: { topic: x.topic } }));
-
-      (img as { id: string; prompt: string | null; created_at: string }[]).forEach(x =>
-        items.push({ id: x.id, table: "generated_images", type: "Image", desc: x.prompt ?? "", created_at: x.created_at, extra: { prompt: x.prompt } }));
 
       (s as { id: string; summary: string | null; created_at: string }[]).forEach(x =>
         items.push({ id: x.id, table: "summaries", type: "Summary", desc: (x.summary ?? "").slice(0, 80), created_at: x.created_at, extra: { summary: x.summary } }));
@@ -192,9 +187,6 @@ function HistoryPage() {
       } else if (x.type === "Flashcard") {
         sessionStorage.setItem("scorp_restore", JSON.stringify({ type: "Flashcard", topic: x.extra?.topic ?? x.desc }));
 
-      } else if (x.type === "Image") {
-        sessionStorage.setItem("scorp_restore", JSON.stringify({ type: "Image", prompt: x.extra?.prompt ?? "" }));
-
       } else if (x.type === "Summary") {
         const { data } = await supabase.from("summaries").select("*").eq("id", x.id).maybeSingle();
         if (data) sessionStorage.setItem("scorp_restore", JSON.stringify({ type: "Summary", data }));
@@ -244,7 +236,7 @@ function HistoryPage() {
 
   const TYPE_ICONS: Record<string, string> = {
     Chat: "💬", Quiz: "❓", Note: "📝", Flashcard: "🗂️",
-    Image: "🖼️", Summary: "📄", Translation: "🌐",
+    Summary: "📄", Translation: "🌐",
     Compare: "⚖️", Research: "🔍", Visual: "🧠",
   };
 

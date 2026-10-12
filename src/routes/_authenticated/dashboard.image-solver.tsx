@@ -64,10 +64,11 @@ FOCUS RULE — MOST IMPORTANT:
 Answer EXACTLY what each question asks. Do not add unrelated topics, tangential facts, or unnecessary padding. Every sentence in your answer must directly serve the question being solved.
 
 LENGTH RULE — scale to the question:
-- Short/definition question → 150–300 words. Direct answer, key concept, one example.
-- Medium calculation/explanation → 400–700 words. Full working shown step by step.
-- Long/multi-part question → 700–1200 words per part. Each sub-part fully worked.
-- Advanced/university-level → 1000–2000 words. Full derivation, worked solution, verification.
+- Short/definition question → 40–100 words. Answer directly with one useful example.
+- Medium calculation/explanation → 100–250 words. Show the essential working clearly.
+- Long/multi-part question → 150–350 words per part. Cover every part without repetition.
+- Advanced/university-level → 250–500 words. Include the key derivation and a quick check.
+If the image contains many questions, keep each answer concise; the student can ask for more detail in a follow-up.
 
 Do NOT pad answers with content the question does not require. If the question asks "define X", define it — do not write textbook chapters on it unless the question asks for that depth.
 
@@ -224,6 +225,10 @@ function ImageSolverPage() {
       reader.onload = () => {
         const dataUrl = reader.result as string;
         const base64 = dataUrl.split(",")[1];
+        if (base64.length > 2_500_000) {
+          toast.error("This image could not be compressed enough. Try a smaller JPEG or PNG.");
+          return;
+        }
         setState({ answer: "", chatHistory: [], followupInput: "" });
         setImgState({ image: { base64, mimeType: file.type || "image/jpeg", name: file.name || "pasted-image.png", preview: dataUrl } });
         toast.success("Image loaded — click Solve");
@@ -276,6 +281,11 @@ function ImageSolverPage() {
           mimeType: imgState.image.mimeType,
         },
       });
+      if (res.provider === "none") {
+        toast.error(res.text);
+        setState({ loading: false });
+        return;
+      }
       setState({
         answer: res.text,
         loading: false,
@@ -319,6 +329,11 @@ function ImageSolverPage() {
           history: safeHistory,
         },
       });
+      if (res.provider === "none") {
+        toast.error(res.text);
+        setState({ followupLoading: false, followupInput: q });
+        return;
+      }
       setState({
         followupLoading: false,
         chatHistory: [

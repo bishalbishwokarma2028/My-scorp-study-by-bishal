@@ -30,7 +30,6 @@ import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_
 import { Route as AuthenticatedDashboardFormulaSheetRouteImport } from './routes/_authenticated/dashboard.formula-sheet'
 import { Route as AuthenticatedDashboardGrammarRouteImport } from './routes/_authenticated/dashboard.grammar'
 import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
-import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
 import { Route as AuthenticatedDashboardImageSolverRouteImport } from './routes/_authenticated/dashboard.image-solver'
 import { Route as AuthenticatedDashboardMathRouteImport } from './routes/_authenticated/dashboard.math'
 import { Route as AuthenticatedDashboardMemorizerRouteImport } from './routes/_authenticated/dashboard.memorizer'
@@ -162,12 +161,6 @@ const AuthenticatedDashboardHistoryRoute =
     path: '/dashboard/history',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDashboardImageGenRoute =
-  AuthenticatedDashboardImageGenRouteImport.update({
-    id: '/dashboard/image-gen',
-    path: '/dashboard/image-gen',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedDashboardImageSolverRoute =
   AuthenticatedDashboardImageSolverRouteImport.update({
     id: '/dashboard/image-solver',
@@ -283,7 +276,6 @@ export interface FileRoutesByFullPath {
   '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
-  '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/dashboard/memorizer': typeof AuthenticatedDashboardMemorizerRoute
@@ -321,7 +313,6 @@ export interface FileRoutesByTo {
   '/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
-  '/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/dashboard/memorizer': typeof AuthenticatedDashboardMemorizerRoute
@@ -362,7 +353,6 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/formula-sheet': typeof AuthenticatedDashboardFormulaSheetRoute
   '/_authenticated/dashboard/grammar': typeof AuthenticatedDashboardGrammarRoute
   '/_authenticated/dashboard/history': typeof AuthenticatedDashboardHistoryRoute
-  '/_authenticated/dashboard/image-gen': typeof AuthenticatedDashboardImageGenRoute
   '/_authenticated/dashboard/image-solver': typeof AuthenticatedDashboardImageSolverRoute
   '/_authenticated/dashboard/math': typeof AuthenticatedDashboardMathRoute
   '/_authenticated/dashboard/memorizer': typeof AuthenticatedDashboardMemorizerRoute
@@ -402,7 +392,6 @@ export interface FileRouteTypes {
     | '/dashboard/formula-sheet'
     | '/dashboard/grammar'
     | '/dashboard/history'
-    | '/dashboard/image-gen'
     | '/dashboard/image-solver'
     | '/dashboard/math'
     | '/dashboard/memorizer'
@@ -440,7 +429,6 @@ export interface FileRouteTypes {
     | '/dashboard/formula-sheet'
     | '/dashboard/grammar'
     | '/dashboard/history'
-    | '/dashboard/image-gen'
     | '/dashboard/image-solver'
     | '/dashboard/math'
     | '/dashboard/memorizer'
@@ -480,7 +468,6 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/formula-sheet'
     | '/_authenticated/dashboard/grammar'
     | '/_authenticated/dashboard/history'
-    | '/_authenticated/dashboard/image-gen'
     | '/_authenticated/dashboard/image-solver'
     | '/_authenticated/dashboard/math'
     | '/_authenticated/dashboard/memorizer'
@@ -658,13 +645,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardHistoryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/dashboard/image-gen': {
-      id: '/_authenticated/dashboard/image-gen'
-      path: '/dashboard/image-gen'
-      fullPath: '/dashboard/image-gen'
-      preLoaderRoute: typeof AuthenticatedDashboardImageGenRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/dashboard/image-solver': {
       id: '/_authenticated/dashboard/image-solver'
       path: '/dashboard/image-solver'
@@ -811,7 +791,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardFormulaSheetRoute: typeof AuthenticatedDashboardFormulaSheetRoute
   AuthenticatedDashboardGrammarRoute: typeof AuthenticatedDashboardGrammarRoute
   AuthenticatedDashboardHistoryRoute: typeof AuthenticatedDashboardHistoryRoute
-  AuthenticatedDashboardImageGenRoute: typeof AuthenticatedDashboardImageGenRoute
   AuthenticatedDashboardImageSolverRoute: typeof AuthenticatedDashboardImageSolverRoute
   AuthenticatedDashboardMathRoute: typeof AuthenticatedDashboardMathRoute
   AuthenticatedDashboardMemorizerRoute: typeof AuthenticatedDashboardMemorizerRoute
@@ -844,7 +823,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedDashboardFormulaSheetRoute,
   AuthenticatedDashboardGrammarRoute: AuthenticatedDashboardGrammarRoute,
   AuthenticatedDashboardHistoryRoute: AuthenticatedDashboardHistoryRoute,
-  AuthenticatedDashboardImageGenRoute: AuthenticatedDashboardImageGenRoute,
   AuthenticatedDashboardImageSolverRoute:
     AuthenticatedDashboardImageSolverRoute,
   AuthenticatedDashboardMathRoute: AuthenticatedDashboardMathRoute,

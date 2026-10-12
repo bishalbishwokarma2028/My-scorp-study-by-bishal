@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePageState } from "@/lib/pageState";
 import { Loader2, ChevronRight, ChevronLeft, Eye, EyeOff, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAI, askAIJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
@@ -270,59 +270,55 @@ const SCIENCE_SUBJECTS = [
 ];
 
 function buildSciencePrompt(topic: string, subject: string): string {
-  return `You are a world-class science teacher teaching "${topic}" from ${subject}. Provide a COMPREHENSIVE, DETAILED lesson.
+  return `Teach "${topic}" from ${subject} as a clear, accurate science lesson. Keep it focused and concise enough to return as valid JSON in one response.
 
-CRITICAL SYMBOL RULE — applies to every text field in the JSON below, especially "equation" and "explanation":
-NEVER use LaTeX syntax of any kind — no \\frac{}{}, \\sqrt{}, \\times, \\div, \\pm, \\leq, \\geq, \\neq, \\rightarrow, \\Delta, \\theta, \\pi, ^{}, _{}, $ signs, or any backslash commands. A student who has never seen LaTeX must be able to read every equation instantly.
-Use plain Unicode symbols instead: × for multiply, ÷ for divide, ± for plus-minus, √ for square root, ² ³ for powers/exponents, ≤ ≥ ≠ ≈, → for reactions/"leads to", Δ for change, π θ α β γ, ° for degrees, and write fractions as "(numerator) / (denominator)" on one line, e.g. "v = Δs / t" NOT "v = \\frac{\\Delta s}{t}", and "F = (G × m₁ × m₂) / r²" NOT "\\frac{Gm_1m_2}{r^2}".
-
-Return STRICT JSON only — no prose, no markdown fences:
+Use plain Unicode science notation (×, ÷, √, ², Δ, →, °); never use LaTeX, backslashes, or dollar-sign math.
+Return exactly one valid JSON object matching this shape. Do not add markdown, comments, or keys:
 {
-  "topic": "${topic}",
-  "subject": "${subject}",
-  "introduction": "Engaging 3-4 sentence introduction that sparks curiosity and explains why this topic is important",
-  "key_concepts": [
-    {"term": "Key term", "definition": "Precise scientific definition (2 sentences)", "example": "Concrete example in everyday life"},
-    ... 5 to 8 concepts ...
-  ],
-  "explanation": [
-    {"section": "Section name (e.g. 'The Basic Mechanism', 'Types and Categories', 'How It Works')", "content": "Detailed explanation of this aspect (4-6 sentences with scientific depth)"},
-    {"section": "Section 2", "content": "..."},
-    {"section": "Section 3", "content": "..."},
-    {"section": "Section 4 (Advanced Aspects)", "content": "..."}
-  ],
-  "diagrams_description": "Description of the key diagram/model/structure students should know and draw for this topic (2-3 sentences) or null",
-  "equations": [
-    {"name": "Equation name", "equation": "The equation/formula with symbols", "explanation": "What each symbol means and when to use it"},
-    ... 1 to 5 equations if applicable, empty array if none ...
-  ],
-  "examples": [
-    {"title": "Example title", "description": "Detailed 2-3 sentence real-world example", "significance": "Why this example matters scientifically (1 sentence)"},
-    {"title": "Example 2", "description": "...", "significance": "..."},
-    {"title": "Example 3", "description": "...", "significance": "..."}
-  ],
-  "experiment": {
-    "title": "Experiment or investigation title",
-    "aim": "What the experiment aims to demonstrate or investigate",
-    "materials": ["Material 1", "Material 2", "Material 3", "..."],
-    "steps": ["Step 1: detailed instruction", "Step 2: ...", "Step 3: ...", "Step 4: ...", "Step 5: ...", "Step 6: ..."],
-    "expected_result": "What should happen and why it demonstrates the concept",
-    "safety": "Any safety precautions needed, or null"
-  },
-  "practice_questions": [
-    {"type": "Define", "question": "Define [key term from this topic]", "answer": "Complete definition answer (2-3 sentences)"},
-    {"type": "Explain", "question": "Explain how [process] works", "answer": "Full explanation answer (3-4 sentences)"},
-    {"type": "Apply", "question": "Application or calculation question about this topic", "answer": "Full model answer"},
-    {"type": "Evaluate", "question": "Evaluate/compare/analyse question requiring higher-order thinking", "answer": "Detailed model answer (4-5 sentences)"},
-    {"type": "Calculate", "question": "Numerical question if equations apply, otherwise a 'Describe' question", "answer": "Worked answer"}
-  ],
-  "connections": [
-    "This topic connects to [related topic] because [reason] (1 sentence)",
-    "Connection 2 to another topic",
-    "Real-world/career connection (e.g. engineers use this for...)"
-  ],
-  "fun_fact": "A genuinely surprising, memorable, counterintuitive, or awe-inspiring fact about this topic"
-}`;
+  "topic": "...",
+  "subject": "...",
+  "introduction": "2-3 sentences introducing the idea and why it matters",
+  "key_concepts": [{"term": "...", "definition": "...", "example": "..."}],
+  "explanation": [{"section": "...", "content": "Clear explanation of the mechanism or principle"}],
+  "diagrams_description": "A simple diagram students could draw, or null",
+  "equations": [{"name": "...", "equation": "...", "explanation": "..."}],
+  "examples": [{"title": "...", "description": "...", "significance": "..."}],
+  "experiment": {"title": "...", "aim": "...", "materials": ["..."], "steps": ["..."], "expected_result": "...", "safety": null},
+  "practice_questions": [{"type": "Define", "question": "...", "answer": "..."}],
+  "connections": ["..."],
+  "fun_fact": "..."
+}
+
+Include 4-6 key concepts, 3 explanation sections, only relevant equations, 2 examples, 4 practice questions, and 3 connections. Give the experiment 4-5 practical steps; keep it safe and age-appropriate. Do not invent a formula when none applies; use an empty equations array.`;
+}
+
+function isScienceData(value: unknown): value is ScienceData {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  const isString = (item: unknown) => typeof item === "string";
+  const isStringArray = (item: unknown) => Array.isArray(item) && item.every(isString);
+  const isObjectArray = (item: unknown, keys: string[]) =>
+    Array.isArray(item) && item.length > 0 && item.every((entry) =>
+      Boolean(entry) && typeof entry === "object" && keys.every((key) => isString((entry as Record<string, unknown>)[key])),
+    );
+  const experiment = data.experiment;
+  if (!experiment || typeof experiment !== "object") return false;
+  const experimentFields = experiment as Record<string, unknown>;
+
+  return isString(data.topic) && isString(data.subject) && isString(data.introduction) &&
+    isObjectArray(data.key_concepts, ["term", "definition", "example"]) &&
+    isObjectArray(data.explanation, ["section", "content"]) &&
+    (isString(data.diagrams_description) || data.diagrams_description === null) &&
+    Array.isArray(data.equations) && data.equations.every((entry) =>
+      Boolean(entry) && typeof entry === "object" && ["name", "equation", "explanation"].every((key) => isString((entry as Record<string, unknown>)[key])),
+    ) &&
+    isObjectArray(data.examples, ["title", "description", "significance"]) &&
+    isString(experimentFields.title) && isString(experimentFields.aim) &&
+    isStringArray(experimentFields.materials) && isStringArray(experimentFields.steps) &&
+    isString(experimentFields.expected_result) &&
+    (isString(experimentFields.safety) || experimentFields.safety === null) &&
+    isObjectArray(data.practice_questions, ["type", "question", "answer"]) &&
+    isStringArray(data.connections) && isString(data.fun_fact);
 }
 
 function PracticeQuestion({ q, index }: { q: ScienceData["practice_questions"][0]; index: number }) {
@@ -395,11 +391,22 @@ FORMATTING RULES (strict):
 - NEVER use LaTeX syntax of any kind — no \\boxed{}, \\frac{}, \\times, \\subset, \\to, ^{}, _{}, $ signs, or backslash commands. Use plain Unicode symbols instead: × for multiply, ÷ for divide, √ for square root, ² ³ for powers/exponents, π, ≤ ≥ ≠ ≈, → for "leads to" or reactions, ° for degrees.
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.
 - Show equations and formulas using plain notation, bolding the key result of each step.`;
-    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
-    const res = await askAI(text, system, history, true);
-    await bump();
-    setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
-    setLoading(false);
+    const history = msgsWithUser.slice(0, -1).slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
+    try {
+      const res = await askAI(text, system, history, true);
+      if (res.provider === "none") {
+        toast.error("The AI service is unavailable. Your question is ready to retry.");
+        setAs({ messages, input: text });
+        return;
+      }
+      await bump();
+      setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
+    } catch {
+      toast.error("The answer could not be loaded. Your question is ready to retry.");
+      setAs({ messages, input: text });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -473,6 +480,7 @@ function SciencePage() {
     openChapter:      SCIENCE_SUBJECTS[0].chapters[0].name as string | null,
     selectedTopic:    null as string | null,
     scienceData:      null as ScienceData | null,
+    topicCache:       {} as Record<string, { data: ScienceData; provider: string | null }>,
     provider:         null as string | null,
   });
   const { activeSubjectIdx, openChapter, selectedTopic, scienceData, provider } = ps;
@@ -487,17 +495,42 @@ function SciencePage() {
 
   async function selectTopic(topic: string) {
     if (topic === selectedTopic) return;
+    const cacheKey = `${activeSubject.subject}:${topic}`;
+    const cached = ps.topicCache?.[cacheKey];
+    if (cached) {
+      set({ selectedTopic: topic, scienceData: cached.data, provider: cached.provider });
+      return;
+    }
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    set({ selectedTopic: topic, scienceData: null });
+    set({ selectedTopic: topic, scienceData: null, provider: null });
     setLoading(true);
     try {
-      const res = await askAI(buildSciencePrompt(topic, activeSubject.subject), "You are a science teacher. Return ONLY valid JSON — no markdown, no prose.", undefined, true);
-      set({ provider: res.provider });
+      const result = await askAIJSON<unknown>(
+        buildSciencePrompt(topic, activeSubject.subject),
+        "You are an accurate science teacher. Return one valid JSON object matching the supplied schema.",
+        undefined,
+        true,
+        4096,
+      );
+      if (result.provider === "none" || !isScienceData(result.data)) {
+        toast.error(result.provider === "none" ? "The AI service is unavailable. Please retry this topic." : "The lesson response was incomplete. Please retry this topic.");
+        set({ selectedTopic: null });
+        return;
+      }
+
+      const entries = Object.entries(ps.topicCache ?? {}).filter(([key]) => key !== cacheKey);
+      const topicCache = Object.fromEntries([
+        ...entries,
+        [cacheKey, { data: result.data, provider: result.provider }],
+      ].slice(-12));
+      set({ scienceData: result.data, provider: result.provider, topicCache });
       await bump();
-      const parsed = extractJSON<ScienceData>(res.text);
-      if (parsed) { set({ scienceData: parsed }); } else { toast.error("Could not load topic — try again"); set({ selectedTopic: null }); }
-    } catch { toast.error("Failed to load topic"); set({ selectedTopic: null }); }
-    setLoading(false);
+    } catch {
+      toast.error("Failed to load topic. Please try again.");
+      set({ selectedTopic: null });
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (selectedTopic) {

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { askAI } from "@/lib/aiProvider";
+import { analyzeImageServer } from "@/lib/aiProvider.functions";
 import { extractPdfText } from "@/lib/pdfExtract";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
@@ -22,6 +23,11 @@ type Message = { role: "user" | "assistant"; content: string; provider?: string;
 
 const CHUNK_SIZE = 2000;
 const MAX_CHUNKS = 4;
+const QUERY_STOP_WORDS = new Set([
+  "about", "after", "also", "and", "are", "can", "could", "does", "for", "from",
+  "give", "have", "how", "into", "main", "more", "most", "please", "some", "that",
+  "the", "their", "this", "what", "when", "where", "which", "with", "would",
+]);
 
 function splitIntoChunks(text: string): string[] {
   const chunks: string[] = [];
@@ -32,9 +38,9 @@ function splitIntoChunks(text: string): string[] {
 }
 
 function scoreChunk(chunk: string, query: string): number {
-  const q = query.toLowerCase();
   const c = chunk.toLowerCase();
-  const words = q.split(/\s+/).filter((w) => w.length > 2);
+  const words = [...new Set(query.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])]
+    .filter((word) => !QUERY_STOP_WORDS.has(word));
   return words.reduce((score, word) => {
     const count = (c.match(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
     return score + count;
@@ -43,7 +49,22 @@ function scoreChunk(chunk: string, query: string): number {
 
 function getRelevantContext(chunks: string[], query: string, maxChunks: number = MAX_CHUNKS): string {
   const scored = chunks.map((chunk, i) => ({ chunk, score: scoreChunk(chunk, query), i }));
-  scored.sort((a, b) => b.score - a.score || a.i - b.i);
+  const bestMatch = scored.reduce((best, item) => item.score > best.score ? item : best, scored[0]);
+  if (bestMatch?.score === 0) {
+    const count = Math.min(maxChunks, chunks.length);
+    const indexes = count === 1
+      ? [Math.floor((chunks.length - 1) / 2)]
+      : Array.from({ length: count }, (_, i) =>
+          Math.round(i * (chunks.length - 1) / (count - 1)),
+        );
+    return [...new Set(indexes)].map((index) => chunks[index]).join("\n\n");
+  }
+
+  scored.sort((a, b) =>
+    b.score - a.score ||
+    Math.abs(a.i - bestMatch.i) - Math.abs(b.i - bestMatch.i) ||
+    a.i - b.i,
+  );
   return scored
     .slice(0, maxChunks)
     .sort((a, b) => a.i - b.i)
@@ -194,10 +215,10 @@ function PdfChatPage() {
         pdfText:  cleaned,
         chunks:   allChunks,
         pdfName:  file.name,
-          pdfPages: result.pageCount,
+        pdfPages: result.pagesProcessed,
         messages: [{
           role: "assistant",
-            content: `📄 **${file.name}** is ready!\n\n**${result.pagesProcessed} of ${result.pageCount} pages** processed · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted${result.scannedPages ? ` · **${result.scannedPages} scanned pages** read with OCR` : ""}${result.truncated ? "\n\n> This PDF exceeds the current indexing limit; the first processed pages or characters are available in chat." : ""}\n\nAsk me anything about the indexed content — I'll search the relevant sections and cite their page labels.`,
+          content: `📄 **${file.name}** is ready!\n\n**${result.pagesProcessed} of ${result.pageCount} pages** processed · **${allChunks.length} sections** indexed · **${Math.round(cleaned.length / 1000)}k characters** extracted${result.scannedPages ? ` · **${result.scannedPages} scanned pages** checked with OCR` : ""}${result.ocrFailedPages ? ` · **OCR could not read ${result.ocrFailedPages} scanned page(s)**` : ""}${result.truncated ? "\n\n> This PDF exceeds the current indexing limit; only the processed pages or characters are available in chat." : ""}\n\nAsk me anything about the indexed content — I'll search relevant sections and cite their page labels.`,
           provider: "Bishal's Assistant",
         }],
       });
@@ -225,19 +246,20 @@ function PdfChatPage() {
     set({ messages: msgsWithUser, input: "" });
     setLoading(true);
 
-    const history = msgsWithUser.slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 1500) }));
+    const history = msgsWithUser.slice(0, -1).slice(-6).map((m) => ({ role: m.role, content: m.content.slice(0, 1500) }));
 
     try {
       const res = await askDocumentQuestion(text, pdfName, chunks, history);
       if (res.provider === "none") {
         toast.error("The AI service is temporarily unavailable. Please retry your question.");
-        set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: "none", revealed: false }] });
+        set({ messages, input: text });
         return;
       }
       await bump();
       set({ messages: [...msgsWithUser, { role: "assistant", content: res.text, provider: res.provider, revealed: false }] });
     } catch {
-      set({ messages: [...msgsWithUser, { role: "assistant", content: "I ran into a hiccup reaching the AI — please send your question again.", provider: "Bishal's Assistant", revealed: false }] });
+      toast.error("I couldn't reach the AI service. Your question is ready to retry.");
+      set({ messages, input: text });
     } finally {
       setLoading(false);
     }
@@ -272,7 +294,7 @@ function PdfChatPage() {
           <p className="text-base font-bold text-foreground">Drop your PDF here</p>
           <p className="mt-1 text-sm text-muted-foreground">or tap to browse</p>
           <p className="mt-3 inline-block rounded-full bg-violet-100 px-4 py-1 text-xs font-semibold text-violet-700">
-            Supports text-based PDFs up to 25 MB
+            Text and scanned PDFs · up to 25 MB · first 50 pages indexed
           </p>
           <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
         </div>

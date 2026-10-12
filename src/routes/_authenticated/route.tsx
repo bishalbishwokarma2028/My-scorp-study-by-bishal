@@ -3,7 +3,7 @@ import { clearAllPageState } from "@/lib/pageState";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, MessageSquare, FileText, ListChecks, Layers,
-  Image as ImageIcon, StickyNote, Languages, Calculator, BarChart3,
+  StickyNote, Languages, Calculator, BarChart3,
   LogOut, Menu, X, Bell, Code2, GitCompare, Search, Eye,
   FlaskConical, Sheet, Brain, FileQuestion, Youtube, BookText,
   Sigma, Microscope, Coins, ScanText, PenLine, Compass, BookMarked,
@@ -38,7 +38,6 @@ const navItems = [
   { to: "/dashboard/compare", label: "Compare Concepts", icon: GitCompare },
   { to: "/dashboard/research", label: "Deep Research", icon: Search },
   { to: "/dashboard/visual-explainer", label: "Visual Explainer", icon: Eye },
-  { to: "/dashboard/image-gen", label: "Image Gen", icon: ImageIcon },
   { to: "/dashboard/image-solver", label: "Image Solver", icon: ScanText },
   { to: "/dashboard/whiteboard", label: "Teaching Board", icon: PenLine },
   { to: "/dashboard/notes", label: "Smart Notes", icon: StickyNote },

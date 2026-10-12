@@ -1,0 +1,48 @@
+Please fix all the following issues together in a single update:
+
+1. Image Solver
+
+When I upload an image to solve a question, the following error appears: “Image analysis is temporarily unavailable. Please try again in a moment.”
+
+Please fix this issue completely so that uploaded images are analyzed correctly and questions are solved accurately and reliably.
+
+2. Chat with PDF
+
+This feature is currently not working at all. Please fix it completely so users can upload PDF documents, ask questions about their content, and receive accurate, relevant answers based on the uploaded files.
+
+3. Mathematics, and Science
+
+When I select a specific topic in any of these features, the error “Could not load topic” appears.
+
+Please fix this issue so that all topics load properly and display accurate, complete, and relevant educational content without errors.
+
+4. Remove Image Gen
+
+Completely remove the Image Gen feature from the application, including its interface and related functionality.
+
+5. Make Every Feature Extremely Fast — Highest Priority
+
+Every feature in the entire application must provide answers as quickly as possible. This is a mandatory requirement.
+
+- Aim to deliver answers within 5–8 seconds maximum for all features.
+- Optimize every feature to minimize response time and eliminate unnecessary delays.
+- Improve API calls, backend processing, database queries, and AI model response handling wherever necessary.
+- Avoid unnecessary loading screens, repeated requests, and inefficient processing.
+- Ensure that all features respond quickly and consistently, even when multiple users are using the application.
+- For features involving long content, such as Smart Notes, use optimized generation methods, streaming, or progressive output where appropriate so users can start receiving content quickly.
+
+The 5–8 second response-time target is a critical requirement for the entire application, not just a few selected features. Optimize all existing features, including the AI Assistant, Deep/Rapid Engine, Quiz Generator, Mock Test, Flashcards, Formula Sheet, Code Tutor, Deep Research, YouTube Summarizer, Compare Concepts, Visual Explainer, Step-by-Step Solver, and all other available tools.
+
+If a task genuinely requires more processing time, show useful progress and deliver the results as efficiently as possible rather than leaving users waiting without feedback.
+
+Final Requirements
+
+Please implement all these fixes together in a single update. After implementation, thoroughly test every feature to verify that:
+
+- All features work correctly without errors.
+- Generated content is accurate, relevant, and sufficiently detailed.
+- All topics and uploaded documents load and process correctly.
+- Response times are consistently optimized, targeting 5–8 seconds or less wherever technically feasible.
+- The application remains stable, reliable, and responsive under normal usage and concurrent requests.
+
+Priority: Fix the broken features, improve content quality, remove Image Gen, and optimize the speed of the entire application. Do not make superficial changes; resolve the underlying issues and verify the results through actual testing.

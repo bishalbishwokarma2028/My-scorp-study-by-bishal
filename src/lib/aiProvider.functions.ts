@@ -334,14 +334,14 @@ async function tryGeminiVision(
     );
     const body = await res.text();
     if (!res.ok) {
-      console.error(`[Vision] Gemini HTTP ${res.status}:`, body.slice(0, 400));
+      logProviderFailure("Gemini vision", `HTTP ${res.status}`);
       return null;
     }
     const data = JSON.parse(body);
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     return (typeof text === "string" && text.trim()) ? text.trim() : null;
   } catch (err) {
-    console.error("[Vision] Gemini exception:", err);
+    logProviderFailure("Gemini vision", err instanceof Error ? err.name : "request error");
     return null;
   }
 }
@@ -727,13 +727,12 @@ const OPENROUTER_VISION_MODELS = [
   "google/gemini-2.5-flash-lite",
   "deepseek/deepseek-v4.1-flash",
   "openai/gpt-4o-mini",
-  "meta-llama/llama-3.2-11b-vision-instruct",
+  "qwen/qwen3.8-omni-flash",
   "anthropic/claude-sonnet-5.5",
 ];
 
-// Groq's free-tier vision model — tried first since it requires no paid
-// credits (unlike the OpenRouter fallbacks below, which need account balance).
-const GROQ_VISION_MODELS = ["meta-llama/llama-4-scout-17b-16e-instruct"];
+// Groq's currently supported multimodal model, tried first before paid fallbacks.
+const GROQ_VISION_MODELS = ["qwen/qwen3.8-27b"];
 
 type VisionHistory = Array<{ role: "user" | "assistant"; content: string }>;
 
@@ -799,14 +798,14 @@ async function tryGroqVision(
     });
     const body = await res.text();
     if (!res.ok) {
-      console.error(`[Vision] Groq ${model} HTTP ${res.status}:`, body.slice(0, 400));
+      logProviderFailure("Groq vision", `HTTP ${res.status}`);
       return null;
     }
     const parsed = JSON.parse(body);
     const text = parsed?.choices?.[0]?.message?.content;
     return (typeof text === "string" && text.trim()) ? text.trim() : null;
   } catch (err) {
-    console.error(`[Vision] Groq ${model} exception:`, err);
+    logProviderFailure("Groq vision", err instanceof Error ? err.name : "request error");
     return null;
   }
 }
@@ -838,14 +837,14 @@ async function tryOpenRouterVision(
     });
     const body = await res.text();
     if (!res.ok) {
-      console.error(`[Vision] OpenRouter ${model} HTTP ${res.status}:`, body.slice(0, 400));
+      logProviderFailure("OpenRouter vision", `HTTP ${res.status}`);
       return null;
     }
     const parsed = JSON.parse(body);
     const text = parsed?.choices?.[0]?.message?.content;
     return (typeof text === "string" && text.trim()) ? text.trim() : null;
   } catch (err) {
-    console.error(`[Vision] OpenRouter ${model} exception:`, err);
+    logProviderFailure("OpenRouter vision", err instanceof Error ? err.name : "request error");
     return null;
   }
 }
@@ -872,7 +871,7 @@ export const analyzeImageServer = createServerFn({ method: "POST" })
     const history: VisionHistory = data.history ?? [];
     const deadline = Date.now() + 18_000;
 
-    // Groq Llama 4 Scout supports image input and is the fastest configured path.
+    // Groq Qwen 3.8 supports image input and is the fastest configured path.
     for (const key of rotatedKeys("groq-vision", serverConfig.ai.groqKeys)) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
