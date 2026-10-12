@@ -9,61 +9,61 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
-import { Route as AdminRouteRouteImport } from './routes/_admin/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteRouteImport } from './routes/_admin/route'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
 import { Route as AdminAdminIndexRouteImport } from './routes/_admin/admin.index'
-import { Route as AuthenticatedDashboardYoutubeRouteImport } from './routes/_authenticated/dashboard.youtube'
-import { Route as AuthenticatedDashboardWhiteboardRouteImport } from './routes/_authenticated/dashboard.whiteboard'
-import { Route as AuthenticatedDashboardVisualExplainerRouteImport } from './routes/_authenticated/dashboard.visual-explainer'
-import { Route as AuthenticatedDashboardTranslatorRouteImport } from './routes/_authenticated/dashboard.translator'
-import { Route as AuthenticatedDashboardSummarizerRouteImport } from './routes/_authenticated/dashboard.summarizer'
-import { Route as AuthenticatedDashboardSolverRouteImport } from './routes/_authenticated/dashboard.solver'
-import { Route as AuthenticatedDashboardScienceRouteImport } from './routes/_authenticated/dashboard.science'
-import { Route as AuthenticatedDashboardResearchRouteImport } from './routes/_authenticated/dashboard.research'
-import { Route as AuthenticatedDashboardQuizRouteImport } from './routes/_authenticated/dashboard.quiz'
-import { Route as AuthenticatedDashboardPdfChatRouteImport } from './routes/_authenticated/dashboard.pdf-chat'
-import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
-import { Route as AuthenticatedDashboardMockTestRouteImport } from './routes/_authenticated/dashboard.mock-test'
-import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
-import { Route as AuthenticatedDashboardMemorizerRouteImport } from './routes/_authenticated/dashboard.memorizer'
-import { Route as AuthenticatedDashboardMathRouteImport } from './routes/_authenticated/dashboard.math'
-import { Route as AuthenticatedDashboardImageSolverRouteImport } from './routes/_authenticated/dashboard.image-solver'
-import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
-import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
-import { Route as AuthenticatedDashboardGrammarRouteImport } from './routes/_authenticated/dashboard.grammar'
-import { Route as AuthenticatedDashboardFormulaSheetRouteImport } from './routes/_authenticated/dashboard.formula-sheet'
-import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
-import { Route as AuthenticatedDashboardCreditsRouteImport } from './routes/_authenticated/dashboard.credits'
-import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
-import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
-import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
-import { Route as AuthenticatedDashboardCareerExplorerRouteImport } from './routes/_authenticated/dashboard.career-explorer'
-import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
-import { Route as AdminAdminUsersRouteImport } from './routes/_admin/admin.users'
-import { Route as AdminAdminUsageRouteImport } from './routes/_admin/admin.usage'
-import { Route as AdminAdminLogsRouteImport } from './routes/_admin/admin.logs'
 import { Route as AdminAdminCreditsRouteImport } from './routes/_admin/admin.credits'
+import { Route as AdminAdminLogsRouteImport } from './routes/_admin/admin.logs'
+import { Route as AdminAdminUsageRouteImport } from './routes/_admin/admin.usage'
+import { Route as AdminAdminUsersRouteImport } from './routes/_admin/admin.users'
+import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard.index'
+import { Route as AuthenticatedDashboardCalculatorRouteImport } from './routes/_authenticated/dashboard.calculator'
+import { Route as AuthenticatedDashboardCareerExplorerRouteImport } from './routes/_authenticated/dashboard.career-explorer'
+import { Route as AuthenticatedDashboardChatRouteImport } from './routes/_authenticated/dashboard.chat'
+import { Route as AuthenticatedDashboardCodeTutorRouteImport } from './routes/_authenticated/dashboard.code-tutor'
+import { Route as AuthenticatedDashboardCompareRouteImport } from './routes/_authenticated/dashboard.compare'
+import { Route as AuthenticatedDashboardCreditsRouteImport } from './routes/_authenticated/dashboard.credits'
+import { Route as AuthenticatedDashboardFlashcardsRouteImport } from './routes/_authenticated/dashboard.flashcards'
+import { Route as AuthenticatedDashboardFormulaSheetRouteImport } from './routes/_authenticated/dashboard.formula-sheet'
+import { Route as AuthenticatedDashboardGrammarRouteImport } from './routes/_authenticated/dashboard.grammar'
+import { Route as AuthenticatedDashboardHistoryRouteImport } from './routes/_authenticated/dashboard.history'
+import { Route as AuthenticatedDashboardImageGenRouteImport } from './routes/_authenticated/dashboard.image-gen'
+import { Route as AuthenticatedDashboardImageSolverRouteImport } from './routes/_authenticated/dashboard.image-solver'
+import { Route as AuthenticatedDashboardMathRouteImport } from './routes/_authenticated/dashboard.math'
+import { Route as AuthenticatedDashboardMemorizerRouteImport } from './routes/_authenticated/dashboard.memorizer'
+import { Route as AuthenticatedDashboardMindmapRouteImport } from './routes/_authenticated/dashboard.mindmap'
+import { Route as AuthenticatedDashboardMockTestRouteImport } from './routes/_authenticated/dashboard.mock-test'
+import { Route as AuthenticatedDashboardNotesRouteImport } from './routes/_authenticated/dashboard.notes'
+import { Route as AuthenticatedDashboardPdfChatRouteImport } from './routes/_authenticated/dashboard.pdf-chat'
+import { Route as AuthenticatedDashboardQuizRouteImport } from './routes/_authenticated/dashboard.quiz'
+import { Route as AuthenticatedDashboardResearchRouteImport } from './routes/_authenticated/dashboard.research'
+import { Route as AuthenticatedDashboardScienceRouteImport } from './routes/_authenticated/dashboard.science'
+import { Route as AuthenticatedDashboardSolverRouteImport } from './routes/_authenticated/dashboard.solver'
+import { Route as AuthenticatedDashboardSummarizerRouteImport } from './routes/_authenticated/dashboard.summarizer'
+import { Route as AuthenticatedDashboardTranslatorRouteImport } from './routes/_authenticated/dashboard.translator'
+import { Route as AuthenticatedDashboardVisualExplainerRouteImport } from './routes/_authenticated/dashboard.visual-explainer'
+import { Route as AuthenticatedDashboardWhiteboardRouteImport } from './routes/_authenticated/dashboard.whiteboard'
+import { Route as AuthenticatedDashboardYoutubeRouteImport } from './routes/_authenticated/dashboard.youtube'
 
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/_admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -71,171 +71,35 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedDashboardIndexRoute =
-  AuthenticatedDashboardIndexRouteImport.update({
-    id: '/dashboard/',
-    path: '/dashboard/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AdminAdminIndexRoute = AdminAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
-const AuthenticatedDashboardYoutubeRoute =
-  AuthenticatedDashboardYoutubeRouteImport.update({
-    id: '/dashboard/youtube',
-    path: '/dashboard/youtube',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardWhiteboardRoute =
-  AuthenticatedDashboardWhiteboardRouteImport.update({
-    id: '/dashboard/whiteboard',
-    path: '/dashboard/whiteboard',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardVisualExplainerRoute =
-  AuthenticatedDashboardVisualExplainerRouteImport.update({
-    id: '/dashboard/visual-explainer',
-    path: '/dashboard/visual-explainer',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardTranslatorRoute =
-  AuthenticatedDashboardTranslatorRouteImport.update({
-    id: '/dashboard/translator',
-    path: '/dashboard/translator',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardSummarizerRoute =
-  AuthenticatedDashboardSummarizerRouteImport.update({
-    id: '/dashboard/summarizer',
-    path: '/dashboard/summarizer',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardSolverRoute =
-  AuthenticatedDashboardSolverRouteImport.update({
-    id: '/dashboard/solver',
-    path: '/dashboard/solver',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardScienceRoute =
-  AuthenticatedDashboardScienceRouteImport.update({
-    id: '/dashboard/science',
-    path: '/dashboard/science',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardResearchRoute =
-  AuthenticatedDashboardResearchRouteImport.update({
-    id: '/dashboard/research',
-    path: '/dashboard/research',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardQuizRoute =
-  AuthenticatedDashboardQuizRouteImport.update({
-    id: '/dashboard/quiz',
-    path: '/dashboard/quiz',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardPdfChatRoute =
-  AuthenticatedDashboardPdfChatRouteImport.update({
-    id: '/dashboard/pdf-chat',
-    path: '/dashboard/pdf-chat',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardNotesRoute =
-  AuthenticatedDashboardNotesRouteImport.update({
-    id: '/dashboard/notes',
-    path: '/dashboard/notes',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardMockTestRoute =
-  AuthenticatedDashboardMockTestRouteImport.update({
-    id: '/dashboard/mock-test',
-    path: '/dashboard/mock-test',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardMindmapRoute =
-  AuthenticatedDashboardMindmapRouteImport.update({
-    id: '/dashboard/mindmap',
-    path: '/dashboard/mindmap',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardMemorizerRoute =
-  AuthenticatedDashboardMemorizerRouteImport.update({
-    id: '/dashboard/memorizer',
-    path: '/dashboard/memorizer',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardMathRoute =
-  AuthenticatedDashboardMathRouteImport.update({
-    id: '/dashboard/math',
-    path: '/dashboard/math',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardImageSolverRoute =
-  AuthenticatedDashboardImageSolverRouteImport.update({
-    id: '/dashboard/image-solver',
-    path: '/dashboard/image-solver',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardImageGenRoute =
-  AuthenticatedDashboardImageGenRouteImport.update({
-    id: '/dashboard/image-gen',
-    path: '/dashboard/image-gen',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardHistoryRoute =
-  AuthenticatedDashboardHistoryRouteImport.update({
-    id: '/dashboard/history',
-    path: '/dashboard/history',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardGrammarRoute =
-  AuthenticatedDashboardGrammarRouteImport.update({
-    id: '/dashboard/grammar',
-    path: '/dashboard/grammar',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardFormulaSheetRoute =
-  AuthenticatedDashboardFormulaSheetRouteImport.update({
-    id: '/dashboard/formula-sheet',
-    path: '/dashboard/formula-sheet',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardFlashcardsRoute =
-  AuthenticatedDashboardFlashcardsRouteImport.update({
-    id: '/dashboard/flashcards',
-    path: '/dashboard/flashcards',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardCreditsRoute =
-  AuthenticatedDashboardCreditsRouteImport.update({
-    id: '/dashboard/credits',
-    path: '/dashboard/credits',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardCompareRoute =
-  AuthenticatedDashboardCompareRouteImport.update({
-    id: '/dashboard/compare',
-    path: '/dashboard/compare',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardCodeTutorRoute =
-  AuthenticatedDashboardCodeTutorRouteImport.update({
-    id: '/dashboard/code-tutor',
-    path: '/dashboard/code-tutor',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardChatRoute =
-  AuthenticatedDashboardChatRouteImport.update({
-    id: '/dashboard/chat',
-    path: '/dashboard/chat',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedDashboardCareerExplorerRoute =
-  AuthenticatedDashboardCareerExplorerRouteImport.update({
-    id: '/dashboard/career-explorer',
-    path: '/dashboard/career-explorer',
+const AdminAdminCreditsRoute = AdminAdminCreditsRouteImport.update({
+  id: '/admin/credits',
+  path: '/admin/credits',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAdminLogsRoute = AdminAdminLogsRouteImport.update({
+  id: '/admin/logs',
+  path: '/admin/logs',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAdminUsageRoute = AdminAdminUsageRouteImport.update({
+  id: '/admin/usage',
+  path: '/admin/usage',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AuthenticatedDashboardIndexRoute =
+  AuthenticatedDashboardIndexRouteImport.update({
+    id: '/dashboard/',
+    path: '/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardCalculatorRoute =
@@ -244,26 +108,162 @@ const AuthenticatedDashboardCalculatorRoute =
     path: '/dashboard/calculator',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AdminAdminUsersRoute = AdminAdminUsersRouteImport.update({
-  id: '/admin/users',
-  path: '/admin/users',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
-const AdminAdminUsageRoute = AdminAdminUsageRouteImport.update({
-  id: '/admin/usage',
-  path: '/admin/usage',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
-const AdminAdminLogsRoute = AdminAdminLogsRouteImport.update({
-  id: '/admin/logs',
-  path: '/admin/logs',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
-const AdminAdminCreditsRoute = AdminAdminCreditsRouteImport.update({
-  id: '/admin/credits',
-  path: '/admin/credits',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
+const AuthenticatedDashboardCareerExplorerRoute =
+  AuthenticatedDashboardCareerExplorerRouteImport.update({
+    id: '/dashboard/career-explorer',
+    path: '/dashboard/career-explorer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardChatRoute =
+  AuthenticatedDashboardChatRouteImport.update({
+    id: '/dashboard/chat',
+    path: '/dashboard/chat',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardCodeTutorRoute =
+  AuthenticatedDashboardCodeTutorRouteImport.update({
+    id: '/dashboard/code-tutor',
+    path: '/dashboard/code-tutor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardCompareRoute =
+  AuthenticatedDashboardCompareRouteImport.update({
+    id: '/dashboard/compare',
+    path: '/dashboard/compare',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardCreditsRoute =
+  AuthenticatedDashboardCreditsRouteImport.update({
+    id: '/dashboard/credits',
+    path: '/dashboard/credits',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardFlashcardsRoute =
+  AuthenticatedDashboardFlashcardsRouteImport.update({
+    id: '/dashboard/flashcards',
+    path: '/dashboard/flashcards',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardFormulaSheetRoute =
+  AuthenticatedDashboardFormulaSheetRouteImport.update({
+    id: '/dashboard/formula-sheet',
+    path: '/dashboard/formula-sheet',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardGrammarRoute =
+  AuthenticatedDashboardGrammarRouteImport.update({
+    id: '/dashboard/grammar',
+    path: '/dashboard/grammar',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardHistoryRoute =
+  AuthenticatedDashboardHistoryRouteImport.update({
+    id: '/dashboard/history',
+    path: '/dashboard/history',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardImageGenRoute =
+  AuthenticatedDashboardImageGenRouteImport.update({
+    id: '/dashboard/image-gen',
+    path: '/dashboard/image-gen',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardImageSolverRoute =
+  AuthenticatedDashboardImageSolverRouteImport.update({
+    id: '/dashboard/image-solver',
+    path: '/dashboard/image-solver',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardMathRoute =
+  AuthenticatedDashboardMathRouteImport.update({
+    id: '/dashboard/math',
+    path: '/dashboard/math',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardMemorizerRoute =
+  AuthenticatedDashboardMemorizerRouteImport.update({
+    id: '/dashboard/memorizer',
+    path: '/dashboard/memorizer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardMindmapRoute =
+  AuthenticatedDashboardMindmapRouteImport.update({
+    id: '/dashboard/mindmap',
+    path: '/dashboard/mindmap',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardMockTestRoute =
+  AuthenticatedDashboardMockTestRouteImport.update({
+    id: '/dashboard/mock-test',
+    path: '/dashboard/mock-test',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardNotesRoute =
+  AuthenticatedDashboardNotesRouteImport.update({
+    id: '/dashboard/notes',
+    path: '/dashboard/notes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardPdfChatRoute =
+  AuthenticatedDashboardPdfChatRouteImport.update({
+    id: '/dashboard/pdf-chat',
+    path: '/dashboard/pdf-chat',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardQuizRoute =
+  AuthenticatedDashboardQuizRouteImport.update({
+    id: '/dashboard/quiz',
+    path: '/dashboard/quiz',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardResearchRoute =
+  AuthenticatedDashboardResearchRouteImport.update({
+    id: '/dashboard/research',
+    path: '/dashboard/research',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardScienceRoute =
+  AuthenticatedDashboardScienceRouteImport.update({
+    id: '/dashboard/science',
+    path: '/dashboard/science',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardSolverRoute =
+  AuthenticatedDashboardSolverRouteImport.update({
+    id: '/dashboard/solver',
+    path: '/dashboard/solver',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardSummarizerRoute =
+  AuthenticatedDashboardSummarizerRouteImport.update({
+    id: '/dashboard/summarizer',
+    path: '/dashboard/summarizer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardTranslatorRoute =
+  AuthenticatedDashboardTranslatorRouteImport.update({
+    id: '/dashboard/translator',
+    path: '/dashboard/translator',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardVisualExplainerRoute =
+  AuthenticatedDashboardVisualExplainerRouteImport.update({
+    id: '/dashboard/visual-explainer',
+    path: '/dashboard/visual-explainer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardWhiteboardRoute =
+  AuthenticatedDashboardWhiteboardRouteImport.update({
+    id: '/dashboard/whiteboard',
+    path: '/dashboard/whiteboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDashboardYoutubeRoute =
+  AuthenticatedDashboardYoutubeRouteImport.update({
+    id: '/dashboard/youtube',
+    path: '/dashboard/youtube',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -511,18 +511,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
+    '/': {
+      id: '/'
+      path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_admin': {
@@ -532,11 +525,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/login': {
@@ -546,13 +546,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/dashboard/': {
-      id: '/_authenticated/dashboard/'
-      path: '/dashboard'
-      fullPath: '/dashboard/'
-      preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_admin/admin/': {
       id: '/_admin/admin/'
       path: '/admin'
@@ -560,207 +553,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
-    '/_authenticated/dashboard/youtube': {
-      id: '/_authenticated/dashboard/youtube'
-      path: '/dashboard/youtube'
-      fullPath: '/dashboard/youtube'
-      preLoaderRoute: typeof AuthenticatedDashboardYoutubeRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/whiteboard': {
-      id: '/_authenticated/dashboard/whiteboard'
-      path: '/dashboard/whiteboard'
-      fullPath: '/dashboard/whiteboard'
-      preLoaderRoute: typeof AuthenticatedDashboardWhiteboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/visual-explainer': {
-      id: '/_authenticated/dashboard/visual-explainer'
-      path: '/dashboard/visual-explainer'
-      fullPath: '/dashboard/visual-explainer'
-      preLoaderRoute: typeof AuthenticatedDashboardVisualExplainerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/translator': {
-      id: '/_authenticated/dashboard/translator'
-      path: '/dashboard/translator'
-      fullPath: '/dashboard/translator'
-      preLoaderRoute: typeof AuthenticatedDashboardTranslatorRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/summarizer': {
-      id: '/_authenticated/dashboard/summarizer'
-      path: '/dashboard/summarizer'
-      fullPath: '/dashboard/summarizer'
-      preLoaderRoute: typeof AuthenticatedDashboardSummarizerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/solver': {
-      id: '/_authenticated/dashboard/solver'
-      path: '/dashboard/solver'
-      fullPath: '/dashboard/solver'
-      preLoaderRoute: typeof AuthenticatedDashboardSolverRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/science': {
-      id: '/_authenticated/dashboard/science'
-      path: '/dashboard/science'
-      fullPath: '/dashboard/science'
-      preLoaderRoute: typeof AuthenticatedDashboardScienceRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/research': {
-      id: '/_authenticated/dashboard/research'
-      path: '/dashboard/research'
-      fullPath: '/dashboard/research'
-      preLoaderRoute: typeof AuthenticatedDashboardResearchRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/quiz': {
-      id: '/_authenticated/dashboard/quiz'
-      path: '/dashboard/quiz'
-      fullPath: '/dashboard/quiz'
-      preLoaderRoute: typeof AuthenticatedDashboardQuizRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/pdf-chat': {
-      id: '/_authenticated/dashboard/pdf-chat'
-      path: '/dashboard/pdf-chat'
-      fullPath: '/dashboard/pdf-chat'
-      preLoaderRoute: typeof AuthenticatedDashboardPdfChatRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/notes': {
-      id: '/_authenticated/dashboard/notes'
-      path: '/dashboard/notes'
-      fullPath: '/dashboard/notes'
-      preLoaderRoute: typeof AuthenticatedDashboardNotesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/mock-test': {
-      id: '/_authenticated/dashboard/mock-test'
-      path: '/dashboard/mock-test'
-      fullPath: '/dashboard/mock-test'
-      preLoaderRoute: typeof AuthenticatedDashboardMockTestRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/mindmap': {
-      id: '/_authenticated/dashboard/mindmap'
-      path: '/dashboard/mindmap'
-      fullPath: '/dashboard/mindmap'
-      preLoaderRoute: typeof AuthenticatedDashboardMindmapRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/memorizer': {
-      id: '/_authenticated/dashboard/memorizer'
-      path: '/dashboard/memorizer'
-      fullPath: '/dashboard/memorizer'
-      preLoaderRoute: typeof AuthenticatedDashboardMemorizerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/math': {
-      id: '/_authenticated/dashboard/math'
-      path: '/dashboard/math'
-      fullPath: '/dashboard/math'
-      preLoaderRoute: typeof AuthenticatedDashboardMathRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/image-solver': {
-      id: '/_authenticated/dashboard/image-solver'
-      path: '/dashboard/image-solver'
-      fullPath: '/dashboard/image-solver'
-      preLoaderRoute: typeof AuthenticatedDashboardImageSolverRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/image-gen': {
-      id: '/_authenticated/dashboard/image-gen'
-      path: '/dashboard/image-gen'
-      fullPath: '/dashboard/image-gen'
-      preLoaderRoute: typeof AuthenticatedDashboardImageGenRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/history': {
-      id: '/_authenticated/dashboard/history'
-      path: '/dashboard/history'
-      fullPath: '/dashboard/history'
-      preLoaderRoute: typeof AuthenticatedDashboardHistoryRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/grammar': {
-      id: '/_authenticated/dashboard/grammar'
-      path: '/dashboard/grammar'
-      fullPath: '/dashboard/grammar'
-      preLoaderRoute: typeof AuthenticatedDashboardGrammarRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/formula-sheet': {
-      id: '/_authenticated/dashboard/formula-sheet'
-      path: '/dashboard/formula-sheet'
-      fullPath: '/dashboard/formula-sheet'
-      preLoaderRoute: typeof AuthenticatedDashboardFormulaSheetRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/flashcards': {
-      id: '/_authenticated/dashboard/flashcards'
-      path: '/dashboard/flashcards'
-      fullPath: '/dashboard/flashcards'
-      preLoaderRoute: typeof AuthenticatedDashboardFlashcardsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/credits': {
-      id: '/_authenticated/dashboard/credits'
-      path: '/dashboard/credits'
-      fullPath: '/dashboard/credits'
-      preLoaderRoute: typeof AuthenticatedDashboardCreditsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/compare': {
-      id: '/_authenticated/dashboard/compare'
-      path: '/dashboard/compare'
-      fullPath: '/dashboard/compare'
-      preLoaderRoute: typeof AuthenticatedDashboardCompareRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/code-tutor': {
-      id: '/_authenticated/dashboard/code-tutor'
-      path: '/dashboard/code-tutor'
-      fullPath: '/dashboard/code-tutor'
-      preLoaderRoute: typeof AuthenticatedDashboardCodeTutorRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/chat': {
-      id: '/_authenticated/dashboard/chat'
-      path: '/dashboard/chat'
-      fullPath: '/dashboard/chat'
-      preLoaderRoute: typeof AuthenticatedDashboardChatRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/career-explorer': {
-      id: '/_authenticated/dashboard/career-explorer'
-      path: '/dashboard/career-explorer'
-      fullPath: '/dashboard/career-explorer'
-      preLoaderRoute: typeof AuthenticatedDashboardCareerExplorerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard/calculator': {
-      id: '/_authenticated/dashboard/calculator'
-      path: '/dashboard/calculator'
-      fullPath: '/dashboard/calculator'
-      preLoaderRoute: typeof AuthenticatedDashboardCalculatorRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_admin/admin/users': {
-      id: '/_admin/admin/users'
-      path: '/admin/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminAdminUsersRouteImport
-      parentRoute: typeof AdminRouteRoute
-    }
-    '/_admin/admin/usage': {
-      id: '/_admin/admin/usage'
-      path: '/admin/usage'
-      fullPath: '/admin/usage'
-      preLoaderRoute: typeof AdminAdminUsageRouteImport
+    '/_admin/admin/credits': {
+      id: '/_admin/admin/credits'
+      path: '/admin/credits'
+      fullPath: '/admin/credits'
+      preLoaderRoute: typeof AdminAdminCreditsRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/_admin/admin/logs': {
@@ -770,12 +567,215 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminLogsRouteImport
       parentRoute: typeof AdminRouteRoute
     }
-    '/_admin/admin/credits': {
-      id: '/_admin/admin/credits'
-      path: '/admin/credits'
-      fullPath: '/admin/credits'
-      preLoaderRoute: typeof AdminAdminCreditsRouteImport
+    '/_admin/admin/usage': {
+      id: '/_admin/admin/usage'
+      path: '/admin/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminAdminUsageRouteImport
       parentRoute: typeof AdminRouteRoute
+    }
+    '/_admin/admin/users': {
+      id: '/_admin/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminAdminUsersRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/_authenticated/dashboard/': {
+      id: '/_authenticated/dashboard/'
+      path: '/dashboard'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/calculator': {
+      id: '/_authenticated/dashboard/calculator'
+      path: '/dashboard/calculator'
+      fullPath: '/dashboard/calculator'
+      preLoaderRoute: typeof AuthenticatedDashboardCalculatorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/career-explorer': {
+      id: '/_authenticated/dashboard/career-explorer'
+      path: '/dashboard/career-explorer'
+      fullPath: '/dashboard/career-explorer'
+      preLoaderRoute: typeof AuthenticatedDashboardCareerExplorerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/chat': {
+      id: '/_authenticated/dashboard/chat'
+      path: '/dashboard/chat'
+      fullPath: '/dashboard/chat'
+      preLoaderRoute: typeof AuthenticatedDashboardChatRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/code-tutor': {
+      id: '/_authenticated/dashboard/code-tutor'
+      path: '/dashboard/code-tutor'
+      fullPath: '/dashboard/code-tutor'
+      preLoaderRoute: typeof AuthenticatedDashboardCodeTutorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/compare': {
+      id: '/_authenticated/dashboard/compare'
+      path: '/dashboard/compare'
+      fullPath: '/dashboard/compare'
+      preLoaderRoute: typeof AuthenticatedDashboardCompareRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/credits': {
+      id: '/_authenticated/dashboard/credits'
+      path: '/dashboard/credits'
+      fullPath: '/dashboard/credits'
+      preLoaderRoute: typeof AuthenticatedDashboardCreditsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/flashcards': {
+      id: '/_authenticated/dashboard/flashcards'
+      path: '/dashboard/flashcards'
+      fullPath: '/dashboard/flashcards'
+      preLoaderRoute: typeof AuthenticatedDashboardFlashcardsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/formula-sheet': {
+      id: '/_authenticated/dashboard/formula-sheet'
+      path: '/dashboard/formula-sheet'
+      fullPath: '/dashboard/formula-sheet'
+      preLoaderRoute: typeof AuthenticatedDashboardFormulaSheetRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/grammar': {
+      id: '/_authenticated/dashboard/grammar'
+      path: '/dashboard/grammar'
+      fullPath: '/dashboard/grammar'
+      preLoaderRoute: typeof AuthenticatedDashboardGrammarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/history': {
+      id: '/_authenticated/dashboard/history'
+      path: '/dashboard/history'
+      fullPath: '/dashboard/history'
+      preLoaderRoute: typeof AuthenticatedDashboardHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/image-gen': {
+      id: '/_authenticated/dashboard/image-gen'
+      path: '/dashboard/image-gen'
+      fullPath: '/dashboard/image-gen'
+      preLoaderRoute: typeof AuthenticatedDashboardImageGenRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/image-solver': {
+      id: '/_authenticated/dashboard/image-solver'
+      path: '/dashboard/image-solver'
+      fullPath: '/dashboard/image-solver'
+      preLoaderRoute: typeof AuthenticatedDashboardImageSolverRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/math': {
+      id: '/_authenticated/dashboard/math'
+      path: '/dashboard/math'
+      fullPath: '/dashboard/math'
+      preLoaderRoute: typeof AuthenticatedDashboardMathRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/memorizer': {
+      id: '/_authenticated/dashboard/memorizer'
+      path: '/dashboard/memorizer'
+      fullPath: '/dashboard/memorizer'
+      preLoaderRoute: typeof AuthenticatedDashboardMemorizerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/mindmap': {
+      id: '/_authenticated/dashboard/mindmap'
+      path: '/dashboard/mindmap'
+      fullPath: '/dashboard/mindmap'
+      preLoaderRoute: typeof AuthenticatedDashboardMindmapRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/mock-test': {
+      id: '/_authenticated/dashboard/mock-test'
+      path: '/dashboard/mock-test'
+      fullPath: '/dashboard/mock-test'
+      preLoaderRoute: typeof AuthenticatedDashboardMockTestRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/notes': {
+      id: '/_authenticated/dashboard/notes'
+      path: '/dashboard/notes'
+      fullPath: '/dashboard/notes'
+      preLoaderRoute: typeof AuthenticatedDashboardNotesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/pdf-chat': {
+      id: '/_authenticated/dashboard/pdf-chat'
+      path: '/dashboard/pdf-chat'
+      fullPath: '/dashboard/pdf-chat'
+      preLoaderRoute: typeof AuthenticatedDashboardPdfChatRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/quiz': {
+      id: '/_authenticated/dashboard/quiz'
+      path: '/dashboard/quiz'
+      fullPath: '/dashboard/quiz'
+      preLoaderRoute: typeof AuthenticatedDashboardQuizRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/research': {
+      id: '/_authenticated/dashboard/research'
+      path: '/dashboard/research'
+      fullPath: '/dashboard/research'
+      preLoaderRoute: typeof AuthenticatedDashboardResearchRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/science': {
+      id: '/_authenticated/dashboard/science'
+      path: '/dashboard/science'
+      fullPath: '/dashboard/science'
+      preLoaderRoute: typeof AuthenticatedDashboardScienceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/solver': {
+      id: '/_authenticated/dashboard/solver'
+      path: '/dashboard/solver'
+      fullPath: '/dashboard/solver'
+      preLoaderRoute: typeof AuthenticatedDashboardSolverRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/summarizer': {
+      id: '/_authenticated/dashboard/summarizer'
+      path: '/dashboard/summarizer'
+      fullPath: '/dashboard/summarizer'
+      preLoaderRoute: typeof AuthenticatedDashboardSummarizerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/translator': {
+      id: '/_authenticated/dashboard/translator'
+      path: '/dashboard/translator'
+      fullPath: '/dashboard/translator'
+      preLoaderRoute: typeof AuthenticatedDashboardTranslatorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/visual-explainer': {
+      id: '/_authenticated/dashboard/visual-explainer'
+      path: '/dashboard/visual-explainer'
+      fullPath: '/dashboard/visual-explainer'
+      preLoaderRoute: typeof AuthenticatedDashboardVisualExplainerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/whiteboard': {
+      id: '/_authenticated/dashboard/whiteboard'
+      path: '/dashboard/whiteboard'
+      fullPath: '/dashboard/whiteboard'
+      preLoaderRoute: typeof AuthenticatedDashboardWhiteboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard/youtube': {
+      id: '/_authenticated/dashboard/youtube'
+      path: '/dashboard/youtube'
+      fullPath: '/dashboard/youtube'
+      preLoaderRoute: typeof AuthenticatedDashboardYoutubeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
