@@ -71,27 +71,30 @@ function buildAnalyzePrompt(code: string, language: string, mode: Mode, targetLa
 
   switch (mode) {
     case "explain":
-      return `${header}You are an expert ${language} tutor. Explain this code completely — as if teaching a complete beginner. Every line must be covered. Use the line numbers shown above in your explanation (e.g. "**Line 5**:", "**Lines 3–7**:").
+      return `${header}You are a patient ${language} teacher. Explain the code to a beginner who may have never programmed before. Use plain, everyday language and short sentences. When a technical word is necessary, define it immediately with a simple example. Never assume the student already understands programming terms.
 
-## 🧭 What This Code Does
-(2–4 sentences: overall purpose of the program)
+## 🧭 In Plain English
+Explain the program's purpose in 2–3 simple sentences. Say what goes in, what the code does, and what comes out.
 
-## 📦 Imports / Dependencies (if any)
-(Explain every import/include/require — what library it is and why it is needed)
+## 📦 Important Imports
+If there are imports, explain only the ones that matter and what each gives this program. Skip this section if there are none.
 
-## 🔢 Line-by-Line Walkthrough
-Cover the full program in order. Group adjacent statements into logical blocks and cite exact line ranges. Skip blank lines and brace-only lines; do not repeat explanations for similar statements.
+## ⭐ Most Important Code
+Choose the 1–3 smallest line or line-range references that contain the program's main idea. For each, start with an exact bold reference such as **Lines 8–11**: then explain in plain language why that code matters. These are the key lines that should stand out; do not list the whole file here.
 
-## 🧠 Key Concepts Explained
-(Explain the important concepts used and connect each one to the code. Keep each explanation concise.)
+## 🔢 Walkthrough
+Explain every meaningful part in the order it runs. Group nearby lines that work together, using exact bold references such as **Lines 3–5**:. Skip blank lines and braces. Use 1–2 short sentences per group. Explain what the code does and why, without repeating the overview.
 
-## 🔄 Data Flow & Execution Order
-(Trace how data moves through the program from start to finish with a real example input)
+## 🧩 New Words, Made Simple
+Define up to 4 important programming words used in this code. Use a short everyday comparison only when it makes the idea clearer. Skip this section if no new words need explaining.
 
-## ✅ What the Output Will Be
-(Show exactly what the program prints/returns for a sample input, step by step)
+## 🔄 A Small Example
+Trace one simple example input through the important lines. Show the output only if it can be worked out from the supplied code; otherwise say what extra input or environment is needed.
 
-Be clear and complete, but concise enough to finish. Do not repeat the same point in multiple sections.`;
+## 💡 Remember
+End with one short sentence stating the main idea the student should remember.
+
+Keep the explanation friendly, concrete, and easy to scan. Use short paragraphs and bullets, bold only the key terms and exact line references, and avoid jargon, filler, and repeated explanations.`;
 
     case "debug":
       return `${header}You are an expert ${language} debugger. Examine EVERY SINGLE LINE of this code. Use the line numbers shown above.
@@ -271,6 +274,18 @@ function parseHighlightedLines(text: string): Set<number> {
   return lines;
 }
 
+function parseKeyHighlightedLines(text: string): Set<number> {
+  const heading = /^#{1,3}\s+.*most important code.*$/im.exec(text);
+  if (!heading) return parseHighlightedLines(text);
+
+  const start = heading.index + heading[0].length;
+  const remaining = text.slice(start).replace(/^\s*\n/, "");
+  const nextHeading = /^#{1,3}\s/m.exec(remaining);
+  const keySection = nextHeading ? remaining.slice(0, nextHeading.index) : remaining;
+  const keyLines = parseHighlightedLines(keySection);
+  return keyLines.size > 0 ? keyLines : parseHighlightedLines(text);
+}
+
 // ─── Line-numbered code viewer with highlights ────────────────────────────────
 function CodeViewer({ code, highlightedLines }: { code: string; highlightedLines: Set<number> }) {
   const codeLines = code.split("\n");
@@ -282,7 +297,9 @@ function CodeViewer({ code, highlightedLines }: { code: string; highlightedLines
           const hi = highlightedLines.has(n);
           return (
             <div key={n} className={`flex min-w-0 ${hi ? "bg-amber-400/15 border-l-2 border-amber-400" : "border-l-2 border-transparent"}`}>
-              <span className={`select-none shrink-0 w-9 text-right pr-2 py-0.5 pl-1 ${hi ? "text-amber-400 font-bold" : "text-slate-600"}`}>{n}</span>
+              <span title={hi ? "Highlighted key code" : undefined} className={`select-none shrink-0 w-12 text-right pr-2 py-0.5 pl-1 ${hi ? "text-amber-400 font-bold" : "text-slate-600"}`}>
+                {hi && <span aria-hidden="true" className="mr-1 text-amber-300">★</span>}{n}
+              </span>
               <span className={`py-0.5 px-2 whitespace-pre flex-1 min-w-0 ${hi ? "text-amber-100" : "text-slate-200"}`}>{line || " "}</span>
             </div>
           );
@@ -333,6 +350,7 @@ function sectionStyle(text: string): { bg: string; border: string; fg: string } 
   if (t.includes("💡") || t.includes("tip"))         return { bg: "bg-yellow-50",  border: "border-l-4 border-yellow-400",  fg: "text-yellow-800" };
   if (t.includes("📊") || t.includes("score"))       return { bg: "bg-indigo-50",  border: "border-l-4 border-indigo-400",  fg: "text-indigo-800" };
   if (t.includes("🔑") || t.includes("key"))         return { bg: "bg-rose-50",    border: "border-l-4 border-rose-400",    fg: "text-rose-800"   };
+  if (t.includes("important"))                       return { bg: "bg-amber-50",   border: "border-l-4 border-amber-400",   fg: "text-amber-900" };
   return                                               { bg: "bg-slate-50",   border: "border-l-4 border-slate-400",   fg: "text-slate-800"  };
 }
 
@@ -460,7 +478,9 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
   const [editMode, setEditMode] = useState(true);
 
   const selectedMode = MODES.find(m => m.id === s.mode)!;
-  const highlightedLines = s.result ? parseHighlightedLines(s.result) : new Set<number>();
+  const highlightedLines = s.result
+    ? (s.mode === "explain" ? parseKeyHighlightedLines(s.result) : parseHighlightedLines(s.result))
+    : new Set<number>();
   const hasHighlights = highlightedLines.size > 0;
 
   async function analyze() {
@@ -636,7 +656,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
             {hasHighlights && s.result && (
               <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
-                {highlightedLines.size} lines highlighted in code
+                {highlightedLines.size} {s.mode === "explain" ? "key lines" : "lines"} highlighted in code
               </span>
             )}
           </div>
