@@ -82,8 +82,10 @@ If there are imports, explain only the ones that matter and what each gives this
 ## ⭐ Most Important Code
 Choose the 1–3 smallest line or line-range references that contain the program's main idea. For each, start with an exact bold reference such as **Lines 8–11**: then explain in plain language why that code matters. These are the key lines that should stand out; do not list the whole file here.
 
-## 🔢 Walkthrough
-Explain every meaningful part in the order it runs. Group nearby lines that work together, using exact bold references such as **Lines 3–5**:. Skip blank lines and braces. Use 1–2 short sentences per group. Explain what the code does and why, without repeating the overview.
+## 🔢 Line-by-Line Explanation
+Write one separate bullet for every physical source line, in its original order. Use this exact label format: **Line 1** — explanation. Replace 1 with the actual line number. Never group lines or use ranges in this section. Do not skip blank lines, comments, braces, closing tags, or punctuation-only lines: briefly explain their purpose, or say that a blank line separates code for readability. For each executable line, simply explain what it does, how it works, and why it is needed. Use one short sentence for simple lines and up to two for complex lines.
+
+Every source line must appear exactly once in this section. Do not let the “Most Important Code” section replace any walkthrough entry.
 
 ## 🧩 New Words, Made Simple
 Define up to 4 important programming words used in this code. Use a short everyday comparison only when it makes the idea clearer. Skip this section if no new words need explaining.
@@ -94,7 +96,7 @@ Trace one simple example input through the important lines. Show the output only
 ## 💡 Remember
 End with one short sentence stating the main idea the student should remember.
 
-Keep the explanation friendly, concrete, and easy to scan. Use short paragraphs and bullets, bold only the key terms and exact line references, and avoid jargon, filler, and repeated explanations.`;
+Keep the explanation friendly, concrete, and easy to scan. Use short sentences, bold the exact line labels, avoid jargon and filler, and give deeper explanations only for the key code.`;
 
     case "debug":
       return `${header}You are an expert ${language} debugger. Examine EVERY SINGLE LINE of this code. Use the line numbers shown above.
@@ -274,6 +276,74 @@ function parseHighlightedLines(text: string): Set<number> {
   return lines;
 }
 
+function findMarkdownSection(text: string, headingPattern: RegExp): { start: number; end: number; header: string; body: string } | null {
+  const heading = headingPattern.exec(text);
+  if (!heading || heading.index === undefined) return null;
+
+  const newline = text.indexOf("\n", heading.index);
+  const bodyStart = newline === -1 ? text.length : newline + 1;
+  const remaining = text.slice(bodyStart);
+  const nextHeading = /^#{1,3}\s/m.exec(remaining);
+  const end = bodyStart + (nextHeading?.index ?? remaining.length);
+  return {
+    start: heading.index,
+    end,
+    header: text.slice(heading.index, bodyStart),
+    body: text.slice(bodyStart, end),
+  };
+}
+
+function parseLineExplanationEntries(text: string): Map<number, string> {
+  const section = findMarkdownSection(text, /^#{1,3}\s+.*line-by-line explanation.*$/im);
+  if (!section) return new Map();
+
+  const labelPattern = /^[ \t]*(?:[-*][ \t]*)?\*\*Line\s+(\d+)\*\*/gm;
+  const labels = [...section.body.matchAll(labelPattern)];
+  const entries = new Map<number, string>();
+  labels.forEach((label, index) => {
+    const start = label.index ?? 0;
+    const end = labels[index + 1]?.index ?? section.body.length;
+    const entry = section.body.slice(start, end).trim().replace(/^[-*]\s*/, "");
+    entries.set(Number(label[1]), entry);
+  });
+  return entries;
+}
+
+function mergeLineExplanationEntries(original: string, supplements: string[], lineCount: number): string {
+  const section = findMarkdownSection(original, /^#{1,3}\s+.*line-by-line explanation.*$/im);
+  const entries = parseLineExplanationEntries(original);
+  supplements.forEach((supplement) => {
+    parseLineExplanationEntries(supplement).forEach((entry, line) => {
+      if (!entries.has(line)) entries.set(line, entry);
+    });
+  });
+
+  const body = Array.from({ length: lineCount }, (_, index) => entries.get(index + 1))
+    .filter((entry): entry is string => Boolean(entry))
+    .map((entry) => `- ${entry}`)
+    .join("\n\n");
+
+  if (!section) {
+    return body ? `${original.trimEnd()}\n\n## 🔢 Line-by-Line Explanation\n\n${body}` : original;
+  }
+  return `${original.slice(0, section.start)}${section.header}\n${body}\n\n${original.slice(section.end)}`;
+}
+
+function buildMissingLinePrompt(code: string, missingLines: number[], previousAnswer: string): string {
+  const sourceLines = code.split("\n");
+  const source = missingLines.map((line) => `${line} | ${sourceLines[line - 1] ?? ""}`).join("\n");
+  const overview = previousAnswer.slice(0, 1_200);
+  return `Complete only the missing entries in the Code Tutor's line-by-line explanation. The source has ${sourceLines.length} physical lines. Return the exact heading "## 🔢 Line-by-Line Explanation", then one bullet for every requested line below, in ascending order. Use this exact format: "- **Line N** — ...". Do not group lines or add other sections.
+
+For executable lines, use simple beginner-friendly language to explain what the line does, how it works, and why it is needed. Use one short sentence for simple lines and up to two for complex lines. For blank lines, comments, braces, and punctuation-only lines, briefly explain their purpose. Do not claim an output unless the code proves it.
+
+Program overview from the earlier answer:
+${overview}
+
+Only these source lines need individual explanations:
+${source}`;
+}
+
 function parseKeyHighlightedLines(text: string): Set<number> {
   const heading = /^#{1,3}\s+.*most important code.*$/im.exec(text);
   if (!heading) return parseHighlightedLines(text);
@@ -286,21 +356,26 @@ function parseKeyHighlightedLines(text: string): Set<number> {
   return keyLines.size > 0 ? keyLines : parseHighlightedLines(text);
 }
 
+function getLineExplanationCoverage(text: string): Set<number> {
+  return new Set(parseLineExplanationEntries(text).keys());
+}
+
 // ─── Line-numbered code viewer with highlights ────────────────────────────────
-function CodeViewer({ code, highlightedLines }: { code: string; highlightedLines: Set<number> }) {
+function CodeViewer({ code, highlightedLines, importantLines }: { code: string; highlightedLines: Set<number>; importantLines: Set<number> }) {
   const codeLines = code.split("\n");
   return (
     <div className="rounded-lg overflow-hidden border border-slate-700 text-xs font-mono">
       <div className="overflow-x-auto max-h-[420px] overflow-y-auto bg-slate-950">
         {codeLines.map((line, i) => {
           const n = i + 1;
-          const hi = highlightedLines.has(n);
+          const important = importantLines.has(n);
+          const explained = highlightedLines.has(n) || important;
           return (
-            <div key={n} className={`flex min-w-0 ${hi ? "bg-amber-400/15 border-l-2 border-amber-400" : "border-l-2 border-transparent"}`}>
-              <span title={hi ? "Highlighted key code" : undefined} className={`select-none shrink-0 w-12 text-right pr-2 py-0.5 pl-1 ${hi ? "text-amber-400 font-bold" : "text-slate-600"}`}>
-                {hi && <span aria-hidden="true" className="mr-1 text-amber-300">★</span>}{n}
+            <div key={n} className={`flex min-w-0 ${important ? "bg-amber-400/15 border-l-2 border-amber-400" : explained ? "bg-sky-400/10 border-l-2 border-sky-400" : "border-l-2 border-transparent"}`}>
+              <span title={important ? "Highlighted key code" : explained ? "Explained line" : undefined} className={`select-none shrink-0 w-12 text-right pr-2 py-0.5 pl-1 ${important ? "text-amber-400 font-bold" : explained ? "text-sky-300 font-semibold" : "text-slate-600"}`}>
+                {important && <span aria-hidden="true" className="mr-1 text-amber-300">★</span>}{n}
               </span>
-              <span className={`py-0.5 px-2 whitespace-pre flex-1 min-w-0 ${hi ? "text-amber-100" : "text-slate-200"}`}>{line || " "}</span>
+              <span className={`py-0.5 px-2 whitespace-pre flex-1 min-w-0 ${important ? "text-amber-100" : explained ? "text-sky-100" : "text-slate-200"}`}>{line || " "}</span>
             </div>
           );
         })}
@@ -478,9 +553,13 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
   const [editMode, setEditMode] = useState(true);
 
   const selectedMode = MODES.find(m => m.id === s.mode)!;
-  const highlightedLines = s.result
+  const explainedLines = s.result
+    ? (s.mode === "explain" ? getLineExplanationCoverage(s.result) : parseHighlightedLines(s.result))
+    : new Set<number>();
+  const importantLines = s.result
     ? (s.mode === "explain" ? parseKeyHighlightedLines(s.result) : parseHighlightedLines(s.result))
     : new Set<number>();
+  const highlightedLines = new Set([...explainedLines, ...importantLines]);
   const hasHighlights = highlightedLines.size > 0;
 
   async function analyze() {
@@ -491,8 +570,12 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
       return toast.error("This code is too large to analyze in one request. Split it into smaller related sections and try again.");
     }
 
-    const systemPrompt = `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. Analyze the entire supplied code and reference exact line numbers or ranges. Group related lines to keep the response complete and readable. Use markdown. Finish every requested section and close every code block. If space is tight, shorten the explanation rather than omit required corrected code.`;
-    const maxTokens = Math.min(23_000, Math.max(7_000, Math.ceil(s.code.length / 2.8) + 4_000));
+    const lineCount = s.code.split("\n").length;
+    const systemPrompt = s.mode === "explain"
+      ? `You are Bishal's Code Tutor — a patient ${s.language} teacher for beginners. Follow the Explain prompt's exact one-entry-per-source-line format. Never combine, skip, reorder, or omit lines. Use plain language, short explanations, and exact line numbers. Complete every requested section and do not stop midway.`
+      : `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. Analyze the entire supplied code and reference exact line numbers or ranges. Group related lines to keep the response complete and readable. Use markdown. Finish every requested section and close every code block. If space is tight, shorten the explanation rather than omit required corrected code.`;
+    const explainTokenBudget = Math.ceil(s.code.length / 2.8) + lineCount * 24 + 4_000;
+    const maxTokens = Math.min(23_000, Math.max(7_000, s.mode === "explain" ? explainTokenBudget : Math.ceil(s.code.length / 2.8) + 4_000));
     setLoading(true);
     setSlowLoading(false);
     set({ result: null });
@@ -535,6 +618,52 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
         });
         setEditMode(true);
         return;
+      }
+
+      if (s.mode === "explain") {
+        let covered = getLineExplanationCoverage(answer);
+        let missingLines = Array.from({ length: lineCount }, (_, index) => index + 1)
+          .filter((line) => !covered.has(line));
+        let repairBatchSize = Math.min(100, missingLines.length);
+        const repairAttemptLimit = Math.min(20, Math.max(2, Math.ceil(missingLines.length / 100) + 1));
+
+        for (let attempt = 0; missingLines.length > 0 && attempt < repairAttemptLimit; attempt++) {
+          let batch = missingLines.slice(0, repairBatchSize);
+          let repairPrompt = buildMissingLinePrompt(s.code, batch, answer);
+          while (repairPrompt.length > 95_000 && batch.length > 1) {
+            repairBatchSize = Math.max(1, Math.floor(batch.length / 2));
+            batch = missingLines.slice(0, repairBatchSize);
+            repairPrompt = buildMissingLinePrompt(s.code, batch, answer);
+          }
+          const repair = await askAI(
+            repairPrompt,
+            systemPrompt,
+            undefined,
+            true,
+            Math.min(8_000, Math.max(2_500, batch.length * 60)),
+          );
+          if (repair.provider === "none") break;
+          if (repair.truncated) {
+            repairBatchSize = Math.max(10, Math.floor(repairBatchSize / 2));
+            continue;
+          }
+
+          answer = mergeLineExplanationEntries(answer, [repair.text], lineCount);
+          covered = getLineExplanationCoverage(answer);
+          missingLines = Array.from({ length: lineCount }, (_, index) => index + 1)
+            .filter((line) => !covered.has(line));
+          repairBatchSize = Math.min(100, missingLines.length);
+        }
+
+        if (missingLines.length > 0) {
+          toast.error("The explanation could not cover every line. Split the code into smaller sections and retry.");
+          set({
+            provider: first.provider,
+            result: "I couldn't verify an explanation for every source line, so I haven't shown a partial walkthrough. Split the code into smaller sections and try again.",
+          });
+          setEditMode(true);
+          return;
+        }
       }
 
       set({ provider: first.provider, result: answer });
@@ -616,7 +745,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
               rows={14} spellCheck={false}
               className="w-full rounded-lg border border-input bg-background p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" />
           ) : (
-            <CodeViewer code={s.code} highlightedLines={highlightedLines} />
+            <CodeViewer code={s.code} highlightedLines={explainedLines} importantLines={importantLines} />
           )}
         </div>
 
@@ -656,7 +785,9 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
             {hasHighlights && s.result && (
               <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-400 inline-block" />
-                {highlightedLines.size} {s.mode === "explain" ? "key lines" : "lines"} highlighted in code
+                {s.mode === "explain"
+                  ? `${explainedLines.size} lines explained · ${importantLines.size} key lines`
+                  : `${highlightedLines.size} lines highlighted in code`}
               </span>
             )}
           </div>
@@ -684,7 +815,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
         )}
         {!loading && s.result && (
           <div className="w-full min-w-0 overflow-hidden max-w-full">
-            <RichMarkdown content={injectCodeSnippets(s.result, s.code)} />
+            <RichMarkdown content={s.mode === "explain" ? s.result : injectCodeSnippets(s.result, s.code)} />
           </div>
         )}
       </div>

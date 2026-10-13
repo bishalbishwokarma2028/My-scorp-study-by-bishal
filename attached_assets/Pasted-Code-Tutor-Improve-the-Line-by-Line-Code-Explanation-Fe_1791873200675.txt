@@ -1,0 +1,30 @@
+Code Tutor – Improve the Line-by-Line Code Explanation Feature
+
+I am not satisfied with the current explanation provided by the Explain Code feature in Code Tutor.
+
+I want the system to explain code line by line, with a clear and easy-to-understand explanation for every single line. No line should be skipped or left unexplained, even when the code is very long.
+
+The following improvements are required:
+
+1. Highlight Every Line: Each line of code must be individually highlighted so that users can easily identify which line is being explained.
+
+2. Explain the Meaning of Each Line: Clearly explain what each line means and what it does.
+
+3. Explain the Purpose and Function: For every line, explain:
+   
+   - What does this line do?
+   - How does it work?
+   - Why is it needed?
+   - What is its purpose?
+   - Where and when is it used?
+   - Why is it important?
+
+4. Highlight Important Code Separately: If certain lines contain critical logic, core functionality, or the most important parts of the program, highlight them using a different color so they stand out from the other lines.
+
+5. Provide Detailed Explanations for Critical Code: For these important lines, provide a more detailed explanation of how they work, why they are essential, and how they affect the overall program.
+
+6. Make the Explanation Beginner-Friendly: Use simple, clear language so that even beginners can understand the code without difficulty.
+
+7. Maintain a Clear Line-by-Line Structure: Each code line should have its own corresponding explanation. The user should be able to identify the exact line being discussed without confusion.
+
+Most importantly, every single line of code must be explained individually without skipping anything. The goal is to help users understand not just what the code does, but also why each line exists, how it works, and what role it plays in the entire program. The explanation should be thorough, well-structured, visually clear, and easy to learn from.
