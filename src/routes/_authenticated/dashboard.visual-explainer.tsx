@@ -666,7 +666,7 @@ function VisualExplainerPage() {
         user_id: user.id,
         topic: s.topic.trim(),
         map_data: parsed as never,
-      });
+      }).then(() => undefined, () => undefined);
     } catch {
       toast.error("The diagram could not be generated. Please retry.");
     } finally {
@@ -753,7 +753,7 @@ function VisualExplainerPage() {
         <div className="card-soft flex flex-col items-center gap-3 py-16 text-center">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="text-sm font-semibold">Building your {diagramInfo?.icon} {diagramInfo?.label}…</p>
-          <p className="text-xs text-muted-foreground">AI is structuring the concept and writing explanations for each node</p>
+          <p className="text-xs text-muted-foreground">{slowLoading ? "This diagram is taking longer than usual; generation is still running." : "AI is structuring the concept and writing explanations for each node"}</p>
         </div>
       )}
 

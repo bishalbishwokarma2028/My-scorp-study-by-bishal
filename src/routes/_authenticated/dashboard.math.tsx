@@ -326,6 +326,7 @@ function MathPage() {
   });
   const { activeSubjectIdx, selectedTopic, mathData, section, provider, expandedExample } = ps;
   const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const activeSubject = MATH_SUBJECTS[activeSubjectIdx];
@@ -341,6 +342,8 @@ function MathPage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     set({ selectedTopic: topic, mathData: null, provider: null, section: "learn", expandedExample: 0 });
     setLoading(true);
+    setSlowLoading(false);
+    const slowTimer = window.setTimeout(() => setSlowLoading(true), 8_000);
     try {
       const result = await askAIJSON<unknown>(
         buildMathPrompt(topic, activeSubject.subject),
@@ -366,6 +369,8 @@ function MathPage() {
       toast.error("Failed to load topic. Please try again.");
       set({ selectedTopic: null });
     } finally {
+      window.clearTimeout(slowTimer);
+      setSlowLoading(false);
       setLoading(false);
     }
   }
@@ -386,7 +391,7 @@ function MathPage() {
         {loading ? (
           <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Loading {selectedTopic}…</p>
+            <p className="text-sm text-muted-foreground">{slowLoading ? `Still preparing ${selectedTopic}…` : `Loading ${selectedTopic}…`}</p>
           </div>
         ) : mathData ? (
             <div className="space-y-4">

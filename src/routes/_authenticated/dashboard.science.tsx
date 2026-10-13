@@ -485,6 +485,7 @@ function SciencePage() {
   });
   const { activeSubjectIdx, openChapter, selectedTopic, scienceData, provider } = ps;
   const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   const activeSubject = SCIENCE_SUBJECTS[activeSubjectIdx];
@@ -504,6 +505,8 @@ function SciencePage() {
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     set({ selectedTopic: topic, scienceData: null, provider: null });
     setLoading(true);
+    setSlowLoading(false);
+    const slowTimer = window.setTimeout(() => setSlowLoading(true), 8_000);
     try {
       const result = await askAIJSON<unknown>(
         buildSciencePrompt(topic, activeSubject.subject),
@@ -529,6 +532,8 @@ function SciencePage() {
       toast.error("Failed to load topic. Please try again.");
       set({ selectedTopic: null });
     } finally {
+      window.clearTimeout(slowTimer);
+      setSlowLoading(false);
       setLoading(false);
     }
   }
@@ -549,7 +554,7 @@ function SciencePage() {
         {loading ? (
           <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Loading {selectedTopic}…</p>
+            <p className="text-sm text-muted-foreground">{slowLoading ? `Still preparing ${selectedTopic}…` : `Loading ${selectedTopic}…`}</p>
           </div>
         ) : scienceData ? (
             <div className="space-y-4">

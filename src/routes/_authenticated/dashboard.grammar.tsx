@@ -412,7 +412,7 @@ function GrammarPage() {
         {loading ? (
           <div className="card-soft flex min-h-[300px] flex-col items-center justify-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Loading {selectedTopic.split(" — ")[0]}…</p>
+            <p className="text-sm text-muted-foreground">{slowLoading ? `Still preparing ${selectedTopic.split(" — ")[0]}…` : `Loading ${selectedTopic.split(" — ")[0]}…`}</p>
           </div>
         ) : grammarData ? (
             <div className="space-y-4">

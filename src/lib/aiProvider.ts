@@ -33,22 +33,23 @@ export async function askAIJSON<T>(
   history?: HistoryMsg[],
   preferLongAnswer?: boolean,
   maxTokens?: number,
-): Promise<{ data: T | null; provider: string }> {
+): Promise<{ data: T | null; provider: string; truncated?: boolean }> {
   const BASE_JSON_SYSTEM = "You MUST return only a single valid JSON object or array. Do NOT wrap it in markdown code fences. Do NOT include any prose, explanation, or comments — output the raw JSON only.";
+  const jsonSystem = systemPrompt || BASE_JSON_SYSTEM;
 
   // First attempt
-  const first = await askAI(prompt, systemPrompt || BASE_JSON_SYSTEM, history, preferLongAnswer, maxTokens);
+  const first = await askAI(prompt, jsonSystem, history, preferLongAnswer, maxTokens);
   if (first.provider === "none") {
     return { data: null, provider: "none" };
   }
-  if (first.provider !== "none") {
+  if (!first.truncated) {
     const parsed = extractJSON<T>(first.text);
     if (parsed !== null) return { data: parsed, provider: first.provider };
   }
 
-  // Retry with ultra-strict JSON instruction
-  const strictSystem = BASE_JSON_SYSTEM + "\n\nPREVIOUS ATTEMPT FAILED TO RETURN VALID JSON. THIS TIME output ONLY the raw JSON — no backticks, no markdown, no other text.";
+  // Preserve domain instructions on retry and require a complete, compact object.
+  const strictSystem = `${jsonSystem}\n\n${BASE_JSON_SYSTEM}\n\nThe previous response was invalid or cut off. Return one complete, compact object this time; do not omit required fields.`;
   const second = await askAI(prompt, strictSystem, history, preferLongAnswer, maxTokens);
   const parsed2 = extractJSON<T>(second.text);
-  return { data: parsed2, provider: second.provider || first.provider };
+  return { data: parsed2, provider: second.provider || first.provider, truncated: second.truncated };
 }

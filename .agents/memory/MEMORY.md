@@ -15,3 +15,4 @@
 - [HEIC upload support](heic-upload-support.md) — heic2any dynamic-imported client-side converts HEIC→JPEG before FileReader; wired into all image `<input type="file">` points
 - [LaTeX safety-net rendering](latex-safety-net.md) — AI models sometimes ignore anti-LaTeX prompts; convert raw LaTeX to plain-text math at render time, don't rely on prompting alone
 - [Popup-window PDF export pitfall](popup-window-print-export.md) — window.open() based print export is unreliable in iframe-proxied previews; print an in-page hidden node instead
+- [App-wide response-time target](response-time-target.md) — aim for 5–8 seconds across study tools where feasible; show progress for longer work

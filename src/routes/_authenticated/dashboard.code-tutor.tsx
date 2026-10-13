@@ -68,7 +68,6 @@ function numberedCode(code: string): string {
 function buildAnalyzePrompt(code: string, language: string, mode: Mode, targetLang: string, question: string): string {
   const lined = numberedCode(code);
   const header = `Language: ${language}\n\`\`\`\n${lined}\n\`\`\`\n\n`;
-  const lineCount = code.split("\n").length;
 
   switch (mode) {
     case "explain":
