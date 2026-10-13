@@ -8,7 +8,7 @@ import { extractJSON } from "./jsonExtract";
 const HistoryMsg = z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(1500) });
 
 const Input = z.object({
-  prompt: z.string().min(1).max(50000),
+  prompt: z.string().min(1).max(100000),
   systemPrompt: z.string().max(44000).optional(),
   history: z.array(HistoryMsg).max(6).optional(),
   /** When true: prioritize the long-answer OpenRouter model before other providers. */
@@ -32,7 +32,7 @@ function rotatedKeys(poolName: string, keys: string[]): string[] {
   return [...keys.slice(start), ...keys.slice(0, start)];
 }
 
-type Result = { text: string; provider: string; isIdentityAnswer?: boolean };
+type Result = { text: string; provider: string; isIdentityAnswer?: boolean; truncated?: boolean };
 type Turn = { role: "user" | "assistant" | "system"; content: string };
 
 const PROVIDER_REQUEST_TIMEOUT_MS = 8_000;
@@ -99,7 +99,13 @@ async function tryGroq(
     }
     const data = JSON.parse(body);
     const text = data?.choices?.[0]?.message?.content;
-    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
+    if (typeof text === "string" && text.trim()) {
+      return {
+        text,
+        provider: "Bishal's Assistant",
+        truncated: data?.choices?.[0]?.finish_reason === "length",
+      };
+    }
     return null;
   } catch {
     logProviderFailure("Groq", "network error");
@@ -143,7 +149,13 @@ async function tryOpenRouter(
     }
     const data = JSON.parse(body);
     const text = data?.choices?.[0]?.message?.content;
-    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
+    if (typeof text === "string" && text.trim()) {
+      return {
+        text,
+        provider: "Bishal's Assistant",
+        truncated: data?.choices?.[0]?.finish_reason === "length",
+      };
+    }
     return null;
   } catch {
     logProviderFailure("OpenRouter", "network error");
@@ -252,7 +264,13 @@ async function tryGemini(
     }
     const data = JSON.parse(body);
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (typeof text === "string" && text.trim()) return { text, provider: "Bishal's Assistant" };
+    if (typeof text === "string" && text.trim()) {
+      return {
+        text,
+        provider: "Bishal's Assistant",
+        truncated: data?.candidates?.[0]?.finishReason === "MAX_TOKENS",
+      };
+    }
     return null;
   } catch {
     logProviderFailure("Gemini", "network error");
@@ -702,7 +720,7 @@ export const askAIServer = createServerFn({ method: "POST" })
     }
 
     if (result) {
-      if (!hasHistory) cacheSet(data.prompt, result.text, result.provider);
+      if (!hasHistory && !result.truncated) cacheSet(data.prompt, result.text, result.provider);
       return result;
     }
 

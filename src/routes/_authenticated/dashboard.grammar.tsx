@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { usePageState } from "@/lib/pageState";
 import { Loader2, ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, XCircle, Send, MessageCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { askAI, extractJSON } from "@/lib/aiProvider";
+import { askAI, askAIJSON } from "@/lib/aiProvider";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { QUOTA_MESSAGE } from "@/lib/usageLimit.config";
 import { QuotaBadge, ProviderBadge } from "@/components/ai-ui";
@@ -117,50 +117,51 @@ const GRAMMAR_TOPICS = [
 ];
 
 function buildGrammarPrompt(topic: string): string {
-  return `You are an expert English teacher. Teach the grammar topic: "${topic}" in comprehensive detail.
-
-Return STRICT JSON only — no prose, no markdown fences, no text outside the JSON:
+  return `Teach the English grammar topic "${topic}" accurately and clearly. Focus on practical rules and examples; avoid repeated explanation.
+Return exactly one valid JSON object matching this schema, with no markdown, comments, or text outside the JSON:
 {
-  "topic": "${topic}",
-  "definition": "Clear, complete definition in 2-3 sentences explaining what this grammar element is",
-  "when_to_use": "Explain specifically when and why to use this grammar element (2-3 sentences with context)",
-  "structure": "The grammatical structure/pattern (e.g. 'Subject + had + past participle') or null if not applicable",
-  "rules": [
-    {"rule": "Rule name or description (short)", "explanation": "Full explanation of this rule with detail on exceptions and nuances (2-3 sentences)"},
-    {"rule": "Rule 2", "explanation": "Explanation 2"},
-    {"rule": "Rule 3", "explanation": "..."},
-    {"rule": "Rule 4", "explanation": "..."},
-    {"rule": "Rule 5", "explanation": "..."}
-  ],
-  "examples": [
-    {"sentence": "Clear example sentence demonstrating the rule", "explanation": "Why this is correct and what rule it demonstrates (2 sentences)", "incorrect": "The wrong version of this sentence (optional)"},
-    {"sentence": "Example 2 (different context or rule)", "explanation": "Explanation 2", "incorrect": "Wrong version"},
-    {"sentence": "Example 3 (advanced or complex use)", "explanation": "Explanation 3"},
-    {"sentence": "Example 4", "explanation": "Explanation 4"},
-    {"sentence": "Example 5 (real-world context)", "explanation": "Explanation 5"}
-  ],
-  "common_mistakes": [
-    {"wrong": "Incorrect version", "correct": "Corrected version", "explanation": "Why students make this mistake and how to remember the rule (2-3 sentences)"},
-    {"wrong": "Mistake 2", "correct": "Correct 2", "explanation": "Explanation 2"},
-    {"wrong": "Mistake 3", "correct": "Correct 3", "explanation": "Explanation 3"}
-  ],
-  "advanced_notes": [
-    "Advanced note 1: a nuance, exception, or advanced usage that most textbooks don't cover (2 sentences)",
-    "Advanced note 2: regional variation, formal/informal differences, or stylistic usage (2 sentences)",
-    "Advanced note 3: connection to other grammar topics or historical context if relevant"
-  ],
+  "topic": "...",
+  "definition": "A concise definition",
+  "when_to_use": "When and why this grammar is used",
+  "structure": "A grammar pattern, or null when not applicable",
+  "rules": [{"rule": "...", "explanation": "A clear, concise explanation with important exceptions"}],
+  "examples": [{"sentence": "...", "explanation": "Why the example is correct", "incorrect": "Optional common incorrect version"}],
+  "common_mistakes": [{"wrong": "...", "correct": "...", "explanation": "Why this mistake happens and how to avoid it"}],
+  "advanced_notes": ["A useful nuance or exception"],
   "exercise": {
-    "instruction": "Clear exercise instruction (e.g. 'Correct the error in each sentence' or 'Fill in the blank with the correct form')",
-    "questions": [
-      {"question": "Exercise question or sentence", "answer": "Correct answer", "hint": "Short helpful hint"},
-      {"question": "Question 2", "answer": "Answer 2", "hint": "Hint 2"},
-      {"question": "Question 3", "answer": "Answer 3"},
-      {"question": "Question 4", "answer": "Answer 4"},
-      {"question": "Question 5", "answer": "Answer 5"},
-      {"question": "Question 6 (harder)", "answer": "Answer 6", "hint": "Hint 6"}
-    ]
+    "instruction": "What to do",
+    "questions": [{"question": "...", "answer": "...", "hint": "Optional short hint"}]
   }
-}`;
+}
+Provide 4-5 rules, 4-5 varied examples, 3 common mistakes, up to 3 useful advanced notes, and 5-6 exercise questions. Keep each explanation focused. Ensure every answer matches the named topic and the JSON is complete.`;
+}
+
+function isGrammarData(value: unknown): value is GrammarData {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  const isString = (item: unknown) => typeof item === "string";
+  const isStringArray = (item: unknown) => Array.isArray(item) && item.every(isString);
+  const hasStringFields = (item: unknown, fields: string[]) =>
+    Boolean(item) && typeof item === "object" &&
+    fields.every((field) => isString((item as Record<string, unknown>)[field]));
+  const exercise = data.exercise;
+  if (!exercise || typeof exercise !== "object") return false;
+  const exerciseData = exercise as Record<string, unknown>;
+
+  return isString(data.topic) && isString(data.definition) && isString(data.when_to_use) &&
+    (isString(data.structure) || data.structure === null) &&
+    Array.isArray(data.rules) && data.rules.length > 0 &&
+    data.rules.every((item) => hasStringFields(item, ["rule", "explanation"])) &&
+    Array.isArray(data.examples) && data.examples.length > 0 &&
+    data.examples.every((item) => hasStringFields(item, ["sentence", "explanation"]) &&
+      (!(item as Record<string, unknown>).incorrect || isString((item as Record<string, unknown>).incorrect))) &&
+    Array.isArray(data.common_mistakes) && data.common_mistakes.length > 0 &&
+    data.common_mistakes.every((item) => hasStringFields(item, ["wrong", "correct", "explanation"])) &&
+    isStringArray(data.advanced_notes) &&
+    isString(exerciseData.instruction) &&
+    Array.isArray(exerciseData.questions) && exerciseData.questions.length > 0 &&
+    exerciseData.questions.every((item) => hasStringFields(item, ["question", "answer"]) &&
+      (!(item as Record<string, unknown>).hint || isString((item as Record<string, unknown>).hint)));
 }
 
 function ExerciseItem({ q, index }: { q: GrammarData["exercise"]["questions"][0]; index: number }) {
@@ -238,11 +239,22 @@ FORMATTING RULES (strict):
 - Break your answer into short paragraphs or a numbered/bulleted list. Never write a big wall of unbroken text.
 - Use *italics* for example sentences or words being discussed, to set them apart from the explanation.
 - NEVER output raw HTML tags like <br>, <b>, <div> — use plain markdown (blank lines for new paragraphs, ** for bold) instead.`;
-    const history = msgsWithUser.slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
-    const res = await askAI(text, system, history, true);
-    await bump();
-    setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
-    setLoading(false);
+    const history = msgsWithUser.slice(0, -1).slice(-6).map(m => ({ role: m.role, content: m.content.slice(0, 1500) }));
+    try {
+      const res = await askAI(text, system, history, true);
+      if (res.provider === "none") {
+        toast.error("The AI service is unavailable. Your question is ready to retry.");
+        setAs({ messages, input: text });
+        return;
+      }
+      await bump();
+      setAs({ messages: [...msgsWithUser, { role: "assistant", content: res.text }] });
+    } catch {
+      toast.error("The answer could not be loaded. Your question is ready to retry.");
+      setAs({ messages, input: text });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -325,11 +337,13 @@ function GrammarPage() {
     selectedTopic:   null as string | null,
     selectedCategory: "",
     grammarData:     null as GrammarData | null,
+    topicCache:      {} as Record<string, { data: GrammarData; provider: string | null }>,
     activeSection:   "learn" as "learn" | "practice",
     provider:        null as string | null,
   });
   const { openCategories, selectedTopic, selectedCategory, grammarData, activeSection, provider } = ps;
   const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
 
   function toggleCategory(cat: string) {
@@ -338,15 +352,46 @@ function GrammarPage() {
 
   async function selectTopic(topic: string, category: string) {
     if (topic === selectedTopic) return;
+    const cacheKey = `${category}:${topic}`;
+    const cached = ps.topicCache?.[cacheKey];
+    if (cached) {
+      set({ selectedTopic: topic, selectedCategory: category, grammarData: cached.data, provider: cached.provider, activeSection: "learn" });
+      return;
+    }
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
     set({ selectedTopic: topic, selectedCategory: category, grammarData: null, activeSection: "learn" });
     setLoading(true);
-    const res = await askAI(buildGrammarPrompt(topic), "Return ONLY valid JSON — no markdown, no prose.", undefined, true);
-    set({ provider: res.provider });
-    await bump();
-    const parsed = extractJSON<GrammarData>(res.text);
-    if (parsed) { set({ grammarData: parsed }); } else { toast.error("Could not load topic — please try again"); set({ selectedTopic: null }); }
-    setLoading(false);
+    setSlowLoading(false);
+    const slowTimer = window.setTimeout(() => setSlowLoading(true), 8_000);
+    try {
+      const result = await askAIJSON<unknown>(
+        buildGrammarPrompt(topic),
+        "You are an accurate English grammar teacher. Return one valid JSON object matching the supplied schema.",
+        undefined,
+        true,
+        3_500,
+      );
+      if (result.provider === "none" || !isGrammarData(result.data)) {
+        toast.error(result.provider === "none" ? "The AI service is unavailable. Please retry this topic." : "The lesson response was incomplete. Please retry this topic.");
+        set({ selectedTopic: null });
+        return;
+      }
+
+      const entries = Object.entries(ps.topicCache ?? {}).filter(([key]) => key !== cacheKey);
+      const topicCache = Object.fromEntries([
+        ...entries,
+        [cacheKey, { data: result.data, provider: result.provider }],
+      ].slice(-12));
+      set({ grammarData: result.data, provider: result.provider, topicCache });
+      await bump();
+    } catch {
+      toast.error("Failed to load topic. Please try again.");
+      set({ selectedTopic: null });
+    } finally {
+      window.clearTimeout(slowTimer);
+      setSlowLoading(false);
+      setLoading(false);
+    }
   }
 
   const cat = GRAMMAR_TOPICS.find(g => g.topics.some(t => t === selectedTopic));

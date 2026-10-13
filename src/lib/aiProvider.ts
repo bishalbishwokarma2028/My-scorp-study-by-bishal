@@ -3,7 +3,7 @@ import { extractJSON } from "./jsonExtract";
 
 export { extractJSON } from "./jsonExtract";
 
-export type AIResult = { text: string; provider: string; isIdentityAnswer?: boolean };
+export type AIResult = { text: string; provider: string; isIdentityAnswer?: boolean; truncated?: boolean };
 export type HistoryMsg = { role: "user" | "assistant"; content: string };
 
 export async function askAI(

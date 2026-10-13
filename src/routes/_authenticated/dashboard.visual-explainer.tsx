@@ -41,8 +41,18 @@ function isValidDiagram(data: unknown): data is DiagramData {
   const d = data as Record<string, unknown>;
   if (d.type === "mindmap") {
     const branches = d.branches;
-    return Array.isArray(branches) && branches.length > 0 &&
-      branches.every((b) => b && typeof b === "object" && typeof (b as Record<string, unknown>).label === "string" && Array.isArray((b as Record<string, unknown>).items));
+    return typeof d.center === "string" && typeof d.centerExplanation === "string" &&
+      Array.isArray(branches) && branches.length >= 5 && branches.length <= 6 &&
+      branches.every((branch) => {
+        if (!branch || typeof branch !== "object") return false;
+        const item = branch as Record<string, unknown>;
+        return typeof item.label === "string" && typeof item.color === "string" &&
+          typeof item.explanation === "string" && Array.isArray(item.items) &&
+          item.items.length >= 1 && item.items.length <= 3 &&
+          item.items.every((sub) => sub && typeof sub === "object" &&
+            typeof (sub as Record<string, unknown>).label === "string" &&
+            typeof (sub as Record<string, unknown>).explanation === "string");
+      });
   }
   if (d.type === "flowchart") {
     const nodes = d.nodes, edges = d.edges;
@@ -476,28 +486,29 @@ function buildPrompt(topic: string, type: DiagramType): string {
   if (type === "mindmap") {
     return `Generate a comprehensive educational mind map for: "${topic}"
 
-${rule}
+Return one complete, valid JSON object only. Keep every explanation to 1-2 useful sentences so the map is fast to generate and every branch fits. Labels must be short and concrete.
 {
   "type": "mindmap",
   "center": "Short topic label (max 16 chars)",
-  "centerExplanation": "5-6 sentences explaining the overall topic in simple, educational terms for a student.",
+  "centerExplanation": "Two concise sentences explaining the topic.",
   "branches": [
     {
       "label": "Branch Name",
       "color": "#6366f1",
-      "explanation": "5-6 sentences explaining what this branch represents and why it matters.",
+      "explanation": "One or two sentences explaining this branch.",
       "items": [
-        { "label": "Sub-item", "explanation": "5-6 sentences explaining this specific sub-concept clearly." }
+        { "label": "Sub-item", "explanation": "One concise sentence explaining this sub-concept." },
+        { "label": "Second item", "explanation": "One concise sentence with a useful fact or example." },
+        { "label": "Third item", "explanation": "One concise sentence connecting it to the topic." }
       ]
     }
   ]
 }
 Requirements:
-- Exactly 5-6 branches
-- 3-4 items per branch
+- Exactly 6 branches and exactly 3 items per branch
 - Branch labels max 12 chars, item labels max 13 chars
 - Use these branch colors in order: "#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6"
-- Every explanation must be genuinely educational and 5-6 complete sentences`;
+- Every explanation must be accurate, useful, concise, and complete`;
   }
 
   if (type === "flowchart") {
@@ -589,6 +600,7 @@ function VisualExplainerPage() {
   });
 
   const [loading, setLoading]   = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const [selected, setSelected] = useState<SelectedNode | null>(null);
   const svgRef = useRef<HTMLDivElement>(null);
   const { quota, quotaLoading, bump } = useUsageLimit(user.id, "cerebras");
@@ -615,39 +627,53 @@ function VisualExplainerPage() {
   async function generate() {
     if (!s.topic.trim()) return toast.error("Enter a topic first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setLoading(true); set({ diagram: null }); setSelected(null);
+    setLoading(true);
+    setSlowLoading(false);
+    set({ diagram: null });
+    setSelected(null);
+    const slowTimer = window.setTimeout(() => setSlowLoading(true), 8_000);
     const prompt = buildPrompt(s.topic.trim(), s.diagramType);
+    const maxTokens = s.diagramType === "mindmap" ? 1_800 : 6_000;
 
-    let parsed: DiagramData | null = null;
-    let prov = "";
-    // Up to 3 attempts total — extra resilience for the more complex
-    // Concept Web schema, which occasionally comes back malformed.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const result = await askAIJSON<DiagramData>(
-        attempt === 0 ? prompt : `${prompt}\n\nIMPORTANT: Your previous attempt returned invalid or incomplete JSON. Double-check every bracket, comma, and quote before responding. Output ONLY the raw JSON object.`,
-        undefined, undefined, true,
-      );
-      prov = result.provider || prov;
-      if (result.data && isValidDiagram(result.data)) {
-        parsed = result.data;
-        break;
+    try {
+      let result = await askAIJSON<unknown>(prompt, undefined, undefined, false, maxTokens);
+      let provider = result.provider;
+      let parsed: DiagramData | null = result.data && isValidDiagram(result.data) ? result.data : null;
+
+      // JSON parsing already retries once; only retry once more if valid JSON had the wrong diagram shape.
+      if (!parsed && result.provider !== "none" && result.data) {
+        result = await askAIJSON<unknown>(
+          `${prompt}\n\nThe previous response had the wrong data shape. Return the same lesson as valid JSON matching the exact schema; keep explanations concise.`,
+          undefined,
+          undefined,
+          false,
+          maxTokens,
+        );
+        provider = result.provider || provider;
+        parsed = result.data && isValidDiagram(result.data) ? result.data : null;
       }
-    }
 
-    set({ provider: prov });
-    await bump();
-    if (!parsed) {
-      toast.error("Couldn't generate diagram — please try again or rephrase your topic");
-    } else {
+      set({ provider });
+      if (!parsed || provider === "none") {
+        toast.error(provider === "none" ? "The AI service is unavailable. Please retry the diagram." : "The diagram response was incomplete. Please retry or simplify the topic.");
+        return;
+      }
+
       set({ diagram: parsed });
+      await bump();
       // Save to mindmaps history (non-blocking)
-      supabase.from("mindmaps").insert({
+      void supabase.from("mindmaps").insert({
         user_id: user.id,
         topic: s.topic.trim(),
         map_data: parsed as never,
-      }).then(() => {});
+      });
+    } catch {
+      toast.error("The diagram could not be generated. Please retry.");
+    } finally {
+      window.clearTimeout(slowTimer);
+      setSlowLoading(false);
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function downloadSVG() {

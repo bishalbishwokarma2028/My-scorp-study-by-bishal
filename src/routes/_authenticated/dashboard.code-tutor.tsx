@@ -81,13 +81,10 @@ function buildAnalyzePrompt(code: string, language: string, mode: Mode, targetLa
 (Explain every import/include/require — what library it is and why it is needed)
 
 ## 🔢 Line-by-Line Walkthrough
-Go through ALL ${lineCount} lines in order. For every meaningful line or logical block, write:
-**Line X** (or **Lines X–Y**): [exactly what this line does, why it is written this way, what would happen if it were missing or wrong]
-
-Do NOT skip any line. Even blank lines or closing braces should be briefly mentioned when relevant.
+Cover the full program in order. Group adjacent statements into logical blocks and cite exact line ranges. Skip blank lines and brace-only lines; do not repeat explanations for similar statements.
 
 ## 🧠 Key Concepts Explained
-(List every programming concept used — loops, functions, data structures, algorithms, OOP, recursion, etc. — and explain each one from scratch as if the reader never heard of it)
+(Explain the important concepts used and connect each one to the code. Keep each explanation concise.)
 
 ## 🔄 Data Flow & Execution Order
 (Trace how data moves through the program from start to finish with a real example input)
@@ -95,21 +92,13 @@ Do NOT skip any line. Even blank lines or closing braces should be briefly menti
 ## ✅ What the Output Will Be
 (Show exactly what the program prints/returns for a sample input, step by step)
 
-Be thorough. This explanation should be complete enough that someone who has never coded can follow every step.`;
+Be clear and complete, but concise enough to finish. Do not repeat the same point in multiple sections.`;
 
     case "debug":
       return `${header}You are an expert ${language} debugger. Examine EVERY SINGLE LINE of this code. Use the line numbers shown above.
 
-## 🔍 Line-by-Line Scan
-Go through every line and classify it:
-- ✅ Correct
-- ⚠️ Warning / bad practice
-- ❌ Bug
-
-Format as a table:
-| Line | Code | Status | Note |
-|------|------|--------|------|
-(fill for every line — even correct ones get ✅)
+## 🔍 Review
+Inspect the full file. Summarize clean sections by line range; list meaningful warnings and bugs with exact line references. Do not produce a row for every correct or blank line.
 
 ## 🐛 Bugs Found (Detailed)
 For each ❌ bug found:
@@ -132,7 +121,7 @@ For each ❌ bug found:
 - Severity: [Critical / Major / Minor]
 - [1-sentence conclusion]
 
-Be exhaustive — a missed bug is a failure.`;
+Be systematic and complete, but keep the answer focused on actionable findings and fixes.`;
 
     case "fix":
       return `${header}You are an expert ${language} engineer. Find and fix EVERY issue in this code. Use the line numbers shown above.
@@ -468,6 +457,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
   });
 
   const [loading,  setLoading]  = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
   const [editMode, setEditMode] = useState(true);
 
   const selectedMode = MODES.find(m => m.id === s.mode)!;
@@ -477,16 +467,67 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
   async function analyze() {
     if (!s.code.trim()) return toast.error("Paste some code first");
     if (quota && quota.remaining <= 0) return toast.error(QUOTA_MESSAGE);
-    setLoading(true); set({ result: null });
-    setEditMode(false);
-
     const prompt = buildAnalyzePrompt(s.code, s.language, s.mode, s.targetLang, s.question);
-    const res = await askAI(prompt,
-      `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. You give deep, line-by-line explanations referencing exact line numbers from the numbered code provided. Every explanation starts from the very first line. You never skip lines. You explain every concept from scratch. Use markdown with code blocks. Be thorough and educational.`,
-      undefined, true);
-    set({ provider: res.provider, result: res.text });
-    await bump();
-    setLoading(false);
+    if (prompt.length > 100_000) {
+      return toast.error("This code is too large to analyze in one request. Split it into smaller related sections and try again.");
+    }
+
+    const systemPrompt = `You are Bishal's Code Tutor — an expert ${s.language} programming tutor. Analyze the entire supplied code and reference exact line numbers or ranges. Group related lines to keep the response complete and readable. Use markdown. Finish every requested section and close every code block. If space is tight, shorten the explanation rather than omit required corrected code.`;
+    const maxTokens = Math.min(23_000, Math.max(7_000, Math.ceil(s.code.length / 2.8) + 4_000));
+    setLoading(true);
+    setSlowLoading(false);
+    set({ result: null });
+    setEditMode(false);
+    const slowTimer = window.setTimeout(() => setSlowLoading(true), 8_000);
+
+    try {
+      const first = await askAI(prompt, systemPrompt, undefined, true, maxTokens);
+      if (first.provider === "none") {
+        toast.error("The AI service is unavailable. Your code is ready to retry.");
+        set({ provider: null, result: null });
+        setEditMode(true);
+        return;
+      }
+
+      let answer = first.text;
+      let truncated = first.truncated === true;
+      let continuationFailed = false;
+      for (let attempt = 0; truncated && attempt < 2; attempt++) {
+        const continuation = await askAI(
+          `Continue the previous Code Tutor response from exactly where it was cut off. Do not repeat earlier sections. Finish all remaining analysis and any code block, then end with a clear conclusion.\n\nEnd of the partial response:\n${answer.slice(-2_200)}`,
+          systemPrompt,
+          undefined,
+          true,
+          8_000,
+        );
+        if (continuation.provider === "none") {
+          continuationFailed = true;
+          break;
+        }
+        answer = `${answer.trimEnd()}\n${continuation.text.trimStart()}`;
+        truncated = continuation.truncated === true;
+      }
+
+      if (truncated || continuationFailed) {
+        toast.error("The response could not be completed safely. Split this file into smaller sections and retry.");
+        set({
+          provider: first.provider,
+          result: "I could not complete this analysis without risking a partial answer. Please split the code into smaller related sections and run the analysis again.",
+        });
+        setEditMode(true);
+        return;
+      }
+
+      set({ provider: first.provider, result: answer });
+      await bump();
+    } catch {
+      toast.error("The analysis failed. Your code is ready to retry.");
+      setEditMode(true);
+    } finally {
+      window.clearTimeout(slowTimer);
+      setSlowLoading(false);
+      setLoading(false);
+    }
   }
 
   function reset() {
@@ -610,7 +651,7 @@ function AnalyzeTab({ quota, bump }: { quota: ReturnType<typeof useUsageLimit>["
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Bishal's Code Tutor is analyzing…</p>
-            <p className="text-xs text-muted-foreground">Doing a deep line-by-line analysis…</p>
+            <p className="text-xs text-muted-foreground">{slowLoading ? "This large analysis is taking longer than usual; the request is still running." : "Checking the code and preparing a complete answer…"}</p>
           </div>
         )}
         {!loading && !s.result && (
